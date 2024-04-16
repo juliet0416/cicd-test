@@ -189,7 +189,7 @@ jobs:
         uses: samuelmeuli/action-electron-builder@v1
         with:
           package_root: ${{ secrets.REPO_FRONT_PATH }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.ACCESS_TOKEN }}
           mac_certs: ${{ secrets.MAC_CERTS }}
           mac_certs_password: ${{ secrets.MAC_CERTS_PASSWORD }}
           skip_build: true
