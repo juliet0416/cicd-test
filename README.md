@@ -1,2 +1,2 @@
 # cicd-test
-cicd-test
+test
