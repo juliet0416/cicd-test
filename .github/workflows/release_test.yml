@@ -13,20 +13,20 @@ jobs:
         include:
           - os: macos-latest
             arch: x86_64
-            file_name: "${{ secrets.CDN_URL }}/${{ secrets.TEST_BUCKET_NAME }}/${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}.dmg"
+            file_name: "Test-99.0.${{ github.run_id }}.dmg"
             file_extension: ".dmg"
             build_arg: "--mac --x64"
           - os: windows-latest
             file_extension: ".exe"
-            file_name: "${{ secrets.CDN_URL }}/${{ secrets.TEST_BUCKET_NAME }}/${{ secrets.TEST_PRODUCT_NAME }}%20Setup%2099.0.${{ github.run_id }}.exe"
+            file_name: "Test%20Setup%2099.0.${{ github.run_id }}.exe"
             build_arg: "--win --x64"
           - os: macos-latest
             arch: arm64
-            file_name: "${{ secrets.CDN_URL }}/${{ secrets.TEST_BUCKET_NAME }}/${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}-arm64.dmg"
+            file_name: "Test-99.0.${{ github.run_id }}-arm64.dmg"
             file_extension: ".dmg"
             build_arg: "--mac --arm64"
           - os: ubuntu-latest
-            file_name: "${{ secrets.CDN_URL }}/${{ secrets.TEST_BUCKET_NAME }}/${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}.AppImage"
+            file_name: "Test-99.0.${{ github.run_id }}.AppImage"
             file_extension: ".AppImage"
             build_arg: "--linux"
     runs-on: ${{ matrix.os }}
