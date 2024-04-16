@@ -39,6 +39,7 @@ jobs:
           repository: ${{ secrets.REPO_URL }}
           ref: ${{ secrets.TEST_REPO_BRANCH }}
           path: ${{ secrets.REPO_PATH }}
+          token: ${{ secrets.ACCESS_TOKEN }}
 
 
       # Output basic information
