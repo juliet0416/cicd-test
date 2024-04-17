@@ -240,7 +240,7 @@ jobs:
       # 上传到OSS
       - name: Upload to OSS
         run: |
-          ossutil cp -rf --acl=public-read ./oss_temp_file/ oss://${{ secrets.TEST_BUCKET_NAME }}/99.0.${{ github.run_id }}/
+          ossutil cp -rf --acl=public-read ./oss_temp_file/ oss://${{ secrets.TEST_BUCKET_NAME }}/
 
 
       # 发送到DingTalk
