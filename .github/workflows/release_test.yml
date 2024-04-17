@@ -4,6 +4,12 @@ on:
   push:
     branches:
     - "release_test"
+  workflow_dispatch:
+    inputs:
+      logLevel:
+        description: 'Log level'
+        required: true
+        default: 'warning'
 
 jobs:
   release:
