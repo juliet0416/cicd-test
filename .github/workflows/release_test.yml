@@ -175,6 +175,7 @@ jobs:
       - name: Build FE Static
         run: |
           cd ${{ secrets.REPO_FRONT_PATH }} 
+          yarn
           cd src/main
           yarn
           yarn run build
