@@ -178,7 +178,7 @@ jobs:
           yarn
           cd src/main
           yarn
-          yarn run build
+          yarn run build:test
           cp -r electron ../../static
       
 
