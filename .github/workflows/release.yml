@@ -1,4 +1,4 @@
-name: Build Test Client
+name: Build Release Client
 
 on:
   workflow_dispatch:
