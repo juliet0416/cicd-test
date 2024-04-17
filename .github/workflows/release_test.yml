@@ -13,20 +13,20 @@ jobs:
         include:
           - os: macos-latest
             arch: x86_64
-            file_name: "Test-Latest.dmg"
+            file_name: "Latest.dmg"
             file_extension: ".dmg"
             build_arg: "--mac --x64"
           - os: windows-latest
             file_extension: ".exe"
-            file_name: "Test-Latest.exe"
+            file_name: "Latest.exe"
             build_arg: "--win --x64"
           - os: macos-latest
             arch: arm64
-            file_name: "Test-Latest-arm64.dmg"
+            file_name: "Latest-arm64.dmg"
             file_extension: ".dmg"
             build_arg: "--mac --arm64"
           - os: ubuntu-latest
-            file_name: "Test-Latest.AppImage"
+            file_name: "Latest.AppImage"
             file_extension: ".AppImage"
             build_arg: "--linux"
     runs-on: ${{ matrix.os }}
@@ -228,8 +228,9 @@ jobs:
         run: |
           for file in ./oss_temp_file/*; do
             filename=$(basename $file)
-            ossutil cp -rf --acl=public-read $file oss://${{ secrets.TEST_BUCKET_NAME }}/${{ matrix.file_name }}
+            ossutil cp -rf --acl=public-read $file oss://${{ secrets.TEST_BUCKET_NAME }}/${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.file_name }}
           done
+        shell: bash
 
       # 发送到DingTalk
       - name: Send dingtalk message
@@ -239,6 +240,6 @@ jobs:
           msgtype: markdown
           content: |
             {
-              "title": "${{ matrix.file_name }}-打包完成通知",
-              "text": "# ${{ matrix.file_name }}-打包完成通知\n ![bang](https://oss.sqlgpt.cn/static/bang100.gif)\n ###  任务id：[${{ github.run_id }}](https://github.com/juliet0416/cicd-test/actions/runs/${{ github.run_id }})\n ### 下载地址：[${{matrix.os}}](${{secrets.CDN_URL}}/test/${{ matrix.file_name }})"
+              "title": "${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.file_name }}-打包完成通知",
+              "text": "# ${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.file_name }}-打包完成通知\n ###  任务id：[${{ github.run_id }}](https://github.com/juliet0416/cicd-test/actions/runs/${{ github.run_id }})\n ### 下载地址：[${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.file_name }}](${{secrets.CDN_URL}}/test/${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.file_name }})"
             }
