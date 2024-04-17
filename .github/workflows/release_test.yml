@@ -163,7 +163,7 @@ jobs:
 
       - name: MVN Build plugins2
         run: |
-          mvn clean install -B '-Dmaven.test.skip=true' -f ${{ secrets.REPO_PKG_POM_PATH }}
+          mvn clean install -B '-Dmaven.test.skip=true' -f ${{ github.workspace }}/${{ secrets.REPO_PKG_POM_PATH }}
 
       # 打包后端工程 & 发送到前端
       - name: Build BE Static
