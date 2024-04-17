@@ -208,9 +208,9 @@ jobs:
           skip_build: true
           args: >
             -c.appId=${{ secrets.APP_ID }}
-            -c.productName=\"${{ secrets.PRODUCT_NAME }}\"
-            -c.win.publisherName=\"${{ secrets.PRODUCT_NAME }}\"
-            -c.nsis.shortcutName=\"${{ secrets.PRODUCT_NAME }}\"
+            -c.productName="${{ secrets.PRODUCT_NAME }}"
+            -c.win.publisherName="${{ secrets.PRODUCT_NAME }}"
+            -c.nsis.shortcutName="${{ secrets.PRODUCT_NAME }}"
             -c.extraMetadata.version=${{ github.event.inputs.version }}
             ${{ matrix.build_arg }}
 
@@ -244,8 +244,8 @@ jobs:
         if: matrix.os == 'macos-latest' && matrix.arch == 'x86_64'
         run: |
           ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.dmg" "oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/"
-      #          ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.zip" "oss://${{ secrets.BUCKET_NAME }}/download/latest/mac/x64/"
-      #          ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.zip.blockmap" "oss://${{ secrets.BUCKET_NAME }}/download/latest/mac/x64/"
+          ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.zip" "oss://${{ secrets.BUCKET_NAME }}/download/latest/mac/x64/"
+          ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.zip.blockmap" "oss://${{ secrets.BUCKET_NAME }}/download/latest/mac/x64/"
       #          ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/latest-mac.yml" "oss://${{ secrets.BUCKET_NAME }}/download/latest/mac/x64/"
       #          ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.dmg" "oss://${{ secrets.BUCKET_NAME }}/download/latest/${{ secrets.PRODUCT_APP_NAME }}-latest.dmg"
 
@@ -253,8 +253,8 @@ jobs:
         if: matrix.os == 'macos-latest' && matrix.arch == 'arm64'
         run: |
           ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg" "oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/"
-      #          ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.zip" "oss://${{ secrets.BUCKET_NAME }}/download/latest/mac/arm64/"
-      #          ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.zip.blockmap" "oss://${{ secrets.BUCKET_NAME }}/download/latest/mac/arm64/"
+          ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.zip" "oss://${{ secrets.BUCKET_NAME }}/download/latest/mac/arm64/"
+          ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.zip.blockmap" "oss://${{ secrets.BUCKET_NAME }}/download/latest/mac/arm64/"
       #          ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/latest-mac.yml" "oss://${{ secrets.BUCKET_NAME }}/download/latest/mac/arm64/"
       #          ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg" "oss://${{ secrets.BUCKET_NAME }}/download/latest/${{ secrets.PRODUCT_APP_NAME }}-arm64-latest.dmg"
 
@@ -262,15 +262,13 @@ jobs:
         if: matrix.os == 'windows-latest'
         run: |
           ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe" "oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/"
-      #          ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe" "oss://${{ secrets.BUCKET_NAME }}/download/latest/windows/"
-      #          ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/latest.yml" "oss://${{ secrets.BUCKET_NAME }}/download/latest/windows/"
-      #          ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe" "oss://${{ secrets.BUCKET_NAME }}/download/latest/${{ secrets.PRODUCT_APP_NAME }}-latest.exe"
+          ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/latest.yml" "oss://${{ secrets.BUCKET_NAME }}/download/latest/windows/"
 
       - name: Upload to OSS for linux
         if: matrix.os == 'ubuntu-latest'
         run: |
           ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.AppImage" "oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/"
-      #          ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.AppImage" "oss://${{ secrets.BUCKET_NAME }}/download/latest/linux/"
+          ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.AppImage" "oss://${{ secrets.BUCKET_NAME }}/download/latest/linux/"
       #          ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/latest-linux-arm64.yml" "oss://${{ secrets.BUCKET_NAME }}/download/latest/linux/"
       #          ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.AppImage" "oss://${{ secrets.BUCKET_NAME }}/download/latest/${{ secrets.PRODUCT_APP_NAME }}-latest.AppImage"
 
