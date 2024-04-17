@@ -188,7 +188,6 @@ jobs:
           cd ${{ secrets.REPO_FRONT_PATH }}
           yarn run build:web:desktop --app_version=99.0.${{ github.run_id }} --app_port=11922
           cp -r dist ./static/
-          rm -r dist
 
       # 打包Electron
       - name: Build/release Electron app
