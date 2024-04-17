@@ -208,11 +208,11 @@ jobs:
           skip_build: true
           args: >
             -c.appId=${{ secrets.APP_ID }}
-            -c.productName='${{ secrets.PRODUCT_NAME }}'
-            -c.win.publisherName='${{ secrets.PRODUCT_NAME }}'
-            -c.nsis.shortcutName='${{ secrets.PRODUCT_NAME }}'
+            -c.productName=\"${{ secrets.PRODUCT_NAME }}\"
+            -c.win.publisherName=\"${{ secrets.PRODUCT_NAME }}\"
+            -c.nsis.shortcutName=\"${{ secrets.PRODUCT_NAME }}\"
             -c.extraMetadata.version=${{ github.event.inputs.version }}
-            ${{ matrix.build_arg}}
+            ${{ matrix.build_arg }}
 
       # 公证&签名 Mac App
       - name: Notarize MacOS x86_64 App
