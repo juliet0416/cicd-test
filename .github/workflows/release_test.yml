@@ -13,20 +13,20 @@ jobs:
         include:
           - os: macos-latest
             arch: x86_64
-            file_name: "Test-99.0.${{ github.run_id }}.dmg"
+            file_name: "Test-Latest.dmg"
             file_extension: ".dmg"
             build_arg: "--mac --x64"
           - os: windows-latest
             file_extension: ".exe"
-            file_name: "Test%20Setup%2099.0.${{ github.run_id }}.exe"
+            file_name: "Test-Latest.exe"
             build_arg: "--win --x64"
           - os: macos-latest
             arch: arm64
-            file_name: "Test-99.0.${{ github.run_id }}-arm64.dmg"
+            file_name: "Test-Latest-arm64.dmg"
             file_extension: ".dmg"
             build_arg: "--mac --arm64"
           - os: ubuntu-latest
-            file_name: "Test-99.0.${{ github.run_id }}.AppImage"
+            file_name: "Test-Latest.AppImage"
             file_extension: ".AppImage"
             build_arg: "--linux"
     runs-on: ${{ matrix.os }}
@@ -186,7 +186,7 @@ jobs:
       - name: Prepare Build Electron
         run: |
           cd ${{ secrets.REPO_FRONT_PATH }}
-          yarn run build:web:desktop --app_version=99.0.${{ github.run_id }} --app_port=${{ secrets.TEST_REPO_PORT }}
+          yarn run build:web:desktop --app_version=99.0.${{ github.run_id }} --app_port=11922
           cp -r dist ./static/
           rm -r dist
 
@@ -240,7 +240,7 @@ jobs:
       # 上传到OSS
       - name: Upload to OSS
         run: |
-          ossutil cp -rf --acl=public-read ./oss_temp_file/ oss://${{ secrets.TEST_BUCKET_NAME }}/
+          ossutil cp -rf --acl=public-read ./oss_temp_file/ oss://${{ secrets.TEST_BUCKET_NAME }}/${{ matrix.file_name }}
 
 
       # 发送到DingTalk
@@ -251,6 +251,6 @@ jobs:
           msgtype: markdown
           content: |
             {
-              "title": "${{ matrix.os }}-${{ secrets.TEST_BUCKET_NAME }}-打包完成通知",
-              "text": "# ${{ matrix.os }}-${{ secrets.TEST_BUCKET_NAME }}-打包完成通知\n ![bang](https://oss.sqlgpt.cn/static/bang100.gif)\n ###  任务id：[${{ github.run_id }}](https://github.com/juliet0416/cicd-test/actions/runs/${{ github.run_id }})\n ### 下载地址：[${{matrix.os}}](${{secrets.CDN_URL}}/test/${{ github.run_id }})"
+              "title": "${{ matrix.file_name }}-打包完成通知",
+              "text": "# ${{ matrix.file_name }}-打包完成通知\n ![bang](https://oss.sqlgpt.cn/static/bang100.gif)\n ###  任务id：[${{ github.run_id }}](https://github.com/juliet0416/cicd-test/actions/runs/${{ github.run_id }})\n ### 下载地址：[${{matrix.os}}](${{secrets.CDN_URL}}/test/${{ matrix.file_name }})"
             }
