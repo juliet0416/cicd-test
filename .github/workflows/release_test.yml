@@ -175,7 +175,6 @@ jobs:
       - name: Build FE Static
         run: |
           cd ${{ secrets.REPO_FRONT_PATH }} 
-          yarn
           cd src/main
           yarn
           yarn run build
@@ -186,6 +185,7 @@ jobs:
       - name: Prepare Build Electron
         run: |
           cd ${{ secrets.REPO_FRONT_PATH }}
+          yarn
           yarn run build:web:desktop --app_version=99.0.${{ github.run_id }} --app_port=11922
           cp -r dist ./static/
 
