@@ -177,7 +177,7 @@ jobs:
           cd ${{ secrets.REPO_FRONT_PATH }} 
           cd src/main
           yarn
-          yarn run build
+          yarn run build:test
           cp -r electron ../../static
       
 
