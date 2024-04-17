@@ -252,5 +252,5 @@ jobs:
           content: |
             {
               "title": "${{ matrix.os }}-${{ secrets.TEST_BUCKET_NAME }}-打包完成通知",
-              "text": "# ${{ matrix.os }}-${{ secrets.TEST_BUCKET_NAME }}-打包完成通知\n ![bang](https://oss.sqlgpt.cn/static/bang100.gif)\n ###  任务id：[${{ github.run_id }}](https://github.com/juliet0416/cicd-test/actions/runs/${{ github.run_id }})\n ### 下载地址：[${{matrix.file_name}}](${{matrix.file_name}})"
+              "text": "# ${{ matrix.os }}-${{ secrets.TEST_BUCKET_NAME }}-打包完成通知\n ![bang](https://oss.sqlgpt.cn/static/bang100.gif)\n ###  任务id：[${{ github.run_id }}](https://github.com/juliet0416/cicd-test/actions/runs/${{ github.run_id }})\n ### 下载地址：[${{matrix.file_name}}](${{secrets.CDN_URL}}/enterprise-test/${{matrix.file_name}})"
             }
