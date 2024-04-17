@@ -164,8 +164,7 @@ jobs:
       # 打包后端工程 & 发送到前端
       - name: Build BE Static
         run: |
-          mvn clean package -B '-Dmaven.test.skip=true' -f ${{ secrets.REPO_POM_PATH }}
-          ls ${{ secrets.REPO_TARGET_PATH }}
+          mvn clean install -B '-Dmaven.test.skip=true' -f ${{ secrets.REPO_POM_PATH }}
           cp ${{ secrets.REPO_JAR_PATH }} ${{ secrets.REPO_STATIC_JAR_PATH }}
 
       # 打包Web前端资源
