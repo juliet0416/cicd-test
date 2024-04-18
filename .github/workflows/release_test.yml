@@ -19,23 +19,28 @@ jobs:
         include:
           - os: macos-latest
             arch: x86_64
-            file_name: "Latest.dmg"
+            file_name: "latest.dmg"
             file_extension: ".dmg"
             build_arg: "--mac --x64"
           - os: windows-latest
             file_extension: ".exe"
-            file_name: "Latest.exe"
+            file_name: "latest.exe"
             build_arg: "--win --x64"
           - os: macos-latest
             arch: arm64
-            file_name: "Latest-arm64.dmg"
+            file_name: "arm64-latest.dmg"
             file_extension: ".dmg"
             build_arg: "--mac --arm64"
           - os: ubuntu-latest
             arch: arm64
-            file_name: "Latest.AppImage"
+            file_name: "arm64-latest.AppImage"
             file_extension: ".AppImage"
             build_arg: "--linux --arm64"
+          - os: ubuntu-latest
+            arch: x86_64
+            file_name: "latest.AppImage"
+            file_extension: ".AppImage"
+            build_arg: "--linux --x64"
     runs-on: ${{ matrix.os }}
 
     # 将release_test分支的代码检出（即复制）到 GitHub Actions 的运行环境中。
@@ -82,9 +87,19 @@ jobs:
           java-package: "jre"
           architecture: "aarch64"
 
-          # Install jre Linux
+      # Install jre Linux x64
       - name: Install Jre for Linux
-        if: ${{ runner.os == 'Linux' }}
+        if: ${{ runner.os == 'Linux' && matrix.arch == 'x86_64' }}
+        uses: actions/setup-java@main
+        with:
+          java-version: "17"
+          distribution: "temurin"
+          java-package: "jre"
+
+
+      # Install jre Linux arm64
+      - name: Install Jre for Linux
+        if: ${{ runner.os == 'Linux' && matrix.arch == 'arm64' }}
         uses: actions/setup-java@main
         with:
           java-version: "17"
@@ -220,12 +235,6 @@ jobs:
           mkdir -p oss_temp_file
           cp -r ${{ secrets.REPO_FRONT_PATH }}/release/*${{ matrix.file_extension }} ./oss_temp_file
 
-      # 准备发往OSS的文件
-      - name: Prepare upload for OSS on linux
-        if: ${{ runner.os == 'Linux' }}
-        run: |
-          cp -r ${{ secrets.REPO_FRONT_PATH }}/release/*.zip ./oss_temp_file
-
 
       # 设置OSS
       - name: Set up oss utils
@@ -246,15 +255,6 @@ jobs:
           done
         shell: bash
 
-      # 上传到OSS
-      - name: Upload to OSS in linux
-        if: ${{ runner.os == 'Linux' }}
-        run: |
-          for file in ./oss_temp_file/*; do
-            filename=$(basename $file)
-            ossutil cp -rf --acl=public-read $file oss://${{ secrets.TEST_BUCKET_NAME }}/
-          done
-        shell: bash
 
       # 发送到DingTalk
       - name: Send dingtalk message
