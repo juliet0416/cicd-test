@@ -21,7 +21,7 @@ jobs:
           - os: macos-latest
             arch: x86_64
             file_name: "latest.dmg"
-            file_extension: "x64.dmg"
+            file_extension: ".dmg"
             build_arg: "--mac --x64"
           - os: windows-latest
             file_extension: ".exe"
