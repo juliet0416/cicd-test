@@ -130,14 +130,14 @@ jobs:
           cp -r $JAVA_HOME ${{ secrets.REPO_JRE_PATH }} 
           chmod -R 777 ${{ secrets.REPO_JRE_PATH }} 
 
-      # Linux
-      - name: Delete File
-        if: ${{ runner.os == 'Linux' }}
-        run: |
-          cd ${{ secrets.REPO_JRE_PATH }} 
-          ls -la
-          rm -rf legal
-          ls -la
+      # # Linux
+      # - name: Delete File
+      #   if: ${{ runner.os == 'Linux' }}
+      #   run: |
+      #     cd ${{ secrets.REPO_JRE_PATH }} 
+      #     ls -la
+      #     rm -rf legal
+      #     ls -la
 
       # 安装Node.js
       - name: Install Node.js
