@@ -4,6 +4,12 @@ on:
   push:
     branches:
     - "release_test"
+  workflow_dispatch:
+    inputs:
+      logLevel:
+        description: 'Log level'
+        required: true
+        default: 'warning'
 
 jobs:
   release:
@@ -13,22 +19,28 @@ jobs:
         include:
           - os: macos-latest
             arch: x86_64
-            file_name: "Test-99.0.${{ github.run_id }}.dmg"
+            file_name: "latest.dmg"
             file_extension: ".dmg"
             build_arg: "--mac --x64"
           - os: windows-latest
             file_extension: ".exe"
-            file_name: "Test%20Setup%2099.0.${{ github.run_id }}.exe"
+            file_name: "latest.exe"
             build_arg: "--win --x64"
           - os: macos-latest
             arch: arm64
-            file_name: "Test-99.0.${{ github.run_id }}-arm64.dmg"
+            file_name: "arm64-latest.dmg"
             file_extension: ".dmg"
             build_arg: "--mac --arm64"
           - os: ubuntu-latest
-            file_name: "Test-99.0.${{ github.run_id }}.AppImage"
+            arch: arm64
+            file_name: "arm64-latest.AppImage"
             file_extension: ".AppImage"
-            build_arg: "--linux"
+            build_arg: "--linux --arm64"
+          - os: ubuntu-latest
+            arch: x86_64
+            file_name: "latest.AppImage"
+            file_extension: ".AppImage"
+            build_arg: "--linux --x64"
     runs-on: ${{ matrix.os }}
 
     # 将release_test分支的代码检出（即复制）到 GitHub Actions 的运行环境中。
@@ -39,6 +51,7 @@ jobs:
           repository: ${{ secrets.REPO_URL }}
           ref: ${{ secrets.TEST_REPO_BRANCH }}
           path: ${{ secrets.REPO_PATH }}
+          token: ${{ secrets.ACCESS_TOKEN }}
 
 
       # Output basic information
@@ -74,14 +87,25 @@ jobs:
           java-package: "jre"
           architecture: "aarch64"
 
-          # Install jre Linux
+      # Install jre Linux x64
       - name: Install Jre for Linux
-        if: ${{ runner.os == 'Linux' }}
+        if: ${{ runner.os == 'Linux' && matrix.arch == 'x86_64' }}
         uses: actions/setup-java@main
         with:
           java-version: "17"
           distribution: "temurin"
           java-package: "jre"
+
+
+      # Install jre Linux arm64
+      - name: Install Jre for Linux
+        if: ${{ runner.os == 'Linux' && matrix.arch == 'arm64' }}
+        uses: actions/setup-java@main
+        with:
+          java-version: "17"
+          distribution: "temurin"
+          java-package: "jre"
+          architecture: "aarch64"
 
       # java.security open tls1 Windows
       - name: Enable tls1
@@ -156,14 +180,18 @@ jobs:
           ref: ${{ secrets.TEST_REPO_BASE_BRANCH }}
           path: ${{ secrets.REPO_BASE_PATH }}
 
-      - name: MVN Build plugins
+      - name: MVN Build plugins1
         run: |
           mvn clean install -B '-Dmaven.test.skip=true' -f ${{ secrets.REPO_BASE_POM_PATH }}
+
+      - name: MVN Build plugins2
+        run: |
+          mvn clean install -B '-Dmaven.test.skip=true' -f ${{ github.workspace }}/${{ secrets.REPO_PKG_POM_PATH }}
 
       # 打包后端工程 & 发送到前端
       - name: Build BE Static
         run: |
-          mvn clean package -B '-Dmaven.test.skip=true' -f ${{ secrets.REPO_POM_PATH }}
+          mvn clean install -B '-Dmaven.test.skip=true' -f ${{ secrets.REPO_POM_PATH }}
           cp ${{ secrets.REPO_JAR_PATH }} ${{ secrets.REPO_STATIC_JAR_PATH }}
 
       # 打包Web前端资源
@@ -172,7 +200,7 @@ jobs:
           cd ${{ secrets.REPO_FRONT_PATH }} 
           cd src/main
           yarn
-          yarn run build
+          yarn run build:test
           cp -r electron ../../static
       
 
@@ -180,9 +208,9 @@ jobs:
       - name: Prepare Build Electron
         run: |
           cd ${{ secrets.REPO_FRONT_PATH }}
+          yarn
           yarn run build:web:desktop --app_version=99.0.${{ github.run_id }} --app_port=${{ secrets.TEST_REPO_PORT }}
-          cp -r dist ./static/
-          rm -r dist
+          cp -r dist ./static
 
       # 打包Electron
       - name: Build/release Electron app
@@ -201,25 +229,12 @@ jobs:
             -c.extraMetadata.version=99.0.${{ github.run_id }}
             ${{ matrix.build_arg}}
 
-#      # 公证&签名 Mac App
-#      - name: Notarize MacOS x86_64 App
-#        if: matrix.os == 'macos-latest' && matrix.arch == 'x86_64'
-#        run: |
-#          xcrun notarytool store-credentials ${{ secrets.PRODUCT_BASE_NAME }} --apple-id "${{ secrets.MAC_APPLE_ID }}" --password "${{ secrets.MAC_APPLE_PASSWORD }}" --team-id "${{ secrets.MAC_TEAM_ID }}"
-#          xcrun notarytool submit ${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}.dmg --keychain-profile ${{ secrets.PRODUCT_BASE_NAME }}
-#
-#      # 公证&签名 Mac App
-#      - name: Notarize MacOS ARM App
-#        if: matrix.os == 'macos-latest' && matrix.arch == 'arm64'
-#        run: |
-#          xcrun notarytool store-credentials ${{ secrets.PRODUCT_BASE_NAME }} --apple-id "${{ secrets.MAC_APPLE_ID }}" --password "${{ secrets.MAC_APPLE_PASSWORD }}" --team-id "${{ secrets.MAC_TEAM_ID }}"
-#          xcrun notarytool submit ${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}-arm64.dmg --keychain-profile ${{ secrets.PRODUCT_BASE_NAME }}
-
       # 准备发往OSS的文件
       - name: Prepare upload for OSS
         run: |
           mkdir -p oss_temp_file
           cp -r ${{ secrets.REPO_FRONT_PATH }}/release/*${{ matrix.file_extension }} ./oss_temp_file
+
 
       # 设置OSS
       - name: Set up oss utils
@@ -234,7 +249,11 @@ jobs:
       # 上传到OSS
       - name: Upload to OSS
         run: |
-          ossutil cp -rf --acl=public-read ./oss_temp_file/ oss://${{ secrets.TEST_BUCKET_NAME }}/99.0.${{ github.run_id }}/
+          for file in ./oss_temp_file/*; do
+            filename=$(basename $file)
+            ossutil cp -rf --acl=public-read $file oss://${{ secrets.TEST_BUCKET_NAME }}/${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.file_name }}
+          done
+        shell: bash
 
 
       # 发送到DingTalk
@@ -245,6 +264,6 @@ jobs:
           msgtype: markdown
           content: |
             {
-              "title": "${{ matrix.os }}-${{ secrets.TEST_BUCKET_NAME }}-打包完成通知",
-              "text": "# ${{ matrix.os }}-${{ secrets.TEST_BUCKET_NAME }}-打包完成通知\n ![bang](https://oss.sqlgpt.cn/static/bang100.gif)\n ###  任务id：[${{ github.run_id }}](https://github.com/juliet0416/cicd-test/actions/runs/${{ github.run_id }})\n ### 下载地址：[${{matrix.file_name}}](${{matrix.file_name}})"
+              "title": "${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.file_name }}-打包完成通知",
+              "text": "# ${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.file_name }}-打包完成通知\n ###  任务id：[${{ github.run_id }}](https://github.com/juliet0416/cicd-test/actions/runs/${{ github.run_id }})\n ### 下载地址：[${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.file_name }}](${{secrets.CDN_URL}}/test/${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.file_name }})"
             }
