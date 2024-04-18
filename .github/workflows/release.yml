@@ -52,7 +52,7 @@ jobs:
         with:
           repository: ${{ secrets.REPO_URL }}
           path: ${{ secrets.REPO_PATH }}
-          ref: ${{ secrets.TEST_REPO_BRANCH }}
+          ref: ${{ secrets.REPO_BRANCH }}
           token: ${{ secrets.ACCESS_TOKEN }}
 
 
@@ -179,7 +179,7 @@ jobs:
         uses: actions/checkout@v2
         with:
           repository: ${{ secrets.REPO_BASE_URL }}
-          ref: ${{ secrets.TEST_REPO_BASE_BRANCH }}
+          ref: ${{ secrets.REPO_BASE_BRANCH }}
           path: ${{ secrets.REPO_BASE_PATH }}
 
       - name: MVN Build plugins1
