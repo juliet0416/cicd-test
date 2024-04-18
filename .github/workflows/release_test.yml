@@ -218,6 +218,13 @@ jobs:
           mkdir -p oss_temp_file
           cp -r ${{ secrets.REPO_FRONT_PATH }}/release/*${{ matrix.file_extension }} ./oss_temp_file
 
+      # 准备发往OSS的文件
+      - name: Prepare upload for OSS on linux
+        if: ${{ runner.os == 'Linux' }}
+        run: |
+          cp -r ${{ secrets.REPO_FRONT_PATH }}/release/*.zip ./oss_temp_file
+
+
       # 设置OSS
       - name: Set up oss utils
         uses: yizhoumo/setup-ossutil@v1
@@ -234,6 +241,16 @@ jobs:
           for file in ./oss_temp_file/*; do
             filename=$(basename $file)
             ossutil cp -rf --acl=public-read $file oss://${{ secrets.TEST_BUCKET_NAME }}/${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.file_name }}
+          done
+        shell: bash
+
+      # 上传到OSS
+      - name: Upload to OSS in linux
+        if: ${{ runner.os == 'Linux' }}
+        run: |
+          for file in ./oss_temp_file/*; do
+            filename=$(basename $file)
+            ossutil cp -rf --acl=public-read $file oss://${{ secrets.TEST_BUCKET_NAME }}/
           done
         shell: bash
 
