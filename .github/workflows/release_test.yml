@@ -35,7 +35,7 @@ jobs:
             arch: arm64
             file_name: "Latest.AppImage"
             file_extension: ".AppImage"
-            build_arg: "--linux"
+            build_arg: "--linux --arm64"
     runs-on: ${{ matrix.os }}
 
     # 将release_test分支的代码检出（即复制）到 GitHub Actions 的运行环境中。
