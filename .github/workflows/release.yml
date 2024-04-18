@@ -287,7 +287,7 @@ jobs:
         run: |
           ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x86_64.AppImage" "oss://${{ secrets.BUCKET_NAME }}/download/test/${{ github.event.inputs.version }}/"
           ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x86_64.AppImage" "oss://${{ secrets.BUCKET_NAME }}/download/test/latest/linux/x86_64/"
-          ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/latest-linux.yml" "oss://${{ secrets.BUCKET_NAME }}/download/test/latest/linux/x86_64"
+          ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/latest-linux.yml" "oss://${{ secrets.BUCKET_NAME }}/download/test/latest/linux/x86_64/"
           ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x86_64.AppImage" "oss://${{ secrets.BUCKET_NAME }}/download/test/latest/${{ secrets.PRODUCT_APP_NAME }}-latest.AppImage"
 
       - name: Upload to OSS for linux arm64
@@ -295,7 +295,7 @@ jobs:
         run: |
           ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.AppImage" "oss://${{ secrets.BUCKET_NAME }}/download/test/${{ github.event.inputs.version }}/"
           ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.AppImage" "oss://${{ secrets.BUCKET_NAME }}/download/test/latest/linux/arm64/"
-          ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/latest-linux-arm64.yml" "oss://${{ secrets.BUCKET_NAME }}/download/test/latest/linux/arm64"
+          ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/latest-linux-arm64.yml" "oss://${{ secrets.BUCKET_NAME }}/download/test/latest/linux/arm64/"
           ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.AppImage" "oss://${{ secrets.BUCKET_NAME }}/download/test/latest/${{ secrets.PRODUCT_APP_NAME }}-arm64-latest.AppImage"
 
 
