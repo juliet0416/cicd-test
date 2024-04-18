@@ -90,6 +90,7 @@ jobs:
           java-version: "17"
           distribution: "temurin"
           java-package: "jre"
+          architecture: "aarch64"
 
       # java.security open tls1 Windows
       - name: Enable tls1
