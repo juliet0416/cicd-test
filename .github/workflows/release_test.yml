@@ -229,10 +229,7 @@ jobs:
             -c.extraMetadata.version=99.0.${{ github.run_id }}
             ${{ matrix.build_arg}}
 
-      # windows加签
-      - name: Copy files to remote server
-        if: ${{ runner.os == 'Windows' }}
-        # 上传文件到远程服务器
+      # 上传文件到远程服务器
       - name: Copy files to remote server
         if: ${{ runner.os == 'Windows' }}
         run: |
