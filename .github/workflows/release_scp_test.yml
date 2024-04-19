@@ -1,0 +1,25 @@
+name: SCP Test
+
+on:
+  workflow_dispatch:  # 允许手动触发
+
+jobs:
+  test-scp:
+    runs-on: windows-latest
+    steps:
+      - name: Create a test file
+        run: |
+          echo "This is a test file." > testfile.txt
+        shell: pwsh
+
+      - name: Test SCP Upload
+        run: |
+          echo "Testing SCP upload..."
+          scp -i ${{ secrets.WIN_SSH_PRIVATE_KEY_PATH }} -P 22 testfile.txt ${{ secrets.WIN_SERVER_USER }}@${{ secrets.WIN_SERVER_IP }}:${{ secrets.REMOTE_SIGN_PATH }}
+        shell: pwsh
+
+      - name: Test SCP Download
+        run: |
+          echo "Testing SCP download..."
+          scp -i ${{ secrets.WIN_SSH_PRIVATE_KEY_PATH }} -P 22 ${{ secrets.WIN_SERVER_USER }}@${{ secrets.WIN_SERVER_IP }}:${{ secrets.REMOTE_SIGN_PATH }}/testfile.txt .
+        shell: pwsh
