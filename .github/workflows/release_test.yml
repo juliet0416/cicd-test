@@ -232,35 +232,24 @@ jobs:
       # windows加签
       - name: Copy files to remote server
         if: ${{ runner.os == 'Windows' }}
-        uses: appleboy/scp-action@master
-        with:
-          host: ${{ secrets.WIN_SERVER_IP }}
-          username: ${{ secrets.WIN_SERVER_USER }}
-          key: ${{ secrets.WIN_SSH_PRIVATE_KEY }}
-          port: 22
-          source: ${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe
-          target: ${{ secrets.REMOTE_SIGN_PATH }}
-          overwrite: true
+        # 上传文件到远程服务器
+      - name: Copy files to remote server
+        if: ${{ runner.os == 'Windows' }}
+        run: |
+          scp -i ${{ secrets.WIN_SSH_PRIVATE_KEY_PATH }} -P 22 ${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe ${{ secrets.WIN_SERVER_USER }}@${{ secrets.WIN_SERVER_IP }}:${{ secrets.REMOTE_SIGN_PATH }}
 
+      # 在远程服务器上加签文件
       - name: Sign the file on remote server
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.WIN_SERVER_IP }}
-          username: ${{ secrets.WIN_SERVER_USER }}
-          key: ${{ secrets.WIN_SSH_PRIVATE_KEY }}
-          port: 22
-          script: ${{ secrets.REMOTE_SIGN_SCRIPT }} "${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe"
+        if: ${{ runner.os == 'Windows' }}
+        run: |
+          ssh -i ${{ secrets.WIN_SSH_PRIVATE_KEY_PATH }} -p 22 ${{ secrets.WIN_SERVER_USER }}@${{ secrets.WIN_SERVER_IP }} "${{ secrets.REMOTE_SIGN_SCRIPT }} ${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe"
 
+      # 从远程服务器获取签名文件
       - name: Fetch signed files from remote server
-        uses: appleboy/scp-action@master
-        with:
-          host: ${{ secrets.WIN_SERVER_IP }}
-          username: ${{ secrets.WIN_SERVER_USER }}
-          key: ${{ secrets.WIN_SSH_PRIVATE_KEY }}
-          port: 22
-          source: ${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe
-          target: ${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe
-          overwrite: true
+        if: ${{ runner.os == 'Windows' }}
+        run: |
+          scp -i ${{ secrets.WIN_SSH_PRIVATE_KEY_PATH }} -P 22 ${{ secrets.WIN_SERVER_USER }}@${{ secrets.WIN_SERVER_IP }}:${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe ${{ secrets.REPO_FRONT_PATH }}/release/
+          
 
       # 准备发往OSS的文件
       - name: Prepare upload for OSS
