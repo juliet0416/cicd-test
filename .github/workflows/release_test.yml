@@ -254,7 +254,7 @@ jobs:
           HOST_KEY: ${{ secrets.HOST_KEY }}
           FILE_TO_UPLOAD: "${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}.exe"
           REMOTE_SCRIPT_PATH: "${{ secrets.REMOTE_SIGN_SCRIPT }} ${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}.exe"
-          LOCAL_DOWNLOAD_PATH: "${{ github.workspace }}/${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}.exe"
+          LOCAL_DOWNLOAD_PATH: "${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}.exe"
         run: |
           winscp.com /log=winscp.log /command `
             "option batch abort" `
@@ -264,6 +264,14 @@ jobs:
             "call ${env:REMOTE_SCRIPT_PATH}" `
             "get ${env:REMOTE_PATH} ${env:LOCAL_DOWNLOAD_PATH}" `
             "exit"
+
+      # 准备发往OSS的文件
+      - name: Prepare upload for OSS on winodows
+        if: ${{ runner.os == 'Windows' }}
+        run: |
+          mkdir -p oss_temp_file
+          cp -r ${{ github.workspace }}/${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}.exe ${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}.exe
+          cp -r ${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}.exe ./oss_temp_file/${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}.exe
 
 
       # 设置OSS
