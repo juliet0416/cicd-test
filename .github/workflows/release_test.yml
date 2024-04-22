@@ -229,13 +229,8 @@ jobs:
             -c.extraMetadata.version=99.0.${{ github.run_id }}
             ${{ matrix.build_arg}}
 
-      # 上传文件到远程服务器
-      - name: Copy files to remote server
-        if: ${{ runner.os == 'Windows' }}
-        run: |
-          scp -i ${{ secrets.WIN_SSH_PRIVATE_KEY_PATH }} -P 22 ${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-99.0.${{ github.run_id }}.exe ${{ secrets.WIN_SERVER_USER }}@${{ secrets.WIN_SERVER_IP }}:${{ secrets.REMOTE_SIGN_PATH }}
 
-            - name: Install WinSCP
+      - name: Install WinSCP
         if: ${{ runner.os == 'Windows' }}
         run: |
           choco install winscp
