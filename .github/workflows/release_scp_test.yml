@@ -1,15 +1,14 @@
 name: SCP Test
 
 on:
-  workflow_dispatch:  # 允许手动触发
+  workflow_dispatch:
 
 jobs:
   test-scp:
     runs-on: windows-latest
     steps:
       - name: Create a test file
-        run: |
-          echo "This is a test file." > testfile.txt
+        run: echo "This is a test file." > testfile.txt
         shell: pwsh
 
       - name: Test SCP Upload
