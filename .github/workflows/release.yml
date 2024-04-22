@@ -18,30 +18,30 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-latest
-            arch: x86_64
-            file_name: "latest.dmg"
-            file_extension: ".dmg"
-            build_arg: "--mac --x64"
+          # - os: macos-latest
+          #   arch: x86_64
+          #   file_name: "latest.dmg"
+          #   file_extension: ".dmg"
+          #   build_arg: "--mac --x64"
           - os: windows-latest
             file_extension: ".exe"
             file_name: "latest.exe"
             build_arg: "--win --x64"
-          - os: macos-latest
-            arch: arm64
-            file_name: "arm64-latest.dmg"
-            file_extension: "dmg"
-            build_arg: "--mac --arm64"
-          - os: ubuntu-latest
-            arch: x86_64
-            file_name: "latest.AppImage"
-            file_extension: ".AppImage"
-            build_arg: "--linux --x64"
-          - os: ubuntu-latest
-            arch: arm64
-            file_name: "arm64-latest.AppImage"
-            file_extension: ".AppImage"
-            build_arg: "--linux --arm64"
+          # - os: macos-latest
+          #   arch: arm64
+          #   file_name: "arm64-latest.dmg"
+          #   file_extension: "dmg"
+          #   build_arg: "--mac --arm64"
+          # - os: ubuntu-latest
+          #   arch: x86_64
+          #   file_name: "latest.AppImage"
+          #   file_extension: ".AppImage"
+          #   build_arg: "--linux --x64"
+          # - os: ubuntu-latest
+          #   arch: arm64
+          #   file_name: "arm64-latest.AppImage"
+          #   file_extension: ".AppImage"
+          #   build_arg: "--linux --arm64"
 
     runs-on: ${{ matrix.os }}
 
@@ -245,7 +245,33 @@ jobs:
         run: |
           xcrun notarytool store-credentials ${{ secrets.PRODUCT_BASE_NAME }} --apple-id "${{ secrets.MAC_APPLE_ID }}" --password "${{ secrets.MAC_APPLE_PASSWORD }}" --team-id "${{ secrets.MAC_TEAM_ID }}"
           xcrun notarytool submit ${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg --keychain-profile ${{ secrets.PRODUCT_BASE_NAME }}
-          
+
+      - name: Install WinSCP
+        if: ${{ runner.os == 'Windows' }}
+        run: |
+          choco install winscp
+      
+      # 上传文件到远程服务器
+      - name: Copy files to remote server
+        if: ${{ runner.os == 'Windows' }}
+        env:
+          SCP_PASSWORD: ${{ secrets.WIN_SSH_PRIVATE_KEY }}
+          REMOTE_HOST: ${{ secrets.WIN_SERVER_IP }}
+          REMOTE_USER: ${{ secrets.WIN_SERVER_USER }}
+          REMOTE_PATH: "${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe"
+          HOST_KEY: ${{ secrets.HOST_KEY }}
+          FILE_TO_UPLOAD: "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe"
+          REMOTE_SCRIPT_PATH: "${{ secrets.REMOTE_SIGN_SCRIPT }} ${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe"
+          LOCAL_DOWNLOAD_PATH: "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe"
+        run: |
+          winscp.com /log=winscp.log /command `
+            "option batch abort" `
+            "option confirm off" `
+            "open scp://${{ env.REMOTE_USER }}:${{ env.SCP_PASSWORD }}@${{ env.REMOTE_HOST }} -hostkey=*" `
+            "put ${env:FILE_TO_UPLOAD} ${env:REMOTE_PATH}" `
+            "call ${env:REMOTE_SCRIPT_PATH}" `
+            "get ${env:REMOTE_PATH} ${env:LOCAL_DOWNLOAD_PATH}" `
+            "exit"
 
       # 设置OSS
       - name: Set up oss utils
