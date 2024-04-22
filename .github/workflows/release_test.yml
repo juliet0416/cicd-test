@@ -269,9 +269,7 @@ jobs:
       - name: Prepare upload for OSS on winodows
         if: ${{ runner.os == 'Windows' }}
         run: |
-          mkdir -p oss_temp_file
-          cp -r ${{ github.workspace }}/${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}.exe ${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}.exe
-          cp -r ${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}.exe ./oss_temp_file/${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}.exe
+          cp -rf ${{ github.workspace }}/${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}.exe ./oss_temp_file/${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}.exe
 
 
       # 设置OSS
