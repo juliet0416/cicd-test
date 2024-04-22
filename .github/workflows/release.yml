@@ -246,6 +246,12 @@ jobs:
           xcrun notarytool store-credentials ${{ secrets.PRODUCT_BASE_NAME }} --apple-id "${{ secrets.MAC_APPLE_ID }}" --password "${{ secrets.MAC_APPLE_PASSWORD }}" --team-id "${{ secrets.MAC_TEAM_ID }}"
           xcrun notarytool submit ${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg --keychain-profile ${{ secrets.PRODUCT_BASE_NAME }}
 
+      # 准备发往OSS的文件
+      - name: Prepare upload for OSS
+        run: |
+          mkdir -p oss_temp_file
+          cp -r ${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe ${{ github.workspace }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe
+
       - name: Install WinSCP
         if: ${{ runner.os == 'Windows' }}
         run: |
@@ -260,7 +266,7 @@ jobs:
           REMOTE_USER: ${{ secrets.WIN_SERVER_USER }}
           REMOTE_PATH: "${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe"
           HOST_KEY: ${{ secrets.HOST_KEY }}
-          FILE_TO_UPLOAD: "${{ github.workspace }}/${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe"
+          FILE_TO_UPLOAD: "${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe"
           REMOTE_SCRIPT_PATH: "${{ secrets.REMOTE_SIGN_SCRIPT }} ${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe"
           LOCAL_DOWNLOAD_PATH: "${{ github.workspace }}/${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe"
         run: |
