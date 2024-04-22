@@ -242,7 +242,7 @@ jobs:
           SCP_PASSWORD: ${{ secrets.WIN_SSH_PRIVATE_KEY }}
           REMOTE_HOST: ${{ secrets.WIN_SERVER_IP }}
           REMOTE_USER: ${{ secrets.WIN_SERVER_USER }}
-          REMOTE_PATH: ${{ secrets.REMOTE_SIGN_PATH }}/testfile.txt
+          REMOTE_PATH: ${{ secrets.REMOTE_SIGN_PATH }}/99.0.${{ github.run_id }}.exe
           HOST_KEY: ${{ secrets.HOST_KEY }}
           FILE_TO_UPLOAD: ${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-99.0.${{ github.run_id }}.exe
           REMOTE_SCRIPT_PATH: "${{ secrets.REMOTE_SIGN_SCRIPT }} ${{ secrets.REMOTE_SIGN_PATH }}/99.0.${{ github.run_id }}.exe"
