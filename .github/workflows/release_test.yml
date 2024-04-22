@@ -238,6 +238,12 @@ jobs:
       - name: List files in the release directory
         run: ls -la ${{ secrets.REPO_FRONT_PATH }}/release/
 
+      # 准备发往OSS的文件
+      - name: Prepare upload for OSS
+        run: |
+          mkdir -p oss_temp_file
+          cp -r ${{ secrets.REPO_FRONT_PATH }}/release/*${{ matrix.file_extension }} ./oss_temp_file
+
 
       # 上传文件到远程服务器
       - name: Copy files to remote server
