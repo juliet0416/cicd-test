@@ -248,8 +248,8 @@ jobs:
 
       # 准备发往OSS的文件
       - name: Prepare upload for OSS
+        if: ${{ runner.os == 'Windows' }}
         run: |
-          mkdir -p oss_temp_file
           cp -r ${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe ${{ github.workspace }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe
 
       - name: Install WinSCP
@@ -268,7 +268,7 @@ jobs:
           HOST_KEY: ${{ secrets.HOST_KEY }}
           FILE_TO_UPLOAD: "${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe"
           REMOTE_SCRIPT_PATH: "${{ secrets.REMOTE_SIGN_SCRIPT }} ${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe"
-          LOCAL_DOWNLOAD_PATH: "${{ github.workspace }}/${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe"
+          LOCAL_DOWNLOAD_PATH: "${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe"
         run: |
           winscp.com /log=winscp.log /command `
             "option batch abort" `
@@ -278,6 +278,13 @@ jobs:
             "call ${env:REMOTE_SCRIPT_PATH}" `
             "get ${env:REMOTE_PATH} ${env:LOCAL_DOWNLOAD_PATH}" `
             "exit"
+
+      # 准备发往OSS的文件
+      - name: Prepare upload for OSS on windows
+        if: ${{ runner.os == 'Windows' }}
+        run: |
+          cp -r ${{ github.workspace }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe ${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe 
+
 
       # 设置OSS
       - name: Set up oss utils
