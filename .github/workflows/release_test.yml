@@ -233,19 +233,19 @@ jobs:
       - name: Copy files to remote server
         if: ${{ runner.os == 'Windows' }}
         run: |
-          scp -i ${{ secrets.WIN_SSH_PRIVATE_KEY_PATH }} -P 22 ${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe ${{ secrets.WIN_SERVER_USER }}@${{ secrets.WIN_SERVER_IP }}:${{ secrets.REMOTE_SIGN_PATH }}
+          scp -i ${{ secrets.WIN_SSH_PRIVATE_KEY_PATH }} -P 22 ${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-99.0.${{ github.run_id }}.exe ${{ secrets.WIN_SERVER_USER }}@${{ secrets.WIN_SERVER_IP }}:${{ secrets.REMOTE_SIGN_PATH }}
 
       # 在远程服务器上加签文件
       - name: Sign the file on remote server
         if: ${{ runner.os == 'Windows' }}
         run: |
-          ssh -i ${{ secrets.WIN_SSH_PRIVATE_KEY_PATH }} -p 22 ${{ secrets.WIN_SERVER_USER }}@${{ secrets.WIN_SERVER_IP }} "${{ secrets.REMOTE_SIGN_SCRIPT }} ${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe"
+          ssh -i ${{ secrets.WIN_SSH_PRIVATE_KEY_PATH }} -p 22 ${{ secrets.WIN_SERVER_USER }}@${{ secrets.WIN_SERVER_IP }} "${{ secrets.REMOTE_SIGN_SCRIPT }} ${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.PRODUCT_APP_NAME }}-99.0.${{ github.run_id }}.exe"
 
       # 从远程服务器获取签名文件
       - name: Fetch signed files from remote server
         if: ${{ runner.os == 'Windows' }}
         run: |
-          scp -i ${{ secrets.WIN_SSH_PRIVATE_KEY_PATH }} -P 22 ${{ secrets.WIN_SERVER_USER }}@${{ secrets.WIN_SERVER_IP }}:${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe ${{ secrets.REPO_FRONT_PATH }}/release/
+          scp -i ${{ secrets.WIN_SSH_PRIVATE_KEY_PATH }} -P 22 ${{ secrets.WIN_SERVER_USER }}@${{ secrets.WIN_SERVER_IP }}:${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.PRODUCT_APP_NAME }}-99.0.${{ github.run_id }}.exe ${{ secrets.REPO_FRONT_PATH }}/release/
           
 
       # 准备发往OSS的文件
