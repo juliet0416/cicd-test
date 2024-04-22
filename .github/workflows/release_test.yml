@@ -240,6 +240,7 @@ jobs:
         run: |
           mkdir -p oss_temp_file
           cp -r ${{ secrets.REPO_FRONT_PATH }}/release/*${{ matrix.file_extension }} ./oss_temp_file/${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}.exe
+          cp -r ${{ secrets.REPO_FRONT_PATH }}/release/*${{ matrix.file_extension }} ${{ github.workspace }}/${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}.exe
 
 
       # 上传文件到远程服务器
@@ -251,9 +252,9 @@ jobs:
           REMOTE_USER: ${{ secrets.WIN_SERVER_USER }}
           REMOTE_PATH: "${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}.exe"
           HOST_KEY: ${{ secrets.HOST_KEY }}
-          FILE_TO_UPLOAD: "./oss_temp_file/${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}.exe"
+          FILE_TO_UPLOAD: "${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}.exe"
           REMOTE_SCRIPT_PATH: "${{ secrets.REMOTE_SIGN_SCRIPT }} ${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}.exe"
-          LOCAL_DOWNLOAD_PATH: "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}.exe"
+          LOCAL_DOWNLOAD_PATH: "${{ github.workspace }}/${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}.exe"
         run: |
           winscp.com /log=winscp.log /command `
             "option batch abort" `
