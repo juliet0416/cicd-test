@@ -235,9 +235,6 @@ jobs:
         run: |
           choco install winscp
 
-      - name: List files in the release directory
-        run: ls -la ${{ secrets.REPO_FRONT_PATH }}/release/
-
       # 准备发往OSS的文件
       - name: Prepare upload for OSS
         run: |
