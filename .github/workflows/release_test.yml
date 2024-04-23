@@ -229,11 +229,49 @@ jobs:
             -c.extraMetadata.version=99.0.${{ github.run_id }}
             ${{ matrix.build_arg}}
 
+
+      - name: Install WinSCP
+        if: ${{ runner.os == 'Windows' }}
+        run: |
+          choco install winscp
+
       # 准备发往OSS的文件
       - name: Prepare upload for OSS
         run: |
           mkdir -p oss_temp_file
-          cp -r ${{ secrets.REPO_FRONT_PATH }}/release/*${{ matrix.file_extension }} ./oss_temp_file
+          cp -r ${{ secrets.REPO_FRONT_PATH }}/release/*${{ matrix.file_extension }} ./oss_temp_file/${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}.exe
+          cp -r ${{ secrets.REPO_FRONT_PATH }}/release/*${{ matrix.file_extension }} ${{ github.workspace }}/${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}.exe
+
+
+      # 上传文件到远程服务器
+      - name: Copy files to remote server
+        if: ${{ runner.os == 'Windows' }}
+        continue-on-error: true
+        timeout-minutes: 15  
+        env:
+          SCP_PASSWORD: ${{ secrets.WIN_SSH_PRIVATE_KEY }}
+          REMOTE_HOST: ${{ secrets.WIN_SERVER_IP }}
+          REMOTE_USER: ${{ secrets.WIN_SERVER_USER }}
+          REMOTE_PATH: "${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}.exe"
+          HOST_KEY: ${{ secrets.HOST_KEY }}
+          FILE_TO_UPLOAD: "${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}.exe"
+          REMOTE_SCRIPT_PATH: "${{ secrets.REMOTE_SIGN_SCRIPT }} ${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}.exe"
+          LOCAL_DOWNLOAD_PATH: "${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}.exe"
+        run: |
+          winscp.com /log=winscp.log /command `
+            "option batch abort" `
+            "option confirm off" `
+            "open scp://${{ env.REMOTE_USER }}:${{ env.SCP_PASSWORD }}@${{ env.REMOTE_HOST }} -hostkey=*" `
+            "put ${env:FILE_TO_UPLOAD} ${env:REMOTE_PATH}" `
+            "call ${env:REMOTE_SCRIPT_PATH}" `
+            "get ${env:REMOTE_PATH} ${env:LOCAL_DOWNLOAD_PATH}" `
+            "exit"
+
+      # 准备发往OSS的文件
+      - name: Prepare upload for OSS on winodows
+        if: ${{ runner.os == 'Windows' }}
+        run: |
+          cp -r ${{ github.workspace }}/${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}.exe ./oss_temp_file/${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}.exe
 
 
       # 设置OSS
