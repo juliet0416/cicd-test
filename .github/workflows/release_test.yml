@@ -246,6 +246,8 @@ jobs:
       # 上传文件到远程服务器
       - name: Copy files to remote server
         if: ${{ runner.os == 'Windows' }}
+        continue-on-error: true
+        timeout-minutes: 15  
         env:
           SCP_PASSWORD: ${{ secrets.WIN_SSH_PRIVATE_KEY }}
           REMOTE_HOST: ${{ secrets.WIN_SERVER_IP }}
@@ -269,7 +271,7 @@ jobs:
       - name: Prepare upload for OSS on winodows
         if: ${{ runner.os == 'Windows' }}
         run: |
-          cp -rf ${{ github.workspace }}/${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}.exe ./oss_temp_file/${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}.exe
+          cp -r ${{ github.workspace }}/${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}.exe ./oss_temp_file/${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}.exe
 
 
       # 设置OSS
