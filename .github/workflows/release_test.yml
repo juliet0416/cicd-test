@@ -76,6 +76,7 @@ jobs:
           java-version: "17"
           distribution: "temurin"
           java-package: "jre"
+          architecture: 'x64'
 
       # Install jre MacOS arm64
       - name: Install Jre MacOS arm64
