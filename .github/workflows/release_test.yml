@@ -71,7 +71,7 @@ jobs:
       # Install jre MacOS X64
       - name: Install Jre MacOS X64
         if: ${{ runner.os == 'macOS' && matrix.arch == 'x86_64' }}
-        uses: actions/setup-java@main
+        uses: actions/setup-java@v2
         with:
           java-version: "17"
           distribution: "temurin"
