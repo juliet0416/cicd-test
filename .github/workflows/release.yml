@@ -261,6 +261,8 @@ jobs:
       # 上传文件到远程服务器
       - name: Copy files to remote server
         if: ${{ runner.os == 'Windows' }}
+        continue-on-error: true
+        timeout-minutes: 15
         env:
           SCP_PASSWORD: ${{ secrets.WIN_SSH_PRIVATE_KEY }}
           REMOTE_HOST: ${{ secrets.WIN_SERVER_IP }}
