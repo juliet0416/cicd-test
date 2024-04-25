@@ -21,7 +21,7 @@ jobs:
           - os: macos-latest
             arch: x86_64
             file_name: "latest.dmg"
-            file_extension: ".dmg"
+            file_extension: "-x64.dmg"
             build_arg: "--mac --x64"
           - os: windows-latest
             file_extension: ".exe"
@@ -30,17 +30,17 @@ jobs:
           - os: macos-latest
             arch: arm64
             file_name: "arm64-latest.dmg"
-            file_extension: "dmg"
+            file_extension: "-arm64.dmg"
             build_arg: "--mac --arm64"
           - os: ubuntu-latest
             arch: x86_64
             file_name: "latest.AppImage"
-            file_extension: ".AppImage"
+            file_extension: "-x86_64.AppImage"
             build_arg: "--linux --x64"
           - os: ubuntu-latest
             arch: arm64
             file_name: "arm64-latest.AppImage"
-            file_extension: ".AppImage"
+            file_extension: "-arm64.AppImage"
             build_arg: "--linux --arm64"
 
     runs-on: ${{ matrix.os }}
@@ -352,7 +352,7 @@ jobs:
           content: |
             {
               "title": "${{ secrets.PRODUCT_APP_NAME }}-${{ matrix.file_name }}-打包完成通知",
-              "text": "# ${{ secrets.PRODUCT_APP_NAME }}-${{ matrix.file_name }}-打包完成通知\n ###  任务id：[${{ github.run_id }}](https://github.com/juliet0416/cicd-test/actions/runs/${{ github.run_id }})\n ### 下载地址：[${{ secrets.PRODUCT_APP_NAME }}-${{ matrix.file_name }}](${{secrets.CDN_URL}}/download/latest/${{ secrets.PRODUCT_APP_NAME }}-${{ matrix.file_name }})"
+              "text": "# ${{ secrets.PRODUCT_APP_NAME }}-${{ matrix.file_name }}-打包完成通知\n ###  任务id：[${{ github.run_id }}](https://github.com/juliet0416/cicd-test/actions/runs/${{ github.run_id }})\n ### 下载地址：[${{ secrets.PRODUCT_APP_NAME }}-${{ matrix.file_name }}](${{secrets.CDN_URL}}/download/${{ github.event.inputs.version }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-${{ matrix.file_extension }})"
             }
 
 
