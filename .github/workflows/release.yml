@@ -253,6 +253,55 @@ jobs:
         run: |
           cp -r ${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe ${{ github.workspace }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe
 
+      # 修改windows加签后的yml文件
+      - name: Calculate file hash
+        if: ${{ runner.os == 'Windows' }}
+        continue-on-error: true
+        id: hash
+        run: |
+          $hash = (CertUtil -hashfile ${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe SHA512)[1] -replace ' ',''
+          $base64 = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($hash))
+          echo "::set-output name=sha512_base64::$base64"
+
+      # 安装yq解析yml
+      - name: Install powershell-yaml module
+        if: ${{ runner.os == 'Windows' }}
+        continue-on-error: true
+        run: |
+          # Set the execution policy to bypass the prompt about installation from untrusted sources
+          Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process -Force
+          # Install the powershell-yaml module
+          Install-Module -Name powershell-yaml -Force -SkipPublisherCheck
+        shell: powershell
+
+      - name: Extract, replace, and print hash value
+        if: ${{ runner.os == 'Windows' }}
+        continue-on-error: true
+        run: |
+          # 引入 powershell-yaml 模块
+          Import-Module powershell-yaml
+          
+          # 读取 YAML 文件
+          $yamlContent = Get-Content -Path ${{ secrets.REPO_FRONT_PATH }}/release/latest.yml -Raw | ConvertFrom-Yaml
+          
+          # Extract and print the old hash value
+          Write-Output "Old Hash: $($yamlContent.sha512)"
+      
+          # 修改 sha512 值
+          $yamlContent.sha512 = '${{ steps.hash.outputs.sha512_base64 }}'
+          
+          # 可选：如果有嵌套的结构，如 files 数组
+          $yamlContent.files[0].sha512 = '${{ steps.hash.outputs.sha512_base64 }}'
+          
+          # 打印新的 sha512 值以确认
+          Write-Output "New Hash: $($yamlContent.sha512)"
+          
+          # 将更改写回 YAML 文件
+          $yamlContent | ConvertTo-Yaml | Set-Content -Path ${{ secrets.REPO_FRONT_PATH }}/release/latest.yml
+        shell: powershell
+        env:
+          new_hash: ${{ steps.hash.outputs.sha512_base64 }}
+
       - name: Install WinSCP
         if: ${{ runner.os == 'Windows' }}
         run: |
