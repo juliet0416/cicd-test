@@ -18,30 +18,30 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-latest
-            arch: x86_64
-            file_name: "latest.dmg"
-            file_extension: "-x64.dmg"
-            build_arg: "--mac --x64"
+          # - os: macos-latest
+          #   arch: x86_64
+          #   file_name: "latest.dmg"
+          #   file_extension: "-x64.dmg"
+          #   build_arg: "--mac --x64"
           - os: windows-latest
             file_extension: ".exe"
             file_name: "latest.exe"
             build_arg: "--win --x64"
-          - os: macos-latest
-            arch: arm64
-            file_name: "arm64-latest.dmg"
-            file_extension: "-arm64.dmg"
-            build_arg: "--mac --arm64"
-          - os: ubuntu-latest
-            arch: x86_64
-            file_name: "latest.AppImage"
-            file_extension: "-x86_64.AppImage"
-            build_arg: "--linux --x64"
-          - os: ubuntu-latest
-            arch: arm64
-            file_name: "arm64-latest.AppImage"
-            file_extension: "-arm64.AppImage"
-            build_arg: "--linux --arm64"
+          # - os: macos-latest
+          #   arch: arm64
+          #   file_name: "arm64-latest.dmg"
+          #   file_extension: "-arm64.dmg"
+          #   build_arg: "--mac --arm64"
+          # - os: ubuntu-latest
+          #   arch: x86_64
+          #   file_name: "latest.AppImage"
+          #   file_extension: "-x86_64.AppImage"
+          #   build_arg: "--linux --x64"
+          # - os: ubuntu-latest
+          #   arch: arm64
+          #   file_name: "arm64-latest.AppImage"
+          #   file_extension: "-arm64.AppImage"
+          #   build_arg: "--linux --arm64"
 
     runs-on: ${{ matrix.os }}
 
@@ -287,6 +287,41 @@ jobs:
         if: ${{ runner.os == 'Windows' }}
         run: |
           cp -r ${{ github.workspace }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe ${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe 
+
+      # 修改windows加签后的yml文件
+      - name: Calculate file hash
+        if: ${{ runner.os == 'Windows' }}
+        id: hash
+        run: |
+          $hash = (CertUtil -hashfile ${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe SHA512)[1] -replace ' ',''
+          $base64 = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($hash))
+          echo "::set-output name=sha512_base64::$base64"
+
+      # 安装yq解析yml
+      - name: Install yq
+        if: ${{ runner.os == 'Windows' }}
+        run: |
+          Invoke-WebRequest -Uri "https://github.com/mikefarah/yq/releases/download/v4.25.1/yq_windows_amd64.exe" -OutFile "yq.exe"
+          New-Item -Path "C:\bin" -ItemType Directory -Force
+          Move-Item -Path "yq.exe" -Destination "C:\bin\yq.exe"
+        shell: powershell
+
+      - name: Extract, replace, and print hash value
+        if: ${{ runner.os == 'Windows' }}
+        run: |
+          # Extract and print the old hash value
+          $old_hash = & C:\bin\yq.exe e '.sha512' ${{ secrets.REPO_FRONT_PATH }}/release/latest.yml
+          Write-Output "Old Hash: $old_hash"
+          Write-Output "New Hash: $new_hash"
+      
+          # Update the yaml file with the new hash
+          & C:\bin\yq.exe e ".sha512 = \"$new_hash\"" -i ${{ secrets.REPO_FRONT_PATH }}/release/latest.yml
+          
+          # Optionally, update hash in nested structure under 'files'
+          & C:\bin\yq.exe e ".files[0].sha512 = \"$new_hash\"" -i ${{ secrets.REPO_FRONT_PATH }}/release/latest.yml
+        shell: powershell
+        env:
+          new_hash: ${{ steps.hash.outputs.sha512_base64 }}
 
 
       # 设置OSS
