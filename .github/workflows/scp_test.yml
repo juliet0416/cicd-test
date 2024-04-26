@@ -24,8 +24,10 @@ jobs:
         if: ${{ runner.os == 'Windows' }}
         id: hash
         run: |
-          $hash = (CertUtil -hashfile testfile.txt SHA512)[1] -replace ' ',''
-          $base64 = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($hash))
+          # $hash = (CertUtil -hashfile testfile.txt SHA512)[1] -replace ' ',''
+          $hash = CertUtil -hashfile testfile.txt SHA512 | Select-Object -Skip 1 -First 1 | ForEach-Object { [Convert]::FromBase64String($_) }
+          # $base64 = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($hash))
+          $base64 = [Convert]::ToBase64String($hashBytes)
           echo "::set-output name=sha512_base64::$base64"
 
       # # 安装yq解析yml
