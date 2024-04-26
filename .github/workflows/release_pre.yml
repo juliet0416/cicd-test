@@ -298,27 +298,38 @@ jobs:
           echo "::set-output name=sha512_base64::$base64"
 
       # 安装yq解析yml
-      - name: Install yq
+      - name: Install powershell-yaml module
         if: ${{ runner.os == 'Windows' }}
         run: |
-          Invoke-WebRequest -Uri "https://github.com/mikefarah/yq/releases/download/v4.25.1/yq_windows_amd64.exe" -OutFile "yq.exe"
-          New-Item -Path "C:\bin" -ItemType Directory -Force
-          Move-Item -Path "yq.exe" -Destination "C:\bin\yq.exe"
+          # Set the execution policy to bypass the prompt about installation from untrusted sources
+          Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process -Force
+          # Install the powershell-yaml module
+          Install-Module -Name powershell-yaml -Force -SkipPublisherCheck
         shell: powershell
 
       - name: Extract, replace, and print hash value
         if: ${{ runner.os == 'Windows' }}
         run: |
-          # Extract and print the old hash value
-          $old_hash = & C:\bin\yq.exe e '.sha512' ${{ secrets.REPO_FRONT_PATH }}/release/latest.yml
-          Write-Output "Old Hash: $old_hash"
-          Write-Output "New Hash: $env:new_hash"
-      
-          # Update the yaml file with the new hash
-          & C:\bin\yq.exe e ".sha512 = `"$env:new_hash`"" -i "${{ secrets.REPO_FRONT_PATH }}/release/latest.yml"
+          # 引入 powershell-yaml 模块
+          Import-Module powershell-yaml
           
-          # Optionally, update hash in nested structure under 'files'
-          & C:\bin\yq.exe e ".files[0].sha512 = `"$env:new_hash`"" -i "${{ secrets.REPO_FRONT_PATH }}/release/latest.yml"
+          # 读取 YAML 文件
+          $yamlContent = Get-Content -Path ${{ secrets.REPO_FRONT_PATH }}/release/latest.yml -Raw | ConvertFrom-Yaml
+          
+          # Extract and print the old hash value
+          Write-Output "Old Hash: $($yamlContent.sha512)"
+      
+          # 修改 sha512 值
+          $yamlContent.sha512 = '${{ steps.hash.outputs.sha512_base64 }}'
+          
+          # 可选：如果有嵌套的结构，如 files 数组
+          $yamlContent.files[0].sha512 = '${{ steps.hash.outputs.sha512_base64 }}'
+          
+          # 打印新的 sha512 值以确认
+          Write-Output "New Hash: $($yamlContent.sha512)"
+          
+          # 将更改写回 YAML 文件
+          $yamlContent | ConvertTo-Yaml | Set-Content -Path ${{ secrets.REPO_FRONT_PATH }}/release/latest.yml
         shell: powershell
         env:
           new_hash: ${{ steps.hash.outputs.sha512_base64 }}
