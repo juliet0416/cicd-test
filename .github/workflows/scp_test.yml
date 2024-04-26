@@ -37,19 +37,41 @@ jobs:
           Move-Item -Path "yq.exe" -Destination "C:\bin\yq.exe"
         shell: powershell
 
+      # - name: Extract, replace, and print hash value
+      #   if: ${{ runner.os == 'Windows' }}
+      #   run: |
+      #     # Extract and print the old hash value
+      #     $old_hash = & C:\bin\yq.exe e '.sha512' latest.yml
+      #     Write-Output "Old Hash: $old_hash"
+      #     Write-Output "New Hash: $env:new_hash"
+      
+      #     # Update the yaml file with the new hash
+      #     & C:\bin\yq.exe e ".sha512 = `"$env:new_hash`"" -i latest.yml
+          
+      #     # Optionally, update hash in nested structure under 'files'
+      #     & C:\bin\yq.exe e ".files[0].sha512 = `"$env:new_hash`"" -i latest.yml
+      #   shell: powershell
+      #   env:
+      #     new_hash: ${{ steps.hash.outputs.sha512_base64 }}
+
       - name: Extract, replace, and print hash value
         if: ${{ runner.os == 'Windows' }}
         run: |
-          # Extract and print the old hash value
-          $old_hash = & C:\bin\yq.exe e '.sha512' latest.yml
-          Write-Output "Old Hash: $old_hash"
-          Write-Output "New Hash: $env:new_hash"
+          # Ensure yq is available in the PATH
+          $env:PATH += ";C:\bin"
       
-          # Update the yaml file with the new hash
-          & C:\bin\yq.exe e ".sha512 = `"$env:new_hash`"" -i latest.yml
-          
+          # Extract and print the old hash value
+          $old_hash = yq e '.sha512' latest.yml
+          Write-Output "Old Hash: $old_hash"
+      
+          # Correctly format and inject the new hash value
+          $new_hash = "${{ steps.hash.outputs.sha512_base64 }}"
+          yq e ".sha512 = `"$new_hash`"" -i latest.yml
+      
           # Optionally, update hash in nested structure under 'files'
-          & C:\bin\yq.exe e ".files[0].sha512 = `"$env:new_hash`"" -i latest.yml
+          yq e ".files[0].sha512 = `"$new_hash`"" -i latest.yml
+      
+          # Print the new hash value
+          Write-Output "New Hash: $new_hash"
         shell: powershell
-        env:
-          new_hash: ${{ steps.hash.outputs.sha512_base64 }}
+
