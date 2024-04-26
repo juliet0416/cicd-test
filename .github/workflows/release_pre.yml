@@ -331,22 +331,26 @@ jobs:
           Import-Module powershell-yaml
           
           # 读取 YAML 文件
-          $yamlContent = Get-Content -Path ${{ secrets.REPO_FRONT_PATH }}/release/latest.yml -Raw | ConvertFrom-Yaml
+          $yamlContent = Get-Content -Path ${{ secrets.REPO_FRONT_PATH }}/release/latest.yml -Raw 
           
           # Extract and print the old hash value
           Write-Output "Old Hash: $($yamlContent.sha512)"
       
           # 修改 sha512 值
-          $yamlContent.sha512 = '${{ steps.hash.outputs.sha512_base64 }}'
+          # $yamlContent.sha512 = '${{ steps.hash.outputs.sha512_base64 }}'
           
           # 可选：如果有嵌套的结构，如 files 数组
-          $yamlContent.files[0].sha512 = '${{ steps.hash.outputs.sha512_base64 }}'
+          # $yamlContent.files[0].sha512 = '${{ steps.hash.outputs.sha512_base64 }}'
+          # 替换哈希值
+          $newHash = ${{ steps.hash.outputs.sha512_base64 }}
+          $yamlContent = $yamlContent -replace '(sha512: ).*', "`$1$newHash"
           
           # 打印新的 sha512 值以确认
           Write-Output "New Hash: $($yamlContent.sha512)"
           
           # 将更改写回 YAML 文件
-          $yamlContent | ConvertTo-Yaml | Set-Content -Path ${{ secrets.REPO_FRONT_PATH }}/release/latest.yml
+          Set-Content -Path ${{ secrets.REPO_FRONT_PATH }}/release/latest.yml -Value $yamlContent
+          # $yamlContent | ConvertTo-Yaml | Set-Content -Path ${{ secrets.REPO_FRONT_PATH }}/release/latest.yml
         shell: powershell
         env:
           new_hash: ${{ steps.hash.outputs.sha512_base64 }}
