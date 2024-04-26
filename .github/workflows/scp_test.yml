@@ -54,10 +54,18 @@ jobs:
       #   env:
       #     new_hash: ${{ steps.hash.outputs.sha512_base64 }}
 
+      - name: Install powershell-yaml module
+        run: |
+          # Set the execution policy to bypass the prompt about installation from untrusted sources
+          Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process -Force
+          # Install the powershell-yaml module
+          Install-Module -Name powershell-yaml -Force -SkipPublisherCheck
+        shell: powershell
+
+        
       - name: Extract, replace, and print hash value
         if: ${{ runner.os == 'Windows' }}
         run: |
-          Install-Module -Name powershell-yaml
           # 引入 powershell-yaml 模块
           Import-Module powershell-yaml
           
