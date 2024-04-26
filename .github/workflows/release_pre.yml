@@ -312,13 +312,13 @@ jobs:
           # Extract and print the old hash value
           $old_hash = & C:\bin\yq.exe e '.sha512' ${{ secrets.REPO_FRONT_PATH }}/release/latest.yml
           Write-Output "Old Hash: $old_hash"
-          Write-Output "New Hash: $new_hash"
+          Write-Output "New Hash: $env:new_hash"
       
           # Update the yaml file with the new hash
-          & C:\bin\yq.exe e ".sha512 = \"$new_hash\"" -i ${{ secrets.REPO_FRONT_PATH }}/release/latest.yml
+          & C:\bin\yq.exe e ".sha512 = `"$env:new_hash`"" -i "${{ secrets.REPO_FRONT_PATH }}/release/latest.yml"
           
           # Optionally, update hash in nested structure under 'files'
-          & C:\bin\yq.exe e ".files[0].sha512 = \"$new_hash\"" -i ${{ secrets.REPO_FRONT_PATH }}/release/latest.yml
+          & C:\bin\yq.exe e ".files[0].sha512 = `"$env:new_hash`"" -i "${{ secrets.REPO_FRONT_PATH }}/release/latest.yml"
         shell: powershell
         env:
           new_hash: ${{ steps.hash.outputs.sha512_base64 }}
