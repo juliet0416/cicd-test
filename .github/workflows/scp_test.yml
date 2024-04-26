@@ -28,14 +28,14 @@ jobs:
           $base64 = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($hash))
           echo "::set-output name=sha512_base64::$base64"
 
-      # 安装yq解析yml
-      - name: Install yq
-        if: ${{ runner.os == 'Windows' }}
-        run: |
-          Invoke-WebRequest -Uri "https://github.com/mikefarah/yq/releases/download/v4.25.1/yq_windows_amd64.exe" -OutFile "yq.exe"
-          New-Item -Path "C:\bin" -ItemType Directory -Force
-          Move-Item -Path "yq.exe" -Destination "C:\bin\yq.exe"
-        shell: powershell
+      # # 安装yq解析yml
+      # - name: Install yq
+      #   if: ${{ runner.os == 'Windows' }}
+      #   run: |
+      #     Invoke-WebRequest -Uri "https://github.com/mikefarah/yq/releases/download/v4.25.1/yq_windows_amd64.exe" -OutFile "yq.exe"
+      #     New-Item -Path "C:\bin" -ItemType Directory -Force
+      #     Move-Item -Path "yq.exe" -Destination "C:\bin\yq.exe"
+      #   shell: powershell
 
       # - name: Extract, replace, and print hash value
       #   if: ${{ runner.os == 'Windows' }}
@@ -57,21 +57,26 @@ jobs:
       - name: Extract, replace, and print hash value
         if: ${{ runner.os == 'Windows' }}
         run: |
-          # Ensure yq is available in the PATH
-          $env:PATH += ";C:\bin"
-      
-          # Extract and print the old hash value
-          $old_hash = yq e '.sha512' latest.yml
-          Write-Output "Old Hash: $old_hash"
-      
-          # Correctly format and inject the new hash value
-          $new_hash = "${{ steps.hash.outputs.sha512_base64 }}"
-          yq e ".sha512 = `"$new_hash`"" -i latest.yml
-      
-          # Optionally, update hash in nested structure under 'files'
-          yq e ".files[0].sha512 = `"$new_hash`"" -i latest.yml
-      
-          # Print the new hash value
-          Write-Output "New Hash: $new_hash"
+          # 引入 powershell-yaml 模块
+          Import-Module powershell-yaml
+          
+          # 读取 YAML 文件
+          $yamlContent = Get-Content -Path latest.yml -Raw | ConvertFrom-Yaml
+          
+          # 打印旧的 sha512 值
+          Write-Output "Old Hash: $($yamlContent.sha512)"
+          
+          # 修改 sha512 值
+          $yamlContent.sha512 = ${{ steps.hash.outputs.sha512_base64 }}
+          
+          # 可选：如果有嵌套的结构，如 files 数组
+          $yamlContent.files[0].sha512 = ${{ steps.hash.outputs.sha512_base64 }}
+          
+          # 打印新的 sha512 值以确认
+          Write-Output "New Hash: $($yamlContent.sha512)"
+          
+          # 将更改写回 YAML 文件
+          $yamlContent | ConvertTo-Yaml | Set-Content -Path latest.yml
+
         shell: powershell
 
