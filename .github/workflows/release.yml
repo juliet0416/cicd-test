@@ -253,6 +253,41 @@ jobs:
         run: |
           cp -r ${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe ${{ github.workspace }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe
 
+      - name: Install WinSCP
+        if: ${{ runner.os == 'Windows' }}
+        run: |
+          choco install winscp
+      
+      # 上传文件到远程服务器
+      - name: Copy files to remote server
+        if: ${{ runner.os == 'Windows' }}
+        continue-on-error: true
+        timeout-minutes: 15
+        env:
+          SCP_PASSWORD: ${{ secrets.WIN_SSH_PRIVATE_KEY }}
+          REMOTE_HOST: ${{ secrets.WIN_SERVER_IP }}
+          REMOTE_USER: ${{ secrets.WIN_SERVER_USER }}
+          REMOTE_PATH: "${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe"
+          HOST_KEY: ${{ secrets.HOST_KEY }}
+          FILE_TO_UPLOAD: "${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe"
+          REMOTE_SCRIPT_PATH: "${{ secrets.REMOTE_SIGN_SCRIPT }} ${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe"
+          LOCAL_DOWNLOAD_PATH: "${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe"
+        run: |
+          winscp.com /log=winscp.log /command `
+            "option batch abort" `
+            "option confirm off" `
+            "open scp://${{ env.REMOTE_USER }}:${{ env.SCP_PASSWORD }}@${{ env.REMOTE_HOST }} -hostkey=*" `
+            "put ${env:FILE_TO_UPLOAD} ${env:REMOTE_PATH}" `
+            "call ${env:REMOTE_SCRIPT_PATH}" `
+            "get ${env:REMOTE_PATH} ${env:LOCAL_DOWNLOAD_PATH}" `
+            "exit"
+
+      # 准备发往OSS的文件
+      - name: Prepare upload for OSS on windows
+        if: ${{ runner.os == 'Windows' }}
+        run: |
+          cp -r ${{ github.workspace }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe ${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe 
+
       # 修改windows加签后的yml文件
       - name: Calculate file hash
         if: ${{ runner.os == 'Windows' }}
@@ -301,42 +336,6 @@ jobs:
         shell: powershell
         env:
           new_hash: ${{ steps.hash.outputs.sha512_base64 }}
-
-      - name: Install WinSCP
-        if: ${{ runner.os == 'Windows' }}
-        run: |
-          choco install winscp
-      
-      # 上传文件到远程服务器
-      - name: Copy files to remote server
-        if: ${{ runner.os == 'Windows' }}
-        continue-on-error: true
-        timeout-minutes: 15
-        env:
-          SCP_PASSWORD: ${{ secrets.WIN_SSH_PRIVATE_KEY }}
-          REMOTE_HOST: ${{ secrets.WIN_SERVER_IP }}
-          REMOTE_USER: ${{ secrets.WIN_SERVER_USER }}
-          REMOTE_PATH: "${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe"
-          HOST_KEY: ${{ secrets.HOST_KEY }}
-          FILE_TO_UPLOAD: "${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe"
-          REMOTE_SCRIPT_PATH: "${{ secrets.REMOTE_SIGN_SCRIPT }} ${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe"
-          LOCAL_DOWNLOAD_PATH: "${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe"
-        run: |
-          winscp.com /log=winscp.log /command `
-            "option batch abort" `
-            "option confirm off" `
-            "open scp://${{ env.REMOTE_USER }}:${{ env.SCP_PASSWORD }}@${{ env.REMOTE_HOST }} -hostkey=*" `
-            "put ${env:FILE_TO_UPLOAD} ${env:REMOTE_PATH}" `
-            "call ${env:REMOTE_SCRIPT_PATH}" `
-            "get ${env:REMOTE_PATH} ${env:LOCAL_DOWNLOAD_PATH}" `
-            "exit"
-
-      # 准备发往OSS的文件
-      - name: Prepare upload for OSS on windows
-        if: ${{ runner.os == 'Windows' }}
-        run: |
-          cp -r ${{ github.workspace }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe ${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe 
-
 
       # 设置OSS
       - name: Set up oss utils
