@@ -19,28 +19,6 @@ jobs:
           echo "    sha512: 3tx3ugvOwH2YISic6SNsyndVU7sZ1g5yZkA823fvbmZma34v9A3FydTO2Qf7F0ZomEKROEsuO5IvAe+wqkHGdA==" >> latest.yml    
         shell: pwsh
 
-      - name: Install WinSCP
-        run: |
-          choco install winscp
-
-      - name: SCP file using WinSCP
-        env:
-          SCP_PASSWORD: ${{ secrets.WIN_SSH_PRIVATE_KEY }}
-          REMOTE_HOST: ${{ secrets.WIN_SERVER_IP }}
-          REMOTE_USER: ${{ secrets.WIN_SERVER_USER }}
-          REMOTE_PATH: ${{ secrets.REMOTE_SIGN_PATH }}/test.exe
-          HOST_KEY: ${{ secrets.HOST_KEY }}
-          FILE_TO_UPLOAD: 'testfile.txt'
-          REMOTE_SCRIPT_PATH: "${{ secrets.REMOTE_SIGN_SCRIPT }} ${{ secrets.REMOTE_SIGN_PATH }}/Chat2DB-Pro-1.0.6.exe"
-          LOCAL_DOWNLOAD_PATH: '${{ github.workspace }}/test.exe'
-        run: |
-          winscp.com /log=winscp.log /command `
-            "option batch abort" `
-            "option confirm off" `
-            "open scp://${{ env.REMOTE_USER }}:${{ env.SCP_PASSWORD }}@${{ env.REMOTE_HOST }} -hostkey=*" `
-            "get ${env:REMOTE_PATH} ${env:LOCAL_DOWNLOAD_PATH}" `
-            "exit"
-
       # 修改windows加签后的yml文件
       - name: Calculate file hash
         if: ${{ runner.os == 'Windows' }}
@@ -63,15 +41,15 @@ jobs:
         if: ${{ runner.os == 'Windows' }}
         run: |
           # Extract and print the old hash value
-          $old_hash = & C:\bin\yq.exe e '.sha512' test.exe
+          $old_hash = & C:\bin\yq.exe e '.sha512' latest.yml
           Write-Output "Old Hash: $old_hash"
-          Write-Output "New Hash: $new_hash"
+          Write-Output "New Hash: $env:new_hash"
       
           # Update the yaml file with the new hash
-          & C:\bin\yq.exe e ".sha512 = \"$new_hash\"" -i latest.yml
+          & C:\bin\yq.exe e ".sha512 = `"$env:new_hash`"" -i latest.yml
           
           # Optionally, update hash in nested structure under 'files'
-          & C:\bin\yq.exe e ".files[0].sha512 = \"$new_hash\"" -i latest.yml
+          & C:\bin\yq.exe e ".files[0].sha512 = `"$env:new_hash`"" -i latest.yml
         shell: powershell
         env:
           new_hash: ${{ steps.hash.outputs.sha512_base64 }}
