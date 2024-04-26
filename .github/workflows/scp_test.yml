@@ -76,10 +76,10 @@ jobs:
           Write-Output "Old Hash: $($yamlContent.sha512)"
           
           # 修改 sha512 值
-          $yamlContent.sha512 = ${{ steps.hash.outputs.sha512_base64 }}
+          $yamlContent.sha512 = '${{ steps.hash.outputs.sha512_base64 }}'
           
           # 可选：如果有嵌套的结构，如 files 数组
-          $yamlContent.files[0].sha512 = ${{ steps.hash.outputs.sha512_base64 }}
+          $yamlContent.files[0].sha512 = '${{ steps.hash.outputs.sha512_base64 }}'
           
           # 打印新的 sha512 值以确认
           Write-Output "New Hash: $($yamlContent.sha512)"
