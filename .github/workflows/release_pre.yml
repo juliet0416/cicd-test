@@ -294,8 +294,22 @@ jobs:
         continue-on-error: true
         id: hash
         run: |
-          $hash = (CertUtil -hashfile ${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe SHA512)[1] -replace ' ',''
-          $base64 = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($hash))
+          # Step 1: Get the SHA512 hash of the file using CertUtil
+          $hashOutput = Certutil -hashfile "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe" SHA512
+          Write-Output "CertUtil Output: $hashOutput"
+          
+          # Extract the hash value (second line of the output)
+          $hashValue = $hashOutput[1].Trim() -replace ' ', ''
+          
+          # Step 2: Convert hex string to bytes and then to Base64
+          $hashBytes = [byte[]]::new($hashValue.Length / 2)
+          for ($i = 0; $i -lt $hashValue.Length; $i += 2) {
+            $hashBytes[$i / 2] = [Convert]::ToByte($hashValue.Substring($i, 2), 16)
+          }
+          $base64 = [Convert]::ToBase64String($hashBytes)
+          Write-Output "Base64 Encoded Hash: $base64"
+      
+          # Set the output variable
           echo "::set-output name=sha512_base64::$base64"
 
       # 安装yq解析yml
