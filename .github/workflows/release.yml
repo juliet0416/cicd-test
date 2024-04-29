@@ -117,8 +117,16 @@ jobs:
           # sed -i '' "s/\(^jdk.tls.disabledAlgorithms=\)\(.*\)\( TLSv1, TLSv1.1,\)\(.*\)/\1\2\4/" "${{ env.JAVA_HOME }}/conf/security/java.security"
           $filePath = "${{ env.JAVA_HOME }}\conf\security\java.security"
           $content = Get-Content $filePath -Raw
-          $updatedContent = $content -replace '^(jdk.tls.disabledAlgorithms=)(.*)( TLSv1, TLSv1.1,)(.*)', '$1$2$4'
+          $updatedContent = $content -replace '(?s)(jdk.tls.disabledAlgorithms\s*=\s*)(.*?)(\s*TLSv1,\s*TLSv1\.1,)(.*?)(?=[,\r\n])', '$1$2$4'
+
           $updatedContent | Set-Content $filePath
+          Write-Output "Original content:"
+          Write-Output $content
+          
+          # 打印修改后的内容确认替换是否生效
+          Write-Output "Updated content:"
+          Write-Output $updatedContent
+          
         shell: pwsh
 
       # java.security open tls1 macOS
