@@ -10,96 +10,31 @@ jobs:
   test-scp:
     runs-on: windows-latest
     steps:
-      - name: Create a test file 
-        run: |
-          echo "This is a test file." > testfile.txt
-          echo "version: 1.0.7" > latest.yml
-          echo "files:" >> latest.yml
-          echo "  - url: test.exe" >> latest.yml
-          echo "    sha512: 3tx3ugvOwH2YISic6SNsyndVU7sZ1g5yZkA823fvbmZma34v9A3FydTO2Qf7F0ZomEKROEsuO5IvAe+wqkHGdA==" >> latest.yml    
-        shell: pwsh
-
-      # 修改windows加签后的yml文件
-      - name: Calculate file hash
+      # Install jre Windows
+      - name: Install Jre for Windows
         if: ${{ runner.os == 'Windows' }}
-        id: hash
-        run: |
-          # Step 1: Get the SHA512 hash of the file using CertUtil
-          $hashOutput = Certutil -hashfile "testfile.txt" SHA512
-          Write-Output "CertUtil Output: $hashOutput"
-          
-          # Extract the hash value (second line of the output)
-          $hashValue = $hashOutput[1].Trim() -replace ' ', ''
-          
-          # Step 2: Convert hex string to bytes and then to Base64
-          $hashBytes = [byte[]]::new($hashValue.Length / 2)
-          for ($i = 0; $i -lt $hashValue.Length; $i += 2) {
-            $hashBytes[$i / 2] = [Convert]::ToByte($hashValue.Substring($i, 2), 16)
-          }
-          $base64 = [Convert]::ToBase64String($hashBytes)
-          Write-Output "Base64 Encoded Hash: $base64"
-      
-          # Set the output variable
-          echo "::set-output name=sha512_base64::$base64"
+        uses: actions/setup-java@main
+        with:
+          java-version: "17"
+          distribution: "temurin"
+          java-package: "jre"
 
-      # # 安装yq解析yml
-      # - name: Install yq
-      #   if: ${{ runner.os == 'Windows' }}
-      #   run: |
-      #     Invoke-WebRequest -Uri "https://github.com/mikefarah/yq/releases/download/v4.25.1/yq_windows_amd64.exe" -OutFile "yq.exe"
-      #     New-Item -Path "C:\bin" -ItemType Directory -Force
-      #     Move-Item -Path "yq.exe" -Destination "C:\bin\yq.exe"
-      #   shell: powershell
-
-      # - name: Extract, replace, and print hash value
-      #   if: ${{ runner.os == 'Windows' }}
-      #   run: |
-      #     # Extract and print the old hash value
-      #     $old_hash = & C:\bin\yq.exe e '.sha512' latest.yml
-      #     Write-Output "Old Hash: $old_hash"
-      #     Write-Output "New Hash: $env:new_hash"
-      
-      #     # Update the yaml file with the new hash
-      #     & C:\bin\yq.exe e ".sha512 = `"$env:new_hash`"" -i latest.yml
-          
-      #     # Optionally, update hash in nested structure under 'files'
-      #     & C:\bin\yq.exe e ".files[0].sha512 = `"$env:new_hash`"" -i latest.yml
-      #   shell: powershell
-      #   env:
-      #     new_hash: ${{ steps.hash.outputs.sha512_base64 }}
-
-      - name: Install powershell-yaml module
-        run: |
-          # Set the execution policy to bypass the prompt about installation from untrusted sources
-          Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process -Force
-          # Install the powershell-yaml module
-          Install-Module -Name powershell-yaml -Force -SkipPublisherCheck
-        shell: powershell
-
-        
-      - name: Extract, replace, and print hash value
+      # java.security open tls1 Windows
+      - name: Enable tls1
         if: ${{ runner.os == 'Windows' }}
         run: |
-          # 引入 powershell-yaml 模块
-          Import-Module powershell-yaml
-          
-          # 读取 YAML 文件
-          $yamlContent = Get-Content -Path latest.yml -Raw | ConvertFrom-Yaml
-          
-          # 打印旧的 sha512 值
-          Write-Output "Old Hash: $($yamlContent.sha512)"
-          
-          # 修改 sha512 值
-          $yamlContent.sha512 = '${{ steps.hash.outputs.sha512_base64 }}'
-          
-          # 可选：如果有嵌套的结构，如 files 数组
-          $yamlContent.files[0].sha512 = '${{ steps.hash.outputs.sha512_base64 }}'
-          
-          # 打印新的 sha512 值以确认
-          Write-Output "New Hash: $($yamlContent.sha512)"
-          
-          # 将更改写回 YAML 文件
-          $yamlContent | ConvertTo-Yaml | Set-Content -Path latest.yml
+          # sed -i '' "s/\(^jdk.tls.disabledAlgorithms=\)\(.*\)\( TLSv1, TLSv1.1,\)\(.*\)/\1\2\4/" "${{ env.JAVA_HOME }}/conf/security/java.security"
+          $filePath = "${{ env.JAVA_HOME }}\conf\security\java.security"
+          $content = Get-Content $filePath -Raw
+          $updatedContent = $content -replace '(?s)(jdk.tls.disabledAlgorithms\s*=\s*)(.*?)(\s*TLSv1,\s*TLSv1\.1,)(.*?)(?=[,\r\n])', '$1$2$4'
 
-        shell: powershell
+
+          $updatedContent | Set-Content $filePath
+          # 在修改前打印文件的内容看看是否正确加载
+          Write-Output "Original content:"
+          Write-Output $content
+          
+          # 打印修改后的内容确认替换是否生效
+          Write-Output "Updated content:"
+          Write-Output $updatedContent
 
