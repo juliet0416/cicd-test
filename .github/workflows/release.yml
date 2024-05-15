@@ -278,7 +278,8 @@ jobs:
           REMOTE_PATH: "${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe"
           HOST_KEY: ${{ secrets.HOST_KEY }}
           FILE_TO_UPLOAD: "${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe"
-          REMOTE_SCRIPT_PATH: "${{ secrets.REMOTE_SIGN_SCRIPT }} ${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe"
+          REMOTE_SCRIPT_PATH_1: "${{ secrets.REMOTE_SIGN_SCRIPT }} --alg SHA-1 ${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe"
+          REMOTE_SCRIPT_PATH_2: "${{ secrets.REMOTE_SIGN_SCRIPT }} --alg SHA-256 ${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe"
           LOCAL_DOWNLOAD_PATH: "${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe"
         run: |
           winscp.com /log=winscp.log /command `
@@ -286,7 +287,8 @@ jobs:
             "option confirm off" `
             "open scp://${{ env.REMOTE_USER }}:${{ env.SCP_PASSWORD }}@${{ env.REMOTE_HOST }} -hostkey=*" `
             "put ${env:FILE_TO_UPLOAD} ${env:REMOTE_PATH}" `
-            "call ${env:REMOTE_SCRIPT_PATH}" `
+            "call ${env:REMOTE_SCRIPT_PATH_1}" `
+            "call ${env:REMOTE_SCRIPT_PATH_2}" `
             "get ${env:REMOTE_PATH} ${env:LOCAL_DOWNLOAD_PATH}" `
             "exit"
 
