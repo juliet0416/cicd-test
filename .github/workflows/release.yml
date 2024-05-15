@@ -426,8 +426,8 @@ jobs:
           msgtype: markdown
           content: |
             {
-              "title": "${{ secrets.PRODUCT_APP_NAME }}-${{ matrix.file_name }}-打包完成通知",
-              "text": "# ${{ secrets.PRODUCT_APP_NAME }}-${{ matrix.file_name }}-打包完成通知\n ###  任务id：[${{ github.run_id }}](https://github.com/juliet0416/cicd-test/actions/runs/${{ github.run_id }})\n ### 下载地址：[${{ secrets.PRODUCT_APP_NAME }}-${{ matrix.file_name }}](${{secrets.CDN_URL}}/download/${{ github.event.inputs.version }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}${{ matrix.file_extension }})"
+              "title": "${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}${{ matrix.file_extension }}-打包完成通知",
+              "text": "# ${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}${{ matrix.file_extension }}-打包完成通知\n ###  任务id：[${{ github.event.inputs.version }}](https://github.com/juliet0416/cicd-test/actions/runs/${{ github.run_id }})\n ### 下载地址：[${{ secrets.PRODUCT_APP_NAME }}-${{ matrix.file_name }}](${{secrets.CDN_URL}}/download/${{ github.event.inputs.version }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}${{ matrix.file_extension }})"
             }
 
 
