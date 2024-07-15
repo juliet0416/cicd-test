@@ -247,32 +247,32 @@ jobs:
       - name: Download DTS MacOS 
         if: matrix.os == 'macos-latest' 
         run: |
-          ossutil cp -rf oss://${{ secrets.BUCKET_NAME }}/dts/dbmotion_MacOS_${{matrix.arch}}.tar.gz ${{ secrets.REPO_FRONT_PATH }}/static/
+          ossutil cp -rf oss://${{ secrets.BUCKET_NAME }}/dts/${{DTS_NAME}}_MacOS_${{matrix.arch}}.tar.gz ${{ secrets.REPO_FRONT_PATH }}/static/
           cd ${{ secrets.REPO_FRONT_PATH }}/static/
-          tar -zxvf dbmotion_MacOS_${{matrix.arch}}.tar.gz
-          cp -r dbmotion_MacOS_${{matrix.arch}} ./dbmotions
-          rm -rf dbmotion_MacOS_${{matrix.arch}}
-          rm -rf dbmotion_MacOS_${{matrix.arch}}.tar.gz
+          tar -zxvf ${{DTS_NAME}}_MacOS_${{matrix.arch}}.tar.gz
+          cp -r ${{DTS_NAME}}_MacOS_${{matrix.arch}} ./${{DTS_NAME}}s
+          rm -rf ${{DTS_NAME}}_MacOS_${{matrix.arch}}
+          rm -rf ${{DTS_NAME}}_MacOS_${{matrix.arch}}.tar.gz
 
       - name: Download DTS Windows
         if: matrix.os == 'windows-latest'
         run: |
-          ossutil cp -rf oss://${{ secrets.BUCKET_NAME }}/dts/dbmotion_Window_${{matrix.arch}}.zip ${{ secrets.REPO_FRONT_PATH }}/static/
+          ossutil cp -rf oss://${{ secrets.BUCKET_NAME }}/dts/${{DTS_NAME}}_Window_${{matrix.arch}}.zip ${{ secrets.REPO_FRONT_PATH }}/static/
           cd ${{ secrets.REPO_FRONT_PATH }}/static/
-          unzip dbmotion_Window_${{matrix.arch}}.zip
-          cp -r dbmotion_Window_${{matrix.arch}} ./dbmotions
-          rm -rf dbmotion_Window_${{matrix.arch}}
-          rm -rf dbmotion_Window_${{matrix.arch}}.zip
+          unzip ${{DTS_NAME}}_Window_${{matrix.arch}}.zip
+          cp -r ${{DTS_NAME}}_Window_${{matrix.arch}} ./${{DTS_NAME}}s
+          rm -rf ${{DTS_NAME}}_Window_${{matrix.arch}}
+          rm -rf ${{DTS_NAME}}_Window_${{matrix.arch}}.zip
 
       - name: Download DTS Linux
         if: matrix.os == 'ubuntu-latest'
         run: |
-          ossutil cp -rf oss://${{ secrets.BUCKET_NAME }}/dts/dbmotion_Linux_${{matrix.arch}}.tar.gz ${{ secrets.REPO_FRONT_PATH }}/static/
+          ossutil cp -rf oss://${{ secrets.BUCKET_NAME }}/dts/${{DTS_NAME}}_Linux_${{matrix.arch}}.tar.gz ${{ secrets.REPO_FRONT_PATH }}/static/
           cd ${{ secrets.REPO_FRONT_PATH }}/static/
-          tar -zxvf dbmotion_Linux_${{matrix.arch}}.tar.gz
-          cp -r dbmotion_Linux_${{matrix.arch}} ./dbmotions
-          rm -rf dbmotion_Linux_${{matrix.arch}}
-          rm -rf dbmotion_Linux_${{matrix.arch}}.tar.gz
+          tar -zxvf ${{DTS_NAME}}_Linux_${{matrix.arch}}.tar.gz
+          cp -r ${{DTS_NAME}}_Linux_${{matrix.arch}} ./${{DTS_NAME}}s
+          rm -rf ${{DTS_NAME}}_Linux_${{matrix.arch}}
+          rm -rf ${{DTS_NAME}}_Linux_${{matrix.arch}}.tar.gz
 
 
       # 打包Electron
