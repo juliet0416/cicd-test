@@ -232,12 +232,21 @@ jobs:
       ## DTS-UI      
       - name: Download DTS-UI
         run: |
-          ossutil cp -rf oss://${{ secrets.BUCKET_NAME }}/dts/dts-ui.zip ${{ secrets.REPO_FRONT_PATH }}/static/
-          cd ${{ secrets.REPO_FRONT_PATH }}/static/
-          unzip dts-ui.zip
-          cp -r dts ./dist/dts
-          rm -rf dts
-          rm -rf dts-ui.zip
+          if [ "${{ runner.os }}" == "Windows" ]; then
+            ossutil cp -rf oss://${{ secrets.BUCKET_NAME }}/dts/dts-ui.zip ${{ secrets.REPO_FRONT_PATH }}/static/
+            cd ${{ secrets.REPO_FRONT_PATH }}/static/
+            unzip -o dts-ui.zip
+            xcopy /E /I dts .\dist\dts\
+            del /S /Q dts
+            del /S /Q dts-ui.zip
+          else
+            ossutil cp -rf oss://${{ secrets.BUCKET_NAME }}/dts/dts-ui.zip ${{ secrets.REPO_FRONT_PATH }}/static/
+            cd ${{ secrets.REPO_FRONT_PATH }}/static/
+            unzip dts-ui.zip
+            cp -r dts ./dist/dts
+            rm -rf dts
+            rm -rf dts-ui.zip
+          fi
 
 
       # DTS
