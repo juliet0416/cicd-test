@@ -237,7 +237,7 @@ jobs:
           cd ${{ secrets.REPO_FRONT_PATH }}/static/
           tar -zxvf dts-ui.zip
           cp -r dts ./dist/dts
-          rm -rf dist
+          rm -rf dts
           rm -rf dts-ui.zip
       
       - name: Download DTS-UI Linux
