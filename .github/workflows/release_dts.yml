@@ -238,10 +238,11 @@ jobs:
         run: |
           ossutil cp -rf oss://${{ secrets.BUCKET_NAME }}/dts/dts-ui.zip ${{ secrets.REPO_FRONT_PATH }}/static/
           cd ${{ secrets.REPO_FRONT_PATH }}/static/
-          tar -zxvf dts-ui.zip dts
+          unzip dts-ui.zip
           cp -r dts ./dist/
           rm -rf dts
           rm -rf dts-ui.zip
+
 
       # DTS
       - name: Download DTS MacOS 
@@ -253,6 +254,7 @@ jobs:
           cp -r ${{secrets.DTS_NAME}}_MacOS_${{matrix.arch}} ./${{secrets.DTS_NAME}}s
           rm -rf ${{secrets.DTS_NAME}}_MacOS_${{matrix.arch}}
           rm -rf ${{secrets.DTS_NAME}}_MacOS_${{matrix.arch}}.tar.gz
+
 
       - name: Download DTS Windows
         if: matrix.os == 'windows-latest'
