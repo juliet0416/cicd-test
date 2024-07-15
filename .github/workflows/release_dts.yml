@@ -229,15 +229,15 @@ jobs:
           yarn run build:web:desktop --app_version=${{ github.event.inputs.version }}
           cp -r dist ./static/
 
-      ## DTS-UI
+      ## DTS-UI      
       - name: Download DTS-UI Linux
         run: |
           ossutil cp -rf oss://${{ secrets.BUCKET_NAME }}/dts/dts-ui-linux.zip ${{ secrets.REPO_FRONT_PATH }}/static/
           cd ${{ secrets.REPO_FRONT_PATH }}/static/
-          unzip dts-ui-linux.zip
+          unzip dts-ui.zip
           cp -r dts ./dist/dts
-          rm -rf dist
-          rm -rf dts-ui-linux.zip
+          rm -rf dts
+          rm -rf dts-ui.zipip
 
 
       # DTS
