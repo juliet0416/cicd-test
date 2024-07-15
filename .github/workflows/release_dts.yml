@@ -1,4 +1,4 @@
-name: Build Release Client
+name: Build DTS Client
 
 on:
   workflow_dispatch:
