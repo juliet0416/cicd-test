@@ -245,7 +245,7 @@ jobs:
         run: |
           ossutil cp -rf oss://${{ secrets.BUCKET_NAME }}/dts/dts-ui-linux.zip ${{ secrets.REPO_FRONT_PATH }}/static/
           cd ${{ secrets.REPO_FRONT_PATH }}/static/
-          unzip -zxvf dts-ui-linux.zip
+          unzip dts-ui-linux.zip
           cp -r dts ./dist/dts
           rm -rf dist
           rm -rf dts-ui-linux.zip
