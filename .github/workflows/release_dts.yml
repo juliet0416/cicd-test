@@ -4,13 +4,13 @@ on:
   workflow_dispatch:
     inputs:
       logLevel:
-        description: 'Log level'
+        description: "Log level"
         required: true
-        default: 'warning'
+        default: "warning"
       version:
-        description: 'Version number'
+        description: "Version number"
         required: true
-        default: '1.0.0'
+        default: "1.0.0"
 
 jobs:
   release:
@@ -55,7 +55,7 @@ jobs:
           access-key-id: ${{ secrets.OSS_ACCESS_KEY_ID }}
           access-key-secret: ${{ secrets.OSS_ACCESS_KEY_SECRET }}
           ossutil-version: "1.7.16"
-          
+
       - name: Check out second repository
         uses: actions/checkout@v2
         with:
@@ -63,7 +63,6 @@ jobs:
           path: ${{ secrets.REPO_PATH }}
           ref: ${{ secrets.REPO_BRANCH }}
           token: ${{ secrets.ACCESS_TOKEN }}
-
 
       # Output basic information
       - name: Print basic information
@@ -87,7 +86,7 @@ jobs:
           java-version: "17"
           distribution: "temurin"
           java-package: "jre"
-          architecture: 'x64'
+          architecture: "x64"
 
       # Install jre MacOS arm64
       - name: Install Jre MacOS arm64
@@ -107,7 +106,6 @@ jobs:
           java-version: "17"
           distribution: "temurin"
           java-package: "jre"
-
 
       # Install jre Linux arm64
       - name: Install Jre for Linux
@@ -131,11 +129,11 @@ jobs:
           $updatedContent | Set-Content $filePath
           Write-Output "Original content:"
           Write-Output $content
-          
+
           # 打印修改后的内容确认替换是否生效
           Write-Output "Updated content:"
           Write-Output $updatedContent
-          
+
         shell: pwsh
 
       # java.security open tls1 macOS
@@ -149,7 +147,7 @@ jobs:
         if: ${{ runner.os == 'Windows' }}
         run: |
           mkdir -p ${{ secrets.REPO_STATIC_PATH }} 
-          cp -r "${{ env.JAVA_HOME }}" ${{ secrets.REPO_JRE_PATH }} 
+          cp -r "${{ env.JAVA_HOME }}" ${{ secrets.REPO_JRE_PATH }}
 
       # Copy jre macOS
       - name: Copy Jre for macOS
@@ -157,7 +155,7 @@ jobs:
         run: |
           mkdir -p ${{ secrets.REPO_STATIC_PATH }} 
           cp -r $JAVA_HOME ${{ secrets.REPO_JRE_PATH }} 
-          chmod -R 777 ${{ secrets.REPO_JRE_PATH }} 
+          chmod -R 777 ${{ secrets.REPO_JRE_PATH }}
 
       # Copy jre Linux
       - name: Copy Jre for Linux
@@ -165,7 +163,7 @@ jobs:
         run: |
           mkdir -p ${{ secrets.REPO_STATIC_PATH }} 
           cp -r $JAVA_HOME ${{ secrets.REPO_JRE_PATH }} 
-          chmod -R 777 ${{ secrets.REPO_JRE_PATH }} 
+          chmod -R 777 ${{ secrets.REPO_JRE_PATH }}
 
       # Linux
       - name: Delete File
@@ -222,7 +220,6 @@ jobs:
           yarn
           yarn run build
           cp -r electron ../../static
-      
 
       # 打包桌面端前端资源
       - name: Prepare Build Electron
@@ -232,39 +229,34 @@ jobs:
           yarn run build:web:desktop --app_version=${{ github.event.inputs.version }}
           cp -r dist ./static/
 
-
       ## DTS-UI
       - name: Download DTS-UI
         run: |
           ossutil cp -rf oss://${{ secrets.BUCKET_NAME }}/dts/dts-ui.zip ${{ secrets.REPO_FRONT_PATH }}/static/
           cd ${{ secrets.REPO_FRONT_PATH }}/static/
-          unzip dts-ui.zip
-          cp -r dts ./dist/
+          tar -zxvf dts-ui.zip dts
+          cp -r dts ./dist/dts
           rm -rf dts
           rm -rf dts-ui.zip
 
-
       # DTS
-      - name: Download DTS MacOS 
-        if: matrix.os == 'macos-latest' 
+      - name: Download DTS MacOS
+        if: matrix.os == 'macos-latest'
         run: |
           ossutil cp -rf oss://${{ secrets.BUCKET_NAME }}/dts/${{secrets.DTS_NAME}}_MacOS_${{matrix.arch}}.tar.gz ${{ secrets.REPO_FRONT_PATH }}/static/
           cd ${{ secrets.REPO_FRONT_PATH }}/static/
           tar -zxvf ${{secrets.DTS_NAME}}_MacOS_${{matrix.arch}}.tar.gz
-          cp -r ${{secrets.DTS_NAME}}_MacOS_${{matrix.arch}} ./${{secrets.DTS_NAME}}s
-          rm -rf ${{secrets.DTS_NAME}}_MacOS_${{matrix.arch}}
+          cp -r ${{secrets.DTS_NAME}} ./${{secrets.DTS_NAME}}s
           rm -rf ${{secrets.DTS_NAME}}_MacOS_${{matrix.arch}}.tar.gz
-
 
       - name: Download DTS Windows
         if: matrix.os == 'windows-latest'
         run: |
           ossutil cp -rf oss://${{ secrets.BUCKET_NAME }}/dts/${{secrets.DTS_NAME}}_Window_${{matrix.arch}}.zip ${{ secrets.REPO_FRONT_PATH }}/static/
           cd ${{ secrets.REPO_FRONT_PATH }}/static/
-          unzip ${{secrets.DTS_NAME}}_Window_${{matrix.arch}}.zip
-          cp -r ${{secrets.DTS_NAME}}_Window_${{matrix.arch}} ./${{secrets.DTS_NAME}}s
-          rm -rf ${{secrets.DTS_NAME}}_Window_${{matrix.arch}}
-          rm -rf ${{secrets.DTS_NAME}}_Window_${{matrix.arch}}.zip
+          tar -zxvf ${{secrets.DTS_NAME}}_Window_${{matrix.arch}}.tar.gz
+          cp -r ${{secrets.DTS_NAME}} ./${{secrets.DTS_NAME}}s
+          rm -rf ${{secrets.DTS_NAME}}_Window_${{matrix.arch}}.tar.gz
 
       - name: Download DTS Linux
         if: matrix.os == 'ubuntu-latest'
@@ -272,10 +264,10 @@ jobs:
           ossutil cp -rf oss://${{ secrets.BUCKET_NAME }}/dts/${{secrets.DTS_NAME}}_Linux_${{matrix.arch}}.tar.gz ${{ secrets.REPO_FRONT_PATH }}/static/
           cd ${{ secrets.REPO_FRONT_PATH }}/static/
           tar -zxvf ${{secrets.DTS_NAME}}_Linux_${{matrix.arch}}.tar.gz
-          cp -r ${{secrets.DTS_NAME}}_Linux_${{matrix.arch}} ./${{secrets.DTS_NAME}}s
-          rm -rf ${{secrets.DTS_NAME}}_Linux_${{matrix.arch}}
+          cp -r ${{secrets.DTS_NAME}} ./${{secrets.DTS_NAME}}s
           rm -rf ${{secrets.DTS_NAME}}_Linux_${{matrix.arch}}.tar.gz
 
+      
 
       # 打包Electron
       - name: Build/release Electron app
@@ -318,7 +310,7 @@ jobs:
         if: ${{ runner.os == 'Windows' }}
         run: |
           choco install winscp
-      
+
       # 上传文件到远程服务器
       - name: Copy files to remote server
         if: ${{ runner.os == 'Windows' }}
@@ -349,7 +341,7 @@ jobs:
       - name: Prepare upload for OSS on windows
         if: ${{ runner.os == 'Windows' }}
         run: |
-          cp -r ${{ github.workspace }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe ${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe 
+          cp -r ${{ github.workspace }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe ${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe
 
       # 修改windows加签后的yml文件
       - name: Calculate file hash
@@ -360,10 +352,10 @@ jobs:
           # Step 1: Get the SHA512 hash of the file using CertUtil
           $hashOutput = Certutil -hashfile "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe" SHA512
           Write-Output "CertUtil Output: $hashOutput"
-          
+
           # Extract the hash value (second line of the output)
           $hashValue = $hashOutput[1].Trim() -replace ' ', ''
-          
+
           # Step 2: Convert hex string to bytes and then to Base64
           $hashBytes = [byte[]]::new($hashValue.Length / 2)
           for ($i = 0; $i -lt $hashValue.Length; $i += 2) {
@@ -371,7 +363,7 @@ jobs:
           }
           $base64 = [Convert]::ToBase64String($hashBytes)
           Write-Output "Base64 Encoded Hash: $base64"
-      
+
           # Set the output variable
           echo "::set-output name=sha512_base64::$base64"
 
@@ -392,35 +384,32 @@ jobs:
         run: |
           # 引入 powershell-yaml 模块
           Import-Module powershell-yaml
-          
+
           # 读取 YAML 文件
           $yamlContent = Get-Content -Path ${{ secrets.REPO_FRONT_PATH }}/release/latest.yml -Raw | ConvertFrom-Yaml
-          
+
           # Extract and print the old hash value
           Write-Output "Old Hash: $($yamlContent.sha512)"
-      
+
           # 修改 sha512 值
           # $yamlContent.sha512 = '${{ steps.hash.outputs.sha512_base64 }}'
-          
+
           # 可选：如果有嵌套的结构，如 files 数组
           # $yamlContent.files[0].sha512 = '${{ steps.hash.outputs.sha512_base64 }}'
           # 替换哈希值
           $newHash = '${{ steps.hash.outputs.sha512_base64 }}'
           $content = Get-Content -Path ${{ secrets.REPO_FRONT_PATH }}/release/latest.yml -Raw
           $content = $content -replace '(sha512: ).*', "`$1$newHash"
-          
+
           # 打印新的 sha512 值以确认
           Write-Output "New Hash: $newHash"
-          
+
           # 将更改写回 YAML 文件
           Set-Content -Path ${{ secrets.REPO_FRONT_PATH }}/release/latest.yml -Value $content
           # $yamlContent | ConvertTo-Yaml | Set-Content -Path ${{ secrets.REPO_FRONT_PATH }}/release/latest.yml
         shell: powershell
         env:
           new_hash: ${{ steps.hash.outputs.sha512_base64 }}
-
-
-
 
       # 上传到OSS
       - name: Upload to OSS for Mac
@@ -465,7 +454,6 @@ jobs:
           ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/latest-linux-arm64.yml" "oss://${{ secrets.BUCKET_NAME }}/dts/latest/linux/arm64/"
           ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.AppImage" "oss://${{ secrets.BUCKET_NAME }}/dts/latest/${{ secrets.PRODUCT_APP_NAME }}-arm64-latest.AppImage"
 
-
       # 发送到DingTalk
       - name: Send dingtalk message
         uses: ghostoy/dingtalk-action@master
@@ -477,6 +465,3 @@ jobs:
               "title": "${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}${{ matrix.file_extension }}-打包完成通知",
               "text": "# ${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}${{ matrix.file_extension }}-打包完成通知\n ###  任务id：[${{ github.event.inputs.version }}](https://github.com/juliet0416/cicd-test/actions/runs/${{ github.run_id }})\n ### 下载地址：[${{ secrets.PRODUCT_APP_NAME }}-${{ matrix.file_name }}](${{secrets.CDN_URL}}/dts/${{ github.event.inputs.version }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}${{ matrix.file_extension }})"
             }
-
-
-
