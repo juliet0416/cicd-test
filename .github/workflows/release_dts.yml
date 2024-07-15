@@ -231,6 +231,7 @@ jobs:
 
       ## DTS-UI
       - name: Download DTS-UI
+        if: matrx.os != 'ubuntu-latest'
         run: |
           ossutil cp -rf oss://${{ secrets.BUCKET_NAME }}/dts/dts-ui.zip ${{ secrets.REPO_FRONT_PATH }}/static/
           cd ${{ secrets.REPO_FRONT_PATH }}/static/
@@ -238,6 +239,17 @@ jobs:
           cp -r dts ./dist/dts
           rm -rf dist
           rm -rf dts-ui.zip
+      
+      - name: Download DTS-UI Linux
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          ossutil cp -rf oss://${{ secrets.BUCKET_NAME }}/dts/dts-ui-linux.zip ${{ secrets.REPO_FRONT_PATH }}/static/
+          cd ${{ secrets.REPO_FRONT_PATH }}/static/
+          unzip -zxvf dts-ui-linux.zip
+          cp -r dts ./dist/dts
+          rm -rf dist
+          rm -rf dts-ui-linux.zip
+
 
       # DTS
       - name: Download DTS MacOS
@@ -265,7 +277,7 @@ jobs:
         run: |
           ossutil cp -rf oss://${{ secrets.BUCKET_NAME }}/dts/${{secrets.DTS_NAME}}_Linux_${{matrix.arch}}.tar.gz ${{ secrets.REPO_FRONT_PATH }}/static/
           cd ${{ secrets.REPO_FRONT_PATH }}/static/
-          tar -zxvf ${{secrets.DTS_NAME}}_Linux_${{matrix.arch}}.tar.gz
+          tar -xzvf ${{secrets.DTS_NAME}}_Linux_${{matrix.arch}}.tar.gz
           cp -r ${{secrets.DTS_NAME}} ./${{secrets.DTS_NAME}}s
           rm -rf ${{secrets.DTS_NAME}}
           rm -rf ${{secrets.DTS_NAME}}_Linux_${{matrix.arch}}.tar.gz
