@@ -230,14 +230,14 @@ jobs:
           cp -r dist ./static/
 
       ## DTS-UI      
-      - name: Download DTS-UI Linux
+      - name: Download DTS-UI
         run: |
-          ossutil cp -rf oss://${{ secrets.BUCKET_NAME }}/dts/dts-ui-linux.zip ${{ secrets.REPO_FRONT_PATH }}/static/
+          ossutil cp -rf oss://${{ secrets.BUCKET_NAME }}/dts/dts-ui.zip ${{ secrets.REPO_FRONT_PATH }}/static/
           cd ${{ secrets.REPO_FRONT_PATH }}/static/
           unzip dts-ui.zip
           cp -r dts ./dist/dts
           rm -rf dts
-          rm -rf dts-ui.zipip
+          rm -rf dts-ui.zip
 
 
       # DTS
