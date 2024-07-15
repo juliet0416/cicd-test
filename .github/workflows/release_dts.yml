@@ -236,6 +236,7 @@ jobs:
           cd ${{ secrets.REPO_FRONT_PATH }}/static/
           tar -zxvf dts-ui.zip
           cp -r dts ./dist/dts
+          rm -rf dist
           rm -rf dts-ui.zip
 
       # DTS
@@ -246,6 +247,7 @@ jobs:
           cd ${{ secrets.REPO_FRONT_PATH }}/static/
           tar -zxvf ${{secrets.DTS_NAME}}_MacOS_${{matrix.arch}}.tar.gz
           cp -r ${{secrets.DTS_NAME}} ./${{secrets.DTS_NAME}}s
+          rm -rf ${{secrets.DTS_NAME}}
           rm -rf ${{secrets.DTS_NAME}}_MacOS_${{matrix.arch}}.tar.gz
 
       - name: Download DTS Windows
@@ -255,6 +257,7 @@ jobs:
           cd ${{ secrets.REPO_FRONT_PATH }}/static/
           tar -zxvf ${{secrets.DTS_NAME}}_Window_${{matrix.arch}}.tar.gz
           cp -r ${{secrets.DTS_NAME}} ./${{secrets.DTS_NAME}}s
+          rm -rf ${{secrets.DTS_NAME}}
           rm -rf ${{secrets.DTS_NAME}}_Window_${{matrix.arch}}.tar.gz
 
       - name: Download DTS Linux
@@ -264,6 +267,7 @@ jobs:
           cd ${{ secrets.REPO_FRONT_PATH }}/static/
           tar -zxvf ${{secrets.DTS_NAME}}_Linux_${{matrix.arch}}.tar.gz
           cp -r ${{secrets.DTS_NAME}} ./${{secrets.DTS_NAME}}s
+          rm -rf ${{secrets.DTS_NAME}}
           rm -rf ${{secrets.DTS_NAME}}_Linux_${{matrix.arch}}.tar.gz
 
       
