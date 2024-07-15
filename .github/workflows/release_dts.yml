@@ -232,17 +232,17 @@ jobs:
       ## DTS-UI      
       - name: Download DTS-UI
         run: |
-          if [ "${{ runner.os }}" == "Windows" ]; then
+          if [[ "${{ runner.os }}" == "Windows" ]]; then
             ossutil cp -rf oss://${{ secrets.BUCKET_NAME }}/dts/dts-ui.zip ${{ secrets.REPO_FRONT_PATH }}/static/
             cd ${{ secrets.REPO_FRONT_PATH }}/static/
-            unzip -o dts-ui.zip
-            xcopy /E /I dts .\dist\dts\
-            del /S /Q dts
-            del /S /Q dts-ui.zip
+            powershell -Command "Expand-Archive -Path dts-ui.zip -DestinationPath . -Force"
+            powershell -Command "xcopy /E /I dts dist\dts\"
+            powershell -Command "Remove-Item -Path dts -Recurse -Force"
+            powershell -Command "Remove-Item -Path dts-ui.zip -Force"
           else
             ossutil cp -rf oss://${{ secrets.BUCKET_NAME }}/dts/dts-ui.zip ${{ secrets.REPO_FRONT_PATH }}/static/
             cd ${{ secrets.REPO_FRONT_PATH }}/static/
-            unzip dts-ui.zip
+            unzip -o dts-ui.zip
             cp -r dts ./dist/dts
             rm -rf dts
             rm -rf dts-ui.zip
