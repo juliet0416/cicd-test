@@ -1,4 +1,4 @@
-name: Build DTS Client
+name: Build Release Client
 
 on:
   workflow_dispatch:
@@ -238,9 +238,9 @@ jobs:
         run: |
           ossutil cp -rf oss://${{ secrets.BUCKET_NAME }}/dts/dts-ui.zip ${{ secrets.REPO_FRONT_PATH }}/static/
           cd ${{ secrets.REPO_FRONT_PATH }}/static/
-          tar -zxvf dts-ui.zip
-          cp -r dts-ui ./dist/dts
-          rm -rf dts-ui
+          tar -zxvf dts-ui.zip dts
+          cp -r dts ./dist/
+          rm -rf dts
           rm -rf dts-ui.zip
 
       # DTS
