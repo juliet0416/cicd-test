@@ -236,7 +236,6 @@ jobs:
           cd ${{ secrets.REPO_FRONT_PATH }}/static/
           tar -zxvf dts-ui.zip dts
           cp -r dts ./dist/dts
-          rm -rf dts
           rm -rf dts-ui.zip
 
       # DTS
