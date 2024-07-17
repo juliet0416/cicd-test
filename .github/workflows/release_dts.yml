@@ -225,6 +225,22 @@ jobs:
             -c.nsis.shortcutName=${{ secrets.TEST_PRODUCT_NAME }}
             -c.extraMetadata.version=99.0.${{ github.run_id }}
             ${{ matrix.build_arg}}
+
+
+      # 公证&签名 Mac App
+      - name: Notarize MacOS x86_64 App
+        if: matrix.os == 'macos-latest' && matrix.arch == 'x86_64'
+        run: |
+          xcrun notarytool store-credentials ${{ secrets.PRODUCT_BASE_NAME }} --apple-id "${{ secrets.MAC_APPLE_ID }}" --password "${{ secrets.MAC_APPLE_PASSWORD }}" --team-id "${{ secrets.MAC_TEAM_ID }}"
+          xcrun notarytool submit ${{ secrets.REPO_FRONT_PATH }}/release/*${{ matrix.file_extension }} --keychain-profile ${{ secrets.PRODUCT_BASE_NAME }}
+
+      # 公证&签名 Mac App
+      - name: Notarize MacOS ARM App
+        if: matrix.os == 'macos-latest' && matrix.arch == 'arm64'
+        run: |
+          xcrun notarytool store-credentials ${{ secrets.PRODUCT_BASE_NAME }} --apple-id "${{ secrets.MAC_APPLE_ID }}" --password "${{ secrets.MAC_APPLE_PASSWORD }}" --team-id "${{ secrets.MAC_TEAM_ID }}"
+          xcrun notarytool submit ${{ secrets.REPO_FRONT_PATH }}/release/*${{ matrix.file_extension }} --keychain-profile ${{ secrets.PRODUCT_BASE_NAME }}
+
     
       - name: Install WinSCP
         if: ${{ runner.os == 'Windows' }}
