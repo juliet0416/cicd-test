@@ -201,7 +201,7 @@ jobs:
           cd ${{ secrets.REPO_FRONT_PATH }} 
           cd src/main
           yarn
-          yarn run build
+          yarn run build:test
           cp -r electron ../../static
       
 
@@ -210,7 +210,7 @@ jobs:
         run: |
           cd ${{ secrets.REPO_FRONT_PATH }}
           yarn
-          yarn run build:web:desktop --app_version=99.0.${{ github.run_id }} --app_port=${{ secrets.DEV_REPO_PORT }}
+          yarn run build:web:desktop --app_version=99.0.${{ github.run_id }} --app_port=${{ secrets.TEST_REPO_PORT }}
           cp -r dist ./static
 
       # 打包Electron
