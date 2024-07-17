@@ -354,7 +354,7 @@ jobs:
           # 替换哈希值
           $newHash = '${{ steps.hash.outputs.sha512_base64 }}'
           $content = Get-Content -Path ${{ secrets.REPO_FRONT_PATH }}/release/latest.yml -Raw
-          $content = $content -replace '(sha512: ).*', "`$1$newHash"
+          $content = $content -replace '(sha512: ).*', "sha512: $newHash"
           
           # 打印新的 sha512 值以确认
           Write-Output "New Hash: $newHash"
