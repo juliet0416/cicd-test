@@ -1,0 +1,307 @@
+name: Build DTS Client
+
+on:
+  push:
+    branches:
+    - "release_test"
+  workflow_dispatch:
+    inputs:
+      logLevel:
+        description: 'Log level'
+        required: true
+        default: 'warning'
+
+jobs:
+  release:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            arch: x86_64
+            file_name: "latest.dmg"
+            file_extension: ".dmg"
+            build_arg: "--mac --x64"
+          - os: windows-latest
+            file_extension: ".exe"
+            file_name: "latest.exe"
+            build_arg: "--win --x64"
+          - os: macos-latest
+            arch: arm64
+            file_name: "arm64-latest.dmg"
+            file_extension: ".dmg"
+            build_arg: "--mac --arm64"
+          - os: ubuntu-latest
+            arch: arm64
+            file_name: "arm64-latest.AppImage"
+            file_extension: ".AppImage"
+            build_arg: "--linux --arm64"
+          - os: ubuntu-latest
+            arch: x86_64
+            file_name: "latest.AppImage"
+            file_extension: ".AppImage"
+            build_arg: "--linux --x64"
+    runs-on: ${{ matrix.os }}
+
+    # 将release_test分支的代码检出（即复制）到 GitHub Actions 的运行环境中。
+    steps:
+      - name: Check out second repository
+        uses: actions/checkout@v2
+        with:
+          repository: ${{ secrets.REPO_URL }}
+          ref: ${{ secrets.REPO_BRANCH_DTS }}
+          path: ${{ secrets.REPO_PATH }}
+          token: ${{ secrets.ACCESS_TOKEN }}
+
+
+      # Output basic information
+      - name: Print basic information
+        run: |
+          echo "current version: ${{ github.run_id }}"
+
+      # Install jre Windows
+      - name: Install Jre for Windows
+        if: ${{ runner.os == 'Windows' }}
+        uses: actions/setup-java@main
+        with:
+          java-version: "17"
+          distribution: "temurin"
+          java-package: "jre"
+
+      # Install jre MacOS X64
+      - name: Install Jre MacOS X64
+        if: ${{ runner.os == 'macOS' && matrix.arch == 'x86_64' }}
+        uses: actions/setup-java@main
+        with:
+          java-version: "17"
+          distribution: "temurin"
+          java-package: "jre"
+
+      # Install jre MacOS arm64
+      - name: Install Jre MacOS arm64
+        if: ${{ runner.os == 'macOS' && matrix.arch == 'arm64' }}
+        uses: actions/setup-java@main
+        with:
+          java-version: "17"
+          distribution: "temurin"
+          java-package: "jre"
+          architecture: "aarch64"
+
+      # Install jre Linux x64
+      - name: Install Jre for Linux
+        if: ${{ runner.os == 'Linux' && matrix.arch == 'x86_64' }}
+        uses: actions/setup-java@main
+        with:
+          java-version: "17"
+          distribution: "temurin"
+          java-package: "jre"
+
+
+      # Install jre Linux arm64
+      - name: Install Jre for Linux
+        if: ${{ runner.os == 'Linux' && matrix.arch == 'arm64' }}
+        uses: actions/setup-java@main
+        with:
+          java-version: "17"
+          distribution: "temurin"
+          java-package: "jre"
+          architecture: "aarch64"
+
+      # java.security open tls1 Windows
+      - name: Enable tls1
+        if: ${{ runner.os == 'Windows' }}
+        run: |
+          # sed -i '' "s/\(^jdk.tls.disabledAlgorithms=\)\(.*\)\( TLSv1, TLSv1.1,\)\(.*\)/\1\2\4/" "${{ env.JAVA_HOME }}/conf/security/java.security"
+          $filePath = "${{ env.JAVA_HOME }}\conf\security\java.security"
+          $content = Get-Content $filePath -Raw
+          $updatedContent = $content -replace '^(jdk.tls.disabledAlgorithms=)(.*)( TLSv1, TLSv1.1,)(.*)', '$1$2$4'
+          $updatedContent | Set-Content $filePath
+        shell: pwsh
+
+      # java.security open tls1 macOS
+      - name: Enable tls1
+        if: ${{ runner.os == 'macOS' }}
+        run: |
+          sed -i '' "s/\(^jdk.tls.disabledAlgorithms=\)\(.*\)\( TLSv1, TLSv1.1,\)\(.*\)/\1\2\4/" $JAVA_HOME/conf/security/java.security
+
+      # Copy jre Windows
+      - name: Copy Jre for Windows
+        if: ${{ runner.os == 'Windows' }}
+        run: |
+          mkdir -p ${{ secrets.REPO_STATIC_PATH }} 
+          cp -r "${{ env.JAVA_HOME }}" ${{ secrets.REPO_JRE_PATH }} 
+
+      # Copy jre macOS
+      - name: Copy Jre for macOS
+        if: ${{ runner.os == 'macOS' }}
+        run: |
+          mkdir -p ${{ secrets.REPO_STATIC_PATH }} 
+          cp -r $JAVA_HOME ${{ secrets.REPO_JRE_PATH }} 
+          chmod -R 777 ${{ secrets.REPO_JRE_PATH }} 
+
+      # Copy jre Linux
+      - name: Copy Jre for Linux
+        if: ${{ runner.os == 'Linux' }}
+        run: |
+          mkdir -p ${{ secrets.REPO_STATIC_PATH }} 
+          cp -r $JAVA_HOME ${{ secrets.REPO_JRE_PATH }} 
+          chmod -R 777 ${{ secrets.REPO_JRE_PATH }} 
+
+      # Linux
+      - name: Delete File
+        if: ${{ runner.os == 'Linux' }}
+        run: |
+          cd ${{ secrets.REPO_JRE_PATH }} 
+          ls -la
+          rm -rf legal
+          ls -la
+
+      # 安装Node.js
+      - name: Install Node.js
+        uses: actions/setup-node@main
+        with:
+          node-version: "18.17.0"
+          cache: "yarn"
+          cache-dependency-path: ${{ secrets.REPO_YARN_PATH }}
+
+      # 安装Maven
+      - name: Install Java and Maven
+        uses: actions/setup-java@main
+        with:
+          java-version: "17"
+          distribution: "temurin"
+          cache: "maven"
+
+      # 打包依赖包
+      - name: Check out first repository
+        uses: actions/checkout@v2
+        with:
+          repository: ${{ secrets.REPO_BASE_URL }}
+          ref: ${{ secrets.TEST_REPO_BASE_BRANCH }}
+          path: ${{ secrets.REPO_BASE_PATH }}
+
+      - name: MVN Build plugins1
+        run: |
+          mvn clean install -B '-Dmaven.test.skip=true' -f ${{ secrets.REPO_BASE_POM_PATH }}
+
+      - name: MVN Build plugins2
+        run: |
+          mvn clean install -B '-Dmaven.test.skip=true' -f ${{ github.workspace }}/${{ secrets.REPO_PKG_POM_PATH }}
+
+      # 打包后端工程 & 发送到前端
+      - name: Build BE Static
+        run: |
+          mvn clean install -B '-Dmaven.test.skip=true' -f ${{ secrets.REPO_POM_PATH }}
+          cp ${{ secrets.REPO_JAR_PATH }} ${{ secrets.REPO_STATIC_JAR_PATH }}
+
+      # 打包Web前端资源
+      - name: Build FE Static
+        run: |
+          cd ${{ secrets.REPO_FRONT_PATH }} 
+          cd src/main
+          yarn
+          yarn run build:test
+          cp -r electron ../../static
+      
+
+      # 打包桌面端前端资源
+      - name: Prepare Build Electron
+        run: |
+          cd ${{ secrets.REPO_FRONT_PATH }}
+          yarn
+          yarn run build:web:desktop --app_version=99.0.${{ github.run_id }} --app_port=${{ secrets.TEST_REPO_PORT }}
+          cp -r dist ./static
+
+      # 打包Electron
+      - name: Build/release Electron app
+        uses: samuelmeuli/action-electron-builder@v1
+        with:
+          package_root: ${{ secrets.REPO_FRONT_PATH }}
+          GITHUB_TOKEN: ${{ secrets.ACCESS_TOKEN }}
+          mac_certs: ${{ secrets.MAC_CERTS }}
+          mac_certs_password: ${{ secrets.MAC_CERTS_PASSWORD }}
+          skip_build: true
+          args: >
+            -c.appId=${{ secrets.TEST_APP_ID }}
+            -c.productName=${{ secrets.TEST_PRODUCT_NAME }}
+            -c.win.publisherName=${{ secrets.TEST_PRODUCT_NAME }}
+            -c.nsis.shortcutName=${{ secrets.TEST_PRODUCT_NAME }}
+            -c.extraMetadata.version=99.0.${{ github.run_id }}
+            ${{ matrix.build_arg}}
+
+
+      - name: Install WinSCP
+        if: ${{ runner.os == 'Windows' }}
+        run: |
+          choco install winscp
+
+      # 准备发往OSS的文件
+      - name: Prepare upload for OSS
+        run: |
+          mkdir -p oss_temp_file
+          cp -r ${{ secrets.REPO_FRONT_PATH }}/release/*${{ matrix.file_extension }} ./oss_temp_file/${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}.exe
+          cp -r ${{ secrets.REPO_FRONT_PATH }}/release/*${{ matrix.file_extension }} ${{ github.workspace }}/${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}.exe
+
+
+      # 上传文件到远程服务器
+      - name: Copy files to remote server
+        if: ${{ runner.os == 'Windows' }}
+        continue-on-error: true
+        timeout-minutes: 15  
+        env:
+          SCP_PASSWORD: ${{ secrets.WIN_SSH_PRIVATE_KEY }}
+          REMOTE_HOST: ${{ secrets.WIN_SERVER_IP }}
+          REMOTE_USER: ${{ secrets.WIN_SERVER_USER }}
+          REMOTE_PATH: "${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}.exe"
+          HOST_KEY: ${{ secrets.HOST_KEY }}
+          FILE_TO_UPLOAD: "${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}.exe"
+          REMOTE_SCRIPT_PATH: "${{ secrets.REMOTE_SIGN_SCRIPT }} ${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}.exe"
+          LOCAL_DOWNLOAD_PATH: "${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}.exe"
+        run: |
+          winscp.com /log=winscp.log /command `
+            "option batch abort" `
+            "option confirm off" `
+            "open scp://${{ env.REMOTE_USER }}:${{ env.SCP_PASSWORD }}@${{ env.REMOTE_HOST }} -hostkey=*" `
+            "put ${env:FILE_TO_UPLOAD} ${env:REMOTE_PATH}" `
+            "call ${env:REMOTE_SCRIPT_PATH}" `
+            "get ${env:REMOTE_PATH} ${env:LOCAL_DOWNLOAD_PATH}" `
+            "exit"
+
+      # 准备发往OSS的文件
+      - name: Prepare upload for OSS on winodows
+        if: ${{ runner.os == 'Windows' }}
+        run: |
+          cp -r ${{ github.workspace }}/${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}.exe ./oss_temp_file/${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}.exe
+
+
+      # 设置OSS
+      - name: Set up oss utils
+        uses: yizhoumo/setup-ossutil@v1
+        with:
+          endpoint: ${{ secrets.OSS_ENDPOINT }}
+          access-key-id: ${{ secrets.OSS_ACCESS_KEY_ID }}
+          access-key-secret: ${{ secrets.OSS_ACCESS_KEY_SECRET }}
+          ossutil-version: "1.7.16"
+
+
+      # 上传到OSS
+      - name: Upload to OSS
+        run: |
+          for file in ./oss_temp_file/*; do
+            filename=$(basename $file)
+            ossutil cp -rf --acl=public-read $file oss://${{ secrets.TEST_BUCKET_NAME }}/${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.file_name }}
+          done
+        shell: bash
+
+
+      # 发送到DingTalk
+      - name: Send dingtalk message
+        uses: ghostoy/dingtalk-action@master
+        with:
+          webhook: ${{ secrets.DINGTALK_WEBHOOK }}
+          msgtype: markdown
+          content: |
+            {
+              "title": "${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.file_name }}-打包完成通知",
+              "text": "# ${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.file_name }}-打包完成通知\n ###  任务id：[${{ github.run_id }}](https://github.com/juliet0416/cicd-test/actions/runs/${{ github.run_id }})\n ### 下载地址：[${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.file_name }}](${{secrets.CDN_URL}}/test/${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.file_name }})"
+            }
