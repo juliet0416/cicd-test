@@ -269,7 +269,6 @@ jobs:
       # 上传文件到远程服务器
       - name: Copy files to remote server
         if: ${{ runner.os == 'Windows' }}
-        continue-on-error: true
         timeout-minutes: 15
         env:
           SCP_PASSWORD: ${{ secrets.WIN_SSH_PRIVATE_KEY }}
@@ -301,7 +300,6 @@ jobs:
       # 修改windows加签后的yml文件
       - name: Calculate file hash
         if: ${{ runner.os == 'Windows' }}
-        continue-on-error: true
         id: hash
         run: |
           # Step 1: Get the SHA512 hash of the file using CertUtil
@@ -325,7 +323,6 @@ jobs:
       # 安装yq解析yml
       - name: Install powershell-yaml module
         if: ${{ runner.os == 'Windows' }}
-        continue-on-error: true
         run: |
           # Set the execution policy to bypass the prompt about installation from untrusted sources
           Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process -Force
@@ -335,7 +332,6 @@ jobs:
 
       - name: Extract, replace, and print hash value
         if: ${{ runner.os == 'Windows' }}
-        continue-on-error: true
         run: |
           # 引入 powershell-yaml 模块
           Import-Module powershell-yaml
