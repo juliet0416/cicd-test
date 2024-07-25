@@ -430,7 +430,7 @@ jobs:
           content: |
             {
               "title": "${{ secrets.PRODUCT_APP_NAME }}-Pre-${{ github.event.inputs.version }}${{ matrix.file_extension }}-打包完成通知",
-              "text": "# ${{ secrets.PRODUCT_APP_NAME }}-Pre-${{ github.event.inputs.version }}${{ matrix.file_extension }}-打包完成通知\n ###  任务id：[Pre-${{ github.event.inputs.version }}](https://github.com/juliet0416/cicd-test/actions/runs/${{ github.run_id }})\n ### 下载地址：[${{ secrets.PRODUCT_APP_NAME }}-${{ matrix.file_name }}](${{secrets.CDN_URL}}/download/${{ github.event.inputs.version }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}${{ matrix.file_extension }})"
+              "text": "# ${{ secrets.PRODUCT_APP_NAME }}-Pre-${{ github.event.inputs.version }}${{ matrix.file_extension }}-打包完成通知\n ###  任务id：[Pre-${{ github.event.inputs.version }}](https://github.com/juliet0416/cicd-test/actions/runs/${{ github.run_id }})\n ### 下载地址：${{secrets.CDN_URL}}/download/${{ github.event.inputs.version }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}${{ matrix.file_extension }}"
             }
 
 
