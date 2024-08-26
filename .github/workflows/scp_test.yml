@@ -10,24 +10,25 @@ jobs:
   test-scp:
     runs-on: windows-latest
     steps:
-      # Install jre Windows
-      - name: Install Jre for Windows
-        if: ${{ runner.os == 'Windows' }}
-        uses: actions/setup-java@main
-        with:
-          java-version: "17"
-          distribution: "temurin"
-          java-package: "jre"
-
-      - name: Send feishu message
-        env:
-          ACTIONS_FEISHU_TAG: 'v1.3.1' # 替换此变量, 最新见 https://github.com/xiachufang/actions-feishu/releases
-          INPUT_WEBHOOK: "${{ secrets.FEISHU_ROBOT_WEBHOOK_URL }}"
-          INPUT_MESSAGE_TYPE: "post"
-          INPUT_TITLE: "${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.file_name }}-打包完成通知"
-          INPUT_CONTENT: "# ${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.file_name }}-打包完成通知\n ###  任务id：[${{ github.run_id }}](https://github.com/juliet0416/cicd-test/actions/runs/${{ github.run_id }})\n ### 下载地址：${{secrets.CDN_URL}}/test/${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.file_name }}"
-        run: |
-          wget -q https://github.com/xiachufang/actions-feishu/releases/download/${{ env.ACTIONS_FEISHU_TAG }}/linux-amd64-actions-feishu.tar.gz
-          tar zxf linux-amd64-actions-feishu.tar.gz feishu
-          ./feishu
+    - name: Send Feishu Message
+      uses: huoxianyin/actions-feishu-notify@main
+      with:
+        url: ${{ secrets.FEISHU_WEBHOOK }}
+        title: "${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.file_name }}-打包完成通知"
+        text: |
+          # ${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.file_name }}-打包完成通知
+          ### 任务id：[[${{ github.run_id }}](https://github.com/juliet0416/cicd-test/actions/runs/${{ github.run_id }})]
+          ### 下载地址：${{secrets.CDN_URL}}/test/${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.file_name }}
+      # - name: Send feishu message
+      #   env:
+      #     ACTIONS_FEISHU_TAG: 'v1.3.1' # 替换此变量, 最新见 https://github.com/xiachufang/actions-feishu/releases
+      #     INPUT_WEBHOOK: "${{ secrets.FEISHU_WEBHOOK }}"
+      #     INPUT_MESSAGE_TYPE: "post"
+      #     INPUT_TITLE: "${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.file_name }}-打包完成通知"
+      #     INPUT_CONTENT: "# ${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.file_name }}-打包完成通知\n ###  任务id：[${{ github.run_id }}](https://github.com/juliet0416/cicd-test/actions/runs/${{ github.run_id }})\n ### 下载地址：${{secrets.CDN_URL}}/test/${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.file_name }}"
+      #   run: |
+      #     wget -q https://github.com/xiachufang/actions-feishu/releases/download/${{ env.ACTIONS_FEISHU_TAG }}/linux-amd64-actions-feishu.tar.gz
+      #     tar zxf linux-amd64-actions-feishu.tar.gz feishu
+      #     ./feishu
+     
 
