@@ -14,8 +14,8 @@ jobs:
       - name: Send feishu message
         uses: foxundermoon/feishu-action@v2
         with:
-          webhook: ${{ secrets.FEISHU_WEBHOOK }}
-          message_type: post
+          url: ${{ secrets.FEISHU_WEBHOOK }}
+          msg_type: post
           content: |
             {
               "zh_cn": {
