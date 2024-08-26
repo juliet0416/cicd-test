@@ -433,5 +433,24 @@ jobs:
               "text": "# ${{ secrets.PRODUCT_APP_NAME }}-Pre-${{ github.event.inputs.version }}${{ matrix.file_extension }}-打包完成通知\n ###  任务id：[Pre-${{ github.event.inputs.version }}](https://github.com/juliet0416/cicd-test/actions/runs/${{ github.run_id }})\n ### 下载地址：${{secrets.CDN_URL}}/download/${{ github.event.inputs.version }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}${{ matrix.file_extension }}"
             }
 
+      # 发送到飞书
+      - name: Send feishu message
+        uses: foxundermoon/feishu-action@v2
+        with:
+          url: ${{ secrets.FEISHU_WEBHOOK }}
+          msg_type: post
+          content: |
+            post:
+              zh_cn:
+                title: "${{ secrets.PRODUCT_APP_NAME }}-Pre-${{ github.event.inputs.version }}${{ matrix.file_extension }}-打包完成通知"
+                content:
+                - - tag: text
+                    text: "任务id："
+                  - tag: a
+                    text: "Pre-${{ github.event.inputs.version }}"
+                    href: "https://github.com/juliet0416/cicd-test/actions/runs/${{ github.run_id }}"
+                - - tag: text
+                    text: "下载地址：${{secrets.CDN_URL}}/download/${{ github.event.inputs.version }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}${{ matrix.file_extension }}"
+
 
 
