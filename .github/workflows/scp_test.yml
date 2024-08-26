@@ -19,22 +19,15 @@ jobs:
           distribution: "temurin"
           java-package: "jre"
 
-      # java.security open tls1 Windows
-      - name: Enable tls1
-        if: ${{ runner.os == 'Windows' }}
+      - name: Send feishu message
+        env:
+          ACTIONS_FEISHU_TAG: 'v1.3.1' # 替换此变量, 最新见 https://github.com/xiachufang/actions-feishu/releases
+          INPUT_WEBHOOK: "${{ secrets.FEISHU_ROBOT_WEBHOOK_URL }}"
+          INPUT_MESSAGE_TYPE: "post"
+          INPUT_TITLE: "${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.file_name }}-打包完成通知"
+          INPUT_CONTENT: "# ${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.file_name }}-打包完成通知\n ###  任务id：[${{ github.run_id }}](https://github.com/juliet0416/cicd-test/actions/runs/${{ github.run_id }})\n ### 下载地址：${{secrets.CDN_URL}}/test/${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.file_name }}"
         run: |
-          # sed -i '' "s/\(^jdk.tls.disabledAlgorithms=\)\(.*\)\( TLSv1, TLSv1.1,\)\(.*\)/\1\2\4/" "${{ env.JAVA_HOME }}/conf/security/java.security"
-          $filePath = "${{ env.JAVA_HOME }}\conf\security\java.security"
-          $content = Get-Content $filePath -Raw
-          $updatedContent = $content -replace '(?s)(jdk.tls.disabledAlgorithms\s*=\s*)(.*?)(\s*TLSv1,\s*TLSv1\.1,)(.*?)(?=[,\r\n])', '$1$2$4'
-
-
-          $updatedContent | Set-Content $filePath
-          # 在修改前打印文件的内容看看是否正确加载
-          Write-Output "Original content:"
-          Write-Output $content
-          
-          # 打印修改后的内容确认替换是否生效
-          Write-Output "Updated content:"
-          Write-Output $updatedContent
+          wget -q https://github.com/xiachufang/actions-feishu/releases/download/${{ env.ACTIONS_FEISHU_TAG }}/linux-amd64-actions-feishu.tar.gz
+          tar zxf linux-amd64-actions-feishu.tar.gz feishu
+          ./feishu
 
