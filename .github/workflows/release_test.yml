@@ -187,7 +187,8 @@ jobs:
           repository: ${{ secrets.SQL_PARSER_BASE_URL }}
           ref: ${{ secrets.SQL_PARSER_REPO_BASE_BRANCH }}
           path: ${{ secrets.SQL_PARSER_REPO_BASE_PATH }}
-          
+          token: ${{ secrets.ACCESS_TOKEN }}
+
           
       # - name: MVN Build plugins1
       #   run: |
