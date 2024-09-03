@@ -184,17 +184,30 @@ jobs:
           cache: "maven"
 
       # 打包依赖包
-      - name: Check out first repository
+      # - name: Check out first repository
+      #   uses: actions/checkout@v2
+      #   with:
+      #     repository: ${{ secrets.REPO_BASE_URL }}
+      #     ref: ${{ secrets.TEST_REPO_BASE_BRANCH }}
+      #     path: ${{ secrets.REPO_BASE_PATH }}
+          
+      - name: Check out sqlParser repository
         uses: actions/checkout@v2
         with:
-          repository: ${{ secrets.REPO_BASE_URL }}
-          ref: ${{ secrets.REPO_BASE_BRANCH }}
-          path: ${{ secrets.REPO_BASE_PATH }}
+          repository: ${{ secrets.SQL_PARSER_BASE_URL }}
+          ref: ${{ secrets.SQL_PARSER_REPO_BASE_BRANCH }}
+          path: ${{ secrets.SQL_PARSER_REPO_BASE_PATH }}
+          token: ${{ secrets.ACCESS_TOKEN }}
 
-      - name: MVN Build plugins1
+          
+      # - name: MVN Build plugins1
+      #   run: |
+      #     mvn clean install -B '-Dmaven.test.skip=true' -f ${{ secrets.REPO_BASE_POM_PATH }}
+
+      - name: MVN Build sqlparse plugins
         run: |
-          mvn clean install -B '-Dmaven.test.skip=true' -f ${{ secrets.REPO_BASE_POM_PATH }}
-
+          mvn clean install -B '-Dmaven.test.skip=true' -f ${{ secrets.SQL_PARSER_REPO_BASE_POM_PATH }}
+          
       - name: MVN Build plugins2
         run: |
           mvn clean install -B '-Dmaven.test.skip=true' -f ${{ github.workspace }}/${{ secrets.REPO_PKG_POM_PATH }}
