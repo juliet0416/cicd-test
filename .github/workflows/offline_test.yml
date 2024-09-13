@@ -323,4 +323,4 @@ jobs:
                     text: "${{ github.run_id }}"
                     href: "https://github.com/juliet0416/cicd-test/actions/runs/${{ github.run_id }}"
                 - - tag: text
-                    text: "下载地址：${{secrets.CDN_URL}}/test/${{ secrets.OFFLINE_TEST_PRODUCT_NAME }}-${{ matrix.file_name }}"
+                    text: "下载地址：${{secrets.CDN_URL}}/offline_test/${{ secrets.OFFLINE_TEST_PRODUCT_NAME }}-${{ matrix.file_name }}"
