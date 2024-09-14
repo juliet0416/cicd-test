@@ -20,13 +20,27 @@ jobs:
           - os: macos-latest
             arch: x86_64
             file_name: "latest.dmg"
-            file_extension: ".dmg"
+            file_extension: "-x64.dmg"
             build_arg: "--mac --x64"
+          - os: windows-latest
+            file_extension: ".exe"
+            file_name: "latest.exe"
+            build_arg: "--win --x64"
           - os: macos-latest
             arch: arm64
             file_name: "arm64-latest.dmg"
-            file_extension: ".dmg"
+            file_extension: "-arm64.dmg"
             build_arg: "--mac --arm64"
+          - os: ubuntu-latest
+            arch: x86_64
+            file_name: "latest.AppImage"
+            file_extension: "-x86_64.AppImage"
+            build_arg: "--linux --x64"
+          - os: ubuntu-latest
+            arch: arm64
+            file_name: "arm64-latest.AppImage"
+            file_extension: "-arm64.AppImage"
+            build_arg: "--linux --arm64"
     runs-on: ${{ matrix.os }}
 
     # 将release_test分支的代码检出（即复制）到 GitHub Actions 的运行环境中。
