@@ -223,6 +223,7 @@ jobs:
         run: |
           cd ${{ secrets.REPO_FRONT_PATH }}
           yarn
+          yarn run modify:package:name chat2db-offline
           yarn run build:web:offline --app_version=99.0.${{ github.run_id }} --app_port=${{ secrets.OFFLINE_TEST_REPO_PORT }} --print_logs=true
           cp -r dist ./static
 
