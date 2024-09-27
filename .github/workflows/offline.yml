@@ -23,10 +23,10 @@ jobs:
             file_name: "latest.dmg"
             file_extension: "-x64.dmg"
             build_arg: "--mac --x64"
-          # - os: windows-latest
-          #   file_extension: ".exe"
-          #   file_name: "latest.exe"
-          #   build_arg: "--win --x64"
+          - os: windows-latest
+            file_extension: ".exe"
+            file_name: "latest.exe"
+            build_arg: "--win --x64"
           - os: macos-latest
             arch: arm64
             file_name: "arm64-latest.dmg"
