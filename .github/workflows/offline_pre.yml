@@ -254,26 +254,37 @@ jobs:
             -c.nsis.shortcutName="${{ secrets.OFFLINE_PRODUCT_NAME }}"
             -c.extraMetadata.version=${{ github.event.inputs.version }}
             ${{ matrix.build_arg }}
+      
+      # 修改名字
+      - name: Modify file name
+        run: |
+          cd ${{ secrets.REPO_FRONT_PATH }}/release
+          mv ${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.dmg ${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.dmg
+          mv ${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg ${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg
+          mv ${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe ${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe
+          mv ${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.AppImage ${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.AppImage
+          mv ${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.AppImage ${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.AppImage
+
 
       # 公证&签名 Mac App
       - name: Notarize MacOS x86_64 App
         if: matrix.os == 'macos-latest' && matrix.arch == 'x86_64'
         run: |
           xcrun notarytool store-credentials ${{ secrets.PRODUCT_BASE_NAME }} --apple-id "${{ secrets.MAC_APPLE_ID }}" --password "${{ secrets.MAC_APPLE_PASSWORD }}" --team-id "${{ secrets.MAC_TEAM_ID }}"
-          xcrun notarytool submit ${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.dmg --keychain-profile ${{ secrets.PRODUCT_BASE_NAME }}
+          xcrun notarytool submit ${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.dmg --keychain-profile ${{ secrets.PRODUCT_BASE_NAME }}
 
       # 公证&签名 Mac App
       - name: Notarize MacOS ARM App
         if: matrix.os == 'macos-latest' && matrix.arch == 'arm64'
         run: |
           xcrun notarytool store-credentials ${{ secrets.PRODUCT_BASE_NAME }} --apple-id "${{ secrets.MAC_APPLE_ID }}" --password "${{ secrets.MAC_APPLE_PASSWORD }}" --team-id "${{ secrets.MAC_TEAM_ID }}"
-          xcrun notarytool submit ${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg --keychain-profile ${{ secrets.PRODUCT_BASE_NAME }}
+          xcrun notarytool submit ${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg --keychain-profile ${{ secrets.PRODUCT_BASE_NAME }}
 
       # 准备发往OSS的文件
       - name: Prepare upload for OSS
         if: ${{ runner.os == 'Windows' }}
         run: |
-          cp -r ${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe ${{ github.workspace }}/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe
+          cp -r ${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe ${{ github.workspace }}/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe
 
       - name: Install WinSCP
         if: ${{ runner.os == 'Windows' }}
@@ -395,27 +406,27 @@ jobs:
       - name: Upload to OSS for Mac
         if: matrix.os == 'macos-latest' && matrix.arch == 'x86_64'
         run: |
-          ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.dmg" "oss://${{ secrets.OFFLINE_BUCKET_NAME }}/offline/${{ github.event.inputs.version }}/"
+          ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.dmg" "oss://${{ secrets.OFFLINE_BUCKET_NAME }}/${{ github.event.inputs.version }}/"
 
       - name: Upload to OSS for Mac arm64
         if: matrix.os == 'macos-latest' && matrix.arch == 'arm64'
         run: |
-          ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg" "oss://${{ secrets.OFFLINE_BUCKET_NAME }}/offline/${{ github.event.inputs.version }}/"
+          ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg" "oss://${{ secrets.OFFLINE_BUCKET_NAME }}/${{ github.event.inputs.version }}/"
 
       - name: Upload to OSS for windows
         if: matrix.os == 'windows-latest'
         run: |
-          ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe" "oss://${{ secrets.OFFLINE_BUCKET_NAME }}/offline/${{ github.event.inputs.version }}/"
+          ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe" "oss://${{ secrets.OFFLINE_BUCKET_NAME }}/${{ github.event.inputs.version }}/"
 
       - name: Upload to OSS for linux x86_64
         if: matrix.os == 'ubuntu-latest' && matrix.arch == 'x86_64'
         run: |
-          ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x86_64.AppImage" "oss://${{ secrets.OFFLINE_BUCKET_NAME }}/offline/${{ github.event.inputs.version }}/"
+          ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x86_64.AppImage" "oss://${{ secrets.OFFLINE_BUCKET_NAME }}/${{ github.event.inputs.version }}/"
 
       - name: Upload to OSS for linux arm64
         if: matrix.os == 'ubuntu-latest' && matrix.arch == 'arm64'
         run: |
-          ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.AppImage" "oss://${{ secrets.OFFLINE_BUCKET_NAME }}/offline/${{ github.event.inputs.version }}/"
+          ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.AppImage" "oss://${{ secrets.OFFLINE_BUCKET_NAME }}/${{ github.event.inputs.version }}/"
        
       # 发送到DingTalk
       - name: Send dingtalk message
