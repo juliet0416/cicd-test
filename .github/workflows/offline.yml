@@ -229,7 +229,7 @@ jobs:
         run: |
           cd ${{ secrets.REPO_FRONT_PATH }}
           yarn
-          yarn run modify:package:name chat2db-offline
+          yarn run modify:package:name chat2db-local Chat2DB-Local
           yarn run build:web:offline --app_version=${{ github.event.inputs.version }}
           cp -r dist ./static/
 
