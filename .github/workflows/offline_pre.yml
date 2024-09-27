@@ -260,20 +260,20 @@ jobs:
         if: matrix.os == 'macos-latest' && matrix.arch == 'x86_64'
         run: |
           xcrun notarytool store-credentials ${{ secrets.PRODUCT_BASE_NAME }} --apple-id "${{ secrets.MAC_APPLE_ID }}" --password "${{ secrets.MAC_APPLE_PASSWORD }}" --team-id "${{ secrets.MAC_TEAM_ID }}"
-          xcrun notarytool submit ${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.dmg --keychain-profile ${{ secrets.PRODUCT_BASE_NAME }}
+          xcrun notarytool submit ${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.dmg --keychain-profile ${{ secrets.PRODUCT_BASE_NAME }}
 
       # 公证&签名 Mac App
       - name: Notarize MacOS ARM App
         if: matrix.os == 'macos-latest' && matrix.arch == 'arm64'
         run: |
           xcrun notarytool store-credentials ${{ secrets.PRODUCT_BASE_NAME }} --apple-id "${{ secrets.MAC_APPLE_ID }}" --password "${{ secrets.MAC_APPLE_PASSWORD }}" --team-id "${{ secrets.MAC_TEAM_ID }}"
-          xcrun notarytool submit ${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg --keychain-profile ${{ secrets.PRODUCT_BASE_NAME }}
+          xcrun notarytool submit ${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg --keychain-profile ${{ secrets.PRODUCT_BASE_NAME }}
 
       # 准备发往OSS的文件
       - name: Prepare upload for OSS
         if: ${{ runner.os == 'Windows' }}
         run: |
-          cp -r ${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe ${{ github.workspace }}/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe
+          cp -r ${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe ${{ github.workspace }}/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe
 
       - name: Install WinSCP
         if: ${{ runner.os == 'Windows' }}
@@ -395,46 +395,28 @@ jobs:
       - name: Upload to OSS for Mac
         if: matrix.os == 'macos-latest' && matrix.arch == 'x86_64'
         run: |
-          ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.dmg" "oss://${{ secrets.OFFLINE_BUCKET_NAME }}/download/${{ github.event.inputs.version }}/"
-          # ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.zip" "oss://${{ secrets.OFFLINE_BUCKET_NAME }}/download/test/latest/mac/x64/"
-          # ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.zip.blockmap" "oss://${{ secrets.OFFLINE_BUCKET_NAME }}/download/test/latest/mac/x64/"
-          # ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/latest-mac.yml" "oss://${{ secrets.OFFLINE_BUCKET_NAME }}/download/test/latest/mac/x64/"
-          # ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.dmg" "oss://${{ secrets.OFFLINE_BUCKET_NAME }}/download/test/latest/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-latest.dmg"
+          ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.dmg" "oss://${{ secrets.OFFLINE_BUCKET_NAME }}/download_offline/${{ github.event.inputs.version }}/"
 
       - name: Upload to OSS for Mac arm64
         if: matrix.os == 'macos-latest' && matrix.arch == 'arm64'
         run: |
-          ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg" "oss://${{ secrets.OFFLINE_BUCKET_NAME }}/download/${{ github.event.inputs.version }}/"
-          # ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.zip" "oss://${{ secrets.OFFLINE_BUCKET_NAME }}/download/test/latest/mac/arm64/"
-          # ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.zip.blockmap" "oss://${{ secrets.OFFLINE_BUCKET_NAME }}/download/test/latest/mac/arm64/"
-          # ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/latest-mac.yml" "oss://${{ secrets.OFFLINE_BUCKET_NAME }}/download/test/latest/mac/arm64/"
-          # ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg" "oss://${{ secrets.OFFLINE_BUCKET_NAME }}/download/test/latest/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-arm64-latest.dmg"
+          ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg" "oss://${{ secrets.OFFLINE_BUCKET_NAME }}/download_offline/${{ github.event.inputs.version }}/"
 
       - name: Upload to OSS for windows
         if: matrix.os == 'windows-latest'
         run: |
-          ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe" "oss://${{ secrets.OFFLINE_BUCKET_NAME }}/download/${{ github.event.inputs.version }}/"
-          # ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/latest.yml" "oss://${{ secrets.OFFLINE_BUCKET_NAME }}/download/test/latest/windows/"
-          # ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe" "oss://${{ secrets.OFFLINE_BUCKET_NAME }}/download/test/latest/windows/"
-          # ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe" "oss://${{ secrets.OFFLINE_BUCKET_NAME }}/download/test/latest/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-latest.exe"
+          ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe" "oss://${{ secrets.OFFLINE_BUCKET_NAME }}/download_offline/${{ github.event.inputs.version }}/"
 
       - name: Upload to OSS for linux x86_64
         if: matrix.os == 'ubuntu-latest' && matrix.arch == 'x86_64'
         run: |
-          ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x86_64.AppImage" "oss://${{ secrets.OFFLINE_BUCKET_NAME }}/download/${{ github.event.inputs.version }}/"
-          # ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x86_64.AppImage" "oss://${{ secrets.OFFLINE_BUCKET_NAME }}/download/test/latest/linux/x86_64/"
-          # ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/latest-linux.yml" "oss://${{ secrets.OFFLINE_BUCKET_NAME }}/download/test/latest/linux/x86_64/"
-          # ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x86_64.AppImage" "oss://${{ secrets.OFFLINE_BUCKET_NAME }}/download/test/latest/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-latest.AppImage"
+          ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x86_64.AppImage" "oss://${{ secrets.OFFLINE_BUCKET_NAME }}/download_offline/${{ github.event.inputs.version }}/"
 
       - name: Upload to OSS for linux arm64
         if: matrix.os == 'ubuntu-latest' && matrix.arch == 'arm64'
         run: |
-          ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.AppImage" "oss://${{ secrets.OFFLINE_BUCKET_NAME }}/download/${{ github.event.inputs.version }}/"
-          # ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.AppImage" "oss://${{ secrets.OFFLINE_BUCKET_NAME }}/download/test/latest/linux/arm64/"
-          # ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/latest-linux-arm64.yml" "oss://${{ secrets.OFFLINE_BUCKET_NAME }}/download/test/latest/linux/arm64/"
-          # ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.AppImage" "oss://${{ secrets.OFFLINE_BUCKET_NAME }}/download/test/latest/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-arm64-latest.AppImage"
-
-
+          ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.AppImage" "oss://${{ secrets.OFFLINE_BUCKET_NAME }}/download_offline/${{ github.event.inputs.version }}/"
+       
       # 发送到DingTalk
       - name: Send dingtalk message
         uses: ghostoy/dingtalk-action@master
@@ -444,7 +426,7 @@ jobs:
           content: |
             {
               "title": "${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-Pre-${{ github.event.inputs.version }}${{ matrix.file_extension }}-打包完成通知",
-              "text": "# ${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-Pre-${{ github.event.inputs.version }}${{ matrix.file_extension }}-打包完成通知\n ###  任务id：[Pre-${{ github.event.inputs.version }}](https://github.com/juliet0416/cicd-test/actions/runs/${{ github.run_id }})\n ### 下载地址：${{secrets.CDN_URL}}/download/${{ github.event.inputs.version }}/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}${{ matrix.file_extension }}"
+              "text": "# ${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-Pre-${{ github.event.inputs.version }}${{ matrix.file_extension }}-打包完成通知\n ###  任务id：[Pre-${{ github.event.inputs.version }}](https://github.com/juliet0416/cicd-test/actions/runs/${{ github.run_id }})\n ### 下载地址：${{secrets.CDN_URL}}/download_offline/${{ github.event.inputs.version }}/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}${{ matrix.file_extension }}"
             }
 
       # 发送到飞书
@@ -464,6 +446,6 @@ jobs:
                     text: "Pre-${{ github.event.inputs.version }}"
                     href: "https://github.com/juliet0416/cicd-test/actions/runs/${{ github.run_id }}"
                 - - tag: text
-                    text: "下载地址：${{secrets.CDN_URL}}/download/${{ github.event.inputs.version }}/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}${{ matrix.file_extension }}"
+                    text: "下载地址：${{secrets.CDN_URL}}/download_offline/${{ github.event.inputs.version }}/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}${{ matrix.file_extension }}"
 
 
