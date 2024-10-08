@@ -239,7 +239,7 @@ jobs:
           args: >
             -c.appId=${{ secrets.OFFLINE_TEST_APP_ID }}
             -c.productName=${{ secrets.OFFLINE_TEST_PRODUCT_NAME }}
-            -c.win.publisherName=${{ secrets.OFFLINE_TEST_PRODUCT_NAME }}
+            -c.win.publisherName=${{ secrets.PUBLISHER_NAME }}
             -c.nsis.shortcutName=${{ secrets.OFFLINE_TEST_PRODUCT_NAME }}
             -c.extraMetadata.version=99.0.${{ github.run_id }}
             ${{ matrix.build_arg}}
