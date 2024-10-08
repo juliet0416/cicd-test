@@ -245,7 +245,7 @@ jobs:
           args: >
             -c.appId=${{ secrets.OFFLINE_APP_ID }}
             -c.productName="${{ secrets.OFFLINE_PRODUCT_NAME }}"
-            -c.win.publisherName="${{ secrets.OFFLINE_PRODUCT_NAME }}"
+            -c.win.publisherName="${{ secrets.PUBLISHER_NAME }}"
             -c.nsis.shortcutName="${{ secrets.OFFLINE_PRODUCT_NAME }}"
             -c.extraMetadata.version=${{ github.event.inputs.version }}
             ${{ matrix.build_arg }}
