@@ -224,7 +224,7 @@ jobs:
           cd ${{ secrets.REPO_FRONT_PATH }}
           yarn
           yarn run modify:package:name chat2db-pro-test
-          yarn run build:web:desktop --app_version=99.0.${{ github.run_id }} --app_port=${{ secrets.TEST_REPO_PORT }} --print_logs=true
+          yarn run build:web:desktop:test --app_version=99.0.${{ github.run_id }} --app_port=${{ secrets.TEST_REPO_PORT }} --print_logs=true
           cp -r dist ./static
 
       # 打包Electron
