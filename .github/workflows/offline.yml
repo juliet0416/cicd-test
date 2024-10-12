@@ -67,7 +67,7 @@ jobs:
         with:
           java-version: "17"
           distribution: "temurin"
-          java-package: "jre"
+          java-package: "jdk"
 
       # Install jre MacOS X64
       - name: Install Jre MacOS X64
