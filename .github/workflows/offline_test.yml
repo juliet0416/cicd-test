@@ -261,9 +261,6 @@ jobs:
           mkdir -p oss_temp_file
           cp -r ${{ secrets.REPO_FRONT_PATH }}/release/*${{ matrix.file_extension }} ./oss_temp_file/${{ secrets.OFFLINE_TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}${{ matrix.file_extension }}
           cp -r ${{ secrets.REPO_FRONT_PATH }}/release/*${{ matrix.file_extension }} ${{ github.workspace }}/${{ secrets.OFFLINE_TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}${{ matrix.file_extension }}
-          if [ "${{ runner.os }}" = "Windows" ]; then
-            cp -r ${{ secrets.REPO_FRONT_PATH }}/release/*${{ matrix.zip_extension }} ./oss_temp_file/${{ secrets.OFFLINE_TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}${{ matrix.zip_extension }}
-          fi
 
       # 上传文件到远程服务器
       - name: Copy files to remote server
@@ -294,7 +291,8 @@ jobs:
         if: ${{ runner.os == 'Windows' }}
         run: |
           cp -r ${{ github.workspace }}/${{ secrets.OFFLINE_TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}.exe ./oss_temp_file/${{ secrets.OFFLINE_TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}.exe
-
+          cp -r ${{ secrets.REPO_FRONT_PATH }}/release/*${{ matrix.zip_extension }} ./oss_temp_file/${{ secrets.OFFLINE_TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}${{ matrix.zip_extension }}
+          
       # 设置OSS
       - name: Set up oss utils
         uses: yizhoumo/setup-ossutil@v1
