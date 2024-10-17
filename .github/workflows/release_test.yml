@@ -312,13 +312,10 @@ jobs:
       # 上传到OSS
       - name: Upload to OSS
         run: |
-          if [[ "${{ runner.os }}" == "Linux" ]]; then
-            for file_name in ${{ join(matrix.file_names, ' ') }}; do
-              ossutil cp -rf --acl=public-read ./oss_temp_file/${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}-${file_name} oss://${{ secrets.TEST_BUCKET_NAME }}/${{ secrets.TEST_PRODUCT_NAME }}-${file_name}
-            done
-          else
-            ossutil cp -rf --acl=public-read ./oss_temp_file/* oss://${{ secrets.TEST_BUCKET_NAME }}/${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.file_name }}
-          fi
+          for file in ./oss_temp_file/*; do
+            filename=$(basename $file)
+            ossutil cp -rf --acl=public-read $file oss://${{ secrets.TEST_BUCKET_NAME }}/${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.file_name }}
+          done
         shell: bash
 
 
@@ -335,6 +332,22 @@ jobs:
             }
 
       # 发送到飞书
+      - name: Prepare Feishu message content
+        id: feishu_content
+        run: |
+          if [[ "${{ runner.os }}" == "Linux" ]]; then
+            content=""
+            for file_name in ${{ join(matrix.file_names, ' ') }}; do
+              content="${content}- - tag: a\n    text: \"${file_name}\"\n    href: \"${{secrets.CDN_URL}}/test/${{ secrets.TEST_PRODUCT_NAME }}-${file_name}\"\n"
+            done
+          else
+            content="- - tag: a\n    text: \"${{ matrix.file_name }}\"\n    href: \"${{secrets.CDN_URL}}/test/${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.file_name }}\"\n"
+          fi
+          echo "download_links<<EOF" >> $GITHUB_OUTPUT
+          echo "$content" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+        shell: bash
+
       - name: Send feishu message
         uses: foxundermoon/feishu-action@v2
         with:
@@ -352,4 +365,4 @@ jobs:
                     href: "https://github.com/juliet0416/cicd-test/actions/runs/${{ github.run_id }}"
                 - - tag: text
                     text: "Download Links:"
-                ${{ runner.os == 'Linux' && join(matrix.file_names | map(file => format('- - tag: a\n    text: "{0}"\n    href: "{1}/test/{2}-{0}"', file, secrets.CDN_URL, secrets.TEST_PRODUCT_NAME)), '\n') || format('- - tag: a\n    text: "{0}"\n    href: "{1}/test/{2}-{0}"', matrix.file_name, secrets.CDN_URL, secrets.TEST_PRODUCT_NAME) }}
+                ${{ steps.feishu_content.outputs.download_links }}
