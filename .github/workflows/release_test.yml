@@ -261,7 +261,13 @@ jobs:
         run: |
           mkdir -p oss_temp_file
           cp -r ${{ secrets.REPO_FRONT_PATH }}/release/   ./oss_temp_file/
-         
+          if [[ "${{ runner.os }}" == "Linux" ]]; then
+            for file_extensions in ${{ join(matrix.file_extensions, ' ') }}; do
+              cp -r ${{ secrets.REPO_FRONT_PATH }}/release/*${file_extensions} ./oss_temp_file/${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}${file_extensions}
+            done
+          else
+            cp -r ${{ secrets.REPO_FRONT_PATH }}/release/*${{ matrix.file_extension }} ./oss_temp_file/${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}${{ matrix.file_extension }}
+          fi
 
       # 上传文件到远程服务器
       - name: Copy files to remote server
