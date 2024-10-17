@@ -256,7 +256,12 @@ jobs:
         run: |
           choco install winscp
 
-
+      # 准备发往OSS的文件
+      - name: Prepare upload for OSS
+        run: |
+          mkdir -p oss_temp_file
+          cp -r ${{ secrets.REPO_FRONT_PATH }}/release/   ./oss_temp_file/
+         
 
       # 上传文件到远程服务器
       - name: Copy files to remote server
