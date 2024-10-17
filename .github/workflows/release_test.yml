@@ -33,8 +33,8 @@ jobs:
             build_arg: "--mac --arm64"
           - os: ubuntu-latest
             arch: arm64
-            file_name: "arm64-latest.AppImage"
-            file_extension: ".AppImage"
+            file_name: "arm64-latest.deb"
+            file_extension: ".deb"
             build_arg: "--linux --arm64"
           - os: ubuntu-latest
             arch: x86_64
