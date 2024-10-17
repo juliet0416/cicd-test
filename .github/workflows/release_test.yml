@@ -33,13 +33,13 @@ jobs:
             build_arg: "--mac --arm64"
           - os: ubuntu-latest
             arch: arm64
-            file_name: "arm64-latest.deb"
-            file_extension: ".deb"
+            file_names: ["arm64-latest.deb", "arm64-latest.rpm", "arm64-latest.AppImage"]
+            file_extensions: [".deb", ".rpm", ".AppImage"]
             build_arg: "--linux --arm64"
           - os: ubuntu-latest
             arch: x86_64
-            file_name: "latest.AppImage"
-            file_extension: ".AppImage"
+            file_names: ["latest.deb", "latest.rpm", "latest.AppImage"]
+            file_extensions: [".deb", ".rpm", ".AppImage"]
             build_arg: "--linux --x64"
     runs-on: ${{ matrix.os }}
 
@@ -260,9 +260,13 @@ jobs:
       - name: Prepare upload for OSS
         run: |
           mkdir -p oss_temp_file
-          cp -r ${{ secrets.REPO_FRONT_PATH }}/release/*${{ matrix.file_extension }} ./oss_temp_file/${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}.exe
-          cp -r ${{ secrets.REPO_FRONT_PATH }}/release/*${{ matrix.file_extension }} ${{ github.workspace }}/${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}.exe
-
+          if [[ "${{ runner.os }}" == "Linux" ]]; then
+            for file_name in ${{ join(matrix.file_names, ' ') }}; do
+              cp -r ${{ secrets.REPO_FRONT_PATH }}/release/*${file_name#*-} ./oss_temp_file/${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}-${file_name}
+            done
+          else
+            cp -r ${{ secrets.REPO_FRONT_PATH }}/release/*${{ matrix.file_extension }} ./oss_temp_file/${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}${{ matrix.file_extension }}
+          fi
 
       # 上传文件到远程服务器
       - name: Copy files to remote server
@@ -308,10 +312,13 @@ jobs:
       # 上传到OSS
       - name: Upload to OSS
         run: |
-          for file in ./oss_temp_file/*; do
-            filename=$(basename $file)
-            ossutil cp -rf --acl=public-read $file oss://${{ secrets.TEST_BUCKET_NAME }}/${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.file_name }}
-          done
+          if [[ "${{ runner.os }}" == "Linux" ]]; then
+            for file_name in ${{ join(matrix.file_names, ' ') }}; do
+              ossutil cp -rf --acl=public-read ./oss_temp_file/${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}-${file_name} oss://${{ secrets.TEST_BUCKET_NAME }}/${{ secrets.TEST_PRODUCT_NAME }}-${file_name}
+            done
+          else
+            ossutil cp -rf --acl=public-read ./oss_temp_file/* oss://${{ secrets.TEST_BUCKET_NAME }}/${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.file_name }}
+          fi
         shell: bash
 
 
@@ -336,12 +343,13 @@ jobs:
           content: |
             post:
               zh_cn:
-                title: "${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.file_name }}-打包完成通知"
+                title: "${{ secrets.TEST_PRODUCT_NAME }} - ${{ runner.os }} Build Complete"
                 content:
                 - - tag: text
-                    text: "任务id："
+                    text: "Task ID: "
                   - tag: a
                     text: "${{ github.run_id }}"
                     href: "https://github.com/juliet0416/cicd-test/actions/runs/${{ github.run_id }}"
                 - - tag: text
-                    text: "下载地址：${{secrets.CDN_URL}}/test/${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.file_name }}"
+                    text: "Download Links:"
+                ${{ runner.os == 'Linux' && join(matrix.file_names | map(file => format('- - tag: a\n    text: "{0}"\n    href: "{1}/test/{2}-{0}"', file, secrets.CDN_URL, secrets.TEST_PRODUCT_NAME)), '\n') || format('- - tag: a\n    text: "{0}"\n    href: "{1}/test/{2}-{0}"', matrix.file_name, secrets.CDN_URL, secrets.TEST_PRODUCT_NAME) }}
