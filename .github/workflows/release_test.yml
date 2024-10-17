@@ -256,17 +256,7 @@ jobs:
         run: |
           choco install winscp
 
-      # 准备发往OSS的文件
-      - name: Prepare upload for OSS
-        run: |
-          mkdir -p oss_temp_file
-          if [[ "${{ runner.os }}" == "Linux" ]]; then
-            for file_name in ${{ join(matrix.file_names, ' ') }}; do
-              cp -r ${{ secrets.REPO_FRONT_PATH }}/release/*${file_name#*-} ./oss_temp_file/${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}-${file_name}
-            done
-          else
-            cp -r ${{ secrets.REPO_FRONT_PATH }}/release/*${{ matrix.file_extension }} ./oss_temp_file/${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}${{ matrix.file_extension }}
-          fi
+
 
       # 上传文件到远程服务器
       - name: Copy files to remote server
