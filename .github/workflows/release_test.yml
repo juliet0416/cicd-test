@@ -263,9 +263,9 @@ jobs:
           cp -r ${{ secrets.REPO_FRONT_PATH }}/release/   ./oss_temp_file/
           if [[ "${{ runner.os }}" == "Linux" ]]; then
             ls -la ${{ secrets.REPO_FRONT_PATH }}/release/
-            cp -r ${{ secrets.REPO_FRONT_PATH }}/release/*.deb ./oss_temp_file/${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}.deb
-            cp -r ${{ secrets.REPO_FRONT_PATH }}/release/*.rpm ./oss_temp_file/${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}.rpm
-            cp -r ${{ secrets.REPO_FRONT_PATH }}/release/*.AppImage ./oss_temp_file/${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}.AppImage
+            cp -r ${{ secrets.REPO_FRONT_PATH }}/release/*.deb ./oss_temp_file/${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}-${{ matrix.arch }}.deb
+            cp -r ${{ secrets.REPO_FRONT_PATH }}/release/*.rpm ./oss_temp_file/${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}-${{ matrix.arch }}.rpm
+            cp -r ${{ secrets.REPO_FRONT_PATH }}/release/*.AppImage ./oss_temp_file/${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}-${{ matrix.arch }}.AppImage
           else
             cp -r ${{ secrets.REPO_FRONT_PATH }}/release/*${{ matrix.file_extension }} ./oss_temp_file/${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}${{ matrix.file_extension }}
           fi
