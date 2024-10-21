@@ -314,22 +314,10 @@ jobs:
       # 上传到OSS
       - name: Upload to OSS
         run: |
-          if [[ "${{ runner.os }}" == "Linux" ]]; then
-            for file in ./oss_temp_file/*; do
-              filename=$(basename "$file")
-              if [[ $filename == *.deb ]]; then
-                ossutil cp -rf --acl=public-read "$file" oss://${{ secrets.TEST_BUCKET_NAME }}/${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.arch }}-latest.deb
-              elif [[ $filename == *.rpm ]]; then
-                ossutil cp -rf --acl=public-read "$file" oss://${{ secrets.TEST_BUCKET_NAME }}/${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.arch }}-latest.rpm
-              elif [[ $filename == *.AppImage ]]; then
-                ossutil cp -rf --acl=public-read "$file" oss://${{ secrets.TEST_BUCKET_NAME }}/${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.arch }}-latest.AppImage
-              fi
-            done
-          else
-            for file in ./oss_temp_file/*; do
-              ossutil cp -rf --acl=public-read "$file" oss://${{ secrets.TEST_BUCKET_NAME }}/${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.file_name }}
-            done
-          fi
+          for file in ./oss_temp_file/*; do
+            filename=$(basename "$file")
+            ossutil cp -rf --acl=public-read "$file" oss://${{ secrets.TEST_BUCKET_NAME }}/test/$filename
+          done
         shell: bash
 
 
