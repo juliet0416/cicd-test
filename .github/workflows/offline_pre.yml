@@ -1,4 +1,4 @@
-name: Build Offline Pre Client
+name: Build Offline Release Client
 
 on:
   workflow_dispatch:
@@ -67,7 +67,7 @@ jobs:
         with:
           java-version: "17"
           distribution: "temurin"
-          java-package: "jre"
+          java-package: "jdk"
 
       # Install jre MacOS X64
       - name: Install Jre MacOS X64
@@ -181,7 +181,7 @@ jobs:
           distribution: "temurin"
           cache: "maven"
 
-      # 打包依赖包
+        # 打包依赖包
       # - name: Check out first repository
       #   uses: actions/checkout@v2
       #   with:
@@ -221,7 +221,7 @@ jobs:
           cd ${{ secrets.REPO_FRONT_PATH }} 
           cd src/main
           yarn
-          yarn run build:offline
+          yarn run build:offline    
           cp -r electron ../../static
 
       # 打包桌面端前端资源
@@ -229,7 +229,7 @@ jobs:
         run: |
           cd ${{ secrets.REPO_FRONT_PATH }}
           yarn
-          yarn run modify:package:name chat2db-offline
+          yarn run modify:package:name chat2db-local Chat2DB-Local
           yarn run build:web:offline --app_version=${{ github.event.inputs.version }}
           cp -r dist ./static/
 
@@ -243,7 +243,7 @@ jobs:
           mac_certs_password: ${{ secrets.MAC_CERTS_PASSWORD }}
           skip_build: true
           args: >
-            -c.appId=${{ secrets.OFFLIEN_APP_ID }}
+            -c.appId=${{ secrets.OFFLINE_APP_ID }}
             -c.productName="${{ secrets.OFFLINE_PRODUCT_NAME }}"
             -c.win.publisherName="${{ secrets.PUBLISHER_NAME }}"
             -c.nsis.shortcutName="${{ secrets.OFFLINE_PRODUCT_NAME }}"
@@ -278,7 +278,6 @@ jobs:
       # 上传文件到远程服务器
       - name: Copy files to remote server
         if: ${{ runner.os == 'Windows' }}
-        continue-on-error: true
         timeout-minutes: 15
         env:
           SCP_PASSWORD: ${{ secrets.WIN_SSH_PRIVATE_KEY }}
@@ -310,7 +309,6 @@ jobs:
       # 修改windows加签后的yml文件
       - name: Calculate file hash
         if: ${{ runner.os == 'Windows' }}
-        continue-on-error: true
         id: hash
         run: |
           # Step 1: Get the SHA512 hash of the file using CertUtil
@@ -334,7 +332,6 @@ jobs:
       # 安装yq解析yml
       - name: Install powershell-yaml module
         if: ${{ runner.os == 'Windows' }}
-        continue-on-error: true
         run: |
           # Set the execution policy to bypass the prompt about installation from untrusted sources
           Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process -Force
@@ -344,7 +341,6 @@ jobs:
 
       - name: Extract, replace, and print hash value
         if: ${{ runner.os == 'Windows' }}
-        continue-on-error: true
         run: |
           # 引入 powershell-yaml 模块
           Import-Module powershell-yaml
@@ -418,8 +414,8 @@ jobs:
           msgtype: markdown
           content: |
             {
-              "title": "${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-Pre-${{ github.event.inputs.version }}${{ matrix.file_extension }}-打包完成通知",
-              "text": "# ${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-Pre-${{ github.event.inputs.version }}${{ matrix.file_extension }}-打包完成通知\n ###  任务id：[Pre-${{ github.event.inputs.version }}](https://github.com/juliet0416/cicd-test/actions/runs/${{ github.run_id }})\n ### 下载地址：${{secrets.CDN_URL}}/offline/${{ github.event.inputs.version }}/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}${{ matrix.file_extension }}"
+              "title": "${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}${{ matrix.file_extension }}-打包完成通知",
+              "text": "# ${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}${{ matrix.file_extension }}-打包完成通知\n ###  任务id：[${{ github.event.inputs.version }}](https://github.com/juliet0416/cicd-test/actions/runs/${{ github.run_id }})\n ### 下载地址：${{secrets.CDN_URL}}/offline/${{ github.event.inputs.version }}/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}${{ matrix.file_extension }}"
             }
 
       # 发送到飞书
@@ -431,12 +427,12 @@ jobs:
           content: |
             post:
               zh_cn:
-                title: "${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-Pre-${{ github.event.inputs.version }}${{ matrix.file_extension }}-打包完成通知"
+                title: "${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}${{ matrix.file_extension }}-打包完成通知"
                 content:
                 - - tag: text
                     text: "任务id："
                   - tag: a
-                    text: "Pre-${{ github.event.inputs.version }}"
+                    text: "${{ github.event.inputs.version }}"
                     href: "https://github.com/juliet0416/cicd-test/actions/runs/${{ github.run_id }}"
                 - - tag: text
                     text: "下载地址：${{secrets.CDN_URL}}/offline/${{ github.event.inputs.version }}/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}${{ matrix.file_extension }}"
