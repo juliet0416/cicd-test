@@ -31,6 +31,16 @@ jobs:
             file_name: "arm64-latest.dmg"
             file_extension: ".dmg"
             build_arg: "--mac --arm64"
+          - os: ubuntu-latest
+            arch: arm64
+            file_names: ["arm64-latest.deb", "arm64-latest.rpm", "arm64-latest.AppImage"]
+            file_extensions: [".deb", ".rpm", ".AppImage"]
+            build_arg: "--linux --arm64"
+          - os: ubuntu-latest
+            arch: x86_64
+            file_names: ["latest.deb", "latest.rpm", "latest.AppImage"]
+            file_extensions: [".deb", ".rpm", ".AppImage"]
+            build_arg: "--linux --x64"
     runs-on: ${{ matrix.os }}
 
     # 将release_test分支的代码检出（即复制）到 GitHub Actions 的运行环境中。
@@ -252,9 +262,9 @@ jobs:
           mkdir -p oss_temp_file
           ls -la ${{ secrets.REPO_FRONT_PATH }}/release/
           if [[ "${{ runner.os }}" == "Linux" ]]; then
-            cp -r ${{ secrets.REPO_FRONT_PATH }}/release/*.deb ./oss_temp_file/${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}-${{ matrix.arch }}.deb
-            cp -r ${{ secrets.REPO_FRONT_PATH }}/release/*.rpm ./oss_temp_file/${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}-${{ matrix.arch }}.rpm
-            cp -r ${{ secrets.REPO_FRONT_PATH }}/release/*.AppImage ./oss_temp_file/${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}-${{ matrix.arch }}.AppImage
+            cp -r ${{ secrets.REPO_FRONT_PATH }}/release/*.deb ./oss_temp_file/${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.arch }}-latest.deb
+            cp -r ${{ secrets.REPO_FRONT_PATH }}/release/*.rpm ./oss_temp_file/${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.arch }}-latest.rpm
+            cp -r ${{ secrets.REPO_FRONT_PATH }}/release/*.AppImage ./oss_temp_file/${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.arch }}-latest.AppImage
           else
             cp -r ${{ secrets.REPO_FRONT_PATH }}/release/*${{ matrix.file_extension }} ./oss_temp_file/${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.file_name }}
           fi
@@ -268,11 +278,11 @@ jobs:
           SCP_PASSWORD: ${{ secrets.WIN_SSH_PRIVATE_KEY }}
           REMOTE_HOST: ${{ secrets.WIN_SERVER_IP }}
           REMOTE_USER: ${{ secrets.WIN_SERVER_USER }}
-          REMOTE_PATH: "${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}.exe"
+          REMOTE_PATH: "${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.file_name }}"
           HOST_KEY: ${{ secrets.HOST_KEY }}
-          FILE_TO_UPLOAD: "${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}.exe"
-          REMOTE_SCRIPT_PATH: "${{ secrets.REMOTE_SIGN_SCRIPT }} ${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}.exe"
-          LOCAL_DOWNLOAD_PATH: "${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}.exe"
+          FILE_TO_UPLOAD: "${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.file_name }}"
+          REMOTE_SCRIPT_PATH: "${{ secrets.REMOTE_SIGN_SCRIPT }} ${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.file_name }}"
+          LOCAL_DOWNLOAD_PATH: "${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.file_name }}"
         run: |
           winscp.com /log=winscp.log /command `
             "option batch abort" `
@@ -287,7 +297,7 @@ jobs:
       - name: Prepare upload for OSS on winodows
         if: ${{ runner.os == 'Windows' }}
         run: |
-          cp -r ${{ github.workspace }}/${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}.exe ./oss_temp_file/${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}.exe
+          cp -r ${{ github.workspace }}/${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.file_name }}.exe ./oss_temp_file/${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.file_name }}.exe
 
 
       # 设置OSS
@@ -358,5 +368,12 @@ jobs:
                   - tag: a
                     text: "${{ github.run_id }}"
                     href: "https://github.com/juliet0416/cicd-test/actions/runs/${{ github.run_id }}"
+                - - tag: text
+                    text: "下载地址: ${{secrets.CDN_URL}}/test/${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.arch }}-latest.deb"
+                - - tag: text
+                    text: "下载地址: ${{secrets.CDN_URL}}/test/${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.arch }}-latest.rpm"
+                - - tag: text
+                    text: "下载地址: ${{secrets.CDN_URL}}/test/${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.arch }}-latest.AppImage"
+
 
 
