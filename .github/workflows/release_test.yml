@@ -3,13 +3,13 @@ name: Build Test Client
 on:
   push:
     branches:
-    - "release_test"
+      - "release_test"
   workflow_dispatch:
     inputs:
       logLevel:
-        description: 'Log level'
+        description: "Log level"
         required: true
-        default: 'warning'
+        default: "warning"
 
 jobs:
   release:
@@ -33,7 +33,8 @@ jobs:
             build_arg: "--mac --arm64"
           - os: ubuntu-latest
             arch: arm64
-            file_names: ["arm64-latest.deb", "arm64-latest.rpm", "arm64-latest.AppImage"]
+            file_names:
+              ["arm64-latest.deb", "arm64-latest.rpm", "arm64-latest.AppImage"]
             file_extensions: [".deb", ".rpm", ".AppImage"]
             build_arg: "--linux --arm64"
           - os: ubuntu-latest
@@ -52,7 +53,6 @@ jobs:
           ref: ${{ secrets.TEST_REPO_BRANCH }}
           path: ${{ secrets.REPO_PATH }}
           token: ${{ secrets.ACCESS_TOKEN }}
-
 
       # Output basic information
       - name: Print basic information
@@ -76,7 +76,7 @@ jobs:
           java-version: "17"
           distribution: "temurin"
           java-package: "jre"
-          architecture: 'x64'
+          architecture: "x64"
 
       # Install jre MacOS arm64
       - name: Install Jre MacOS arm64
@@ -96,7 +96,6 @@ jobs:
           java-version: "17"
           distribution: "temurin"
           java-package: "jre"
-
 
       # Install jre Linux arm64
       - name: Install Jre for Linux
@@ -136,7 +135,7 @@ jobs:
         if: ${{ runner.os == 'Windows' }}
         run: |
           mkdir -p ${{ secrets.REPO_STATIC_PATH }} 
-          cp -r "${{ env.JAVA_HOME }}" ${{ secrets.REPO_JRE_PATH }} 
+          cp -r "${{ env.JAVA_HOME }}" ${{ secrets.REPO_JRE_PATH }}
 
       # Copy jre macOS
       - name: Copy Jre for macOS
@@ -144,7 +143,7 @@ jobs:
         run: |
           mkdir -p ${{ secrets.REPO_STATIC_PATH }} 
           cp -r $JAVA_HOME ${{ secrets.REPO_JRE_PATH }} 
-          chmod -R 777 ${{ secrets.REPO_JRE_PATH }} 
+          chmod -R 777 ${{ secrets.REPO_JRE_PATH }}
 
       # Copy jre Linux
       - name: Copy Jre for Linux
@@ -152,7 +151,7 @@ jobs:
         run: |
           mkdir -p ${{ secrets.REPO_STATIC_PATH }} 
           cp -r $JAVA_HOME ${{ secrets.REPO_JRE_PATH }} 
-          chmod -R 777 ${{ secrets.REPO_JRE_PATH }} 
+          chmod -R 777 ${{ secrets.REPO_JRE_PATH }}
 
       # Linux
       - name: Delete File
@@ -186,7 +185,7 @@ jobs:
       #     repository: ${{ secrets.REPO_BASE_URL }}
       #     ref: ${{ secrets.TEST_REPO_BASE_BRANCH }}
       #     path: ${{ secrets.REPO_BASE_PATH }}
-          
+
       - name: Check out sqlParser repository
         uses: actions/checkout@v2
         with:
@@ -195,7 +194,6 @@ jobs:
           path: ${{ secrets.SQL_PARSER_REPO_BASE_PATH }}
           token: ${{ secrets.ACCESS_TOKEN }}
 
-          
       # - name: MVN Build plugins1
       #   run: |
       #     mvn clean install -B '-Dmaven.test.skip=true' -f ${{ secrets.REPO_BASE_POM_PATH }}
@@ -222,7 +220,6 @@ jobs:
           yarn
           yarn run build:test
           cp -r electron ../../static
-      
 
       # 打包桌面端前端资源
       - name: Prepare Build Electron
@@ -250,7 +247,6 @@ jobs:
             -c.extraMetadata.version=99.0.${{ github.run_id }}
             ${{ matrix.build_arg}}
 
-
       - name: Install WinSCP
         if: ${{ runner.os == 'Windows' }}
         run: |
@@ -267,17 +263,18 @@ jobs:
             cp -r ${{ secrets.REPO_FRONT_PATH }}/release/*.rpm ./oss_temp_file/${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.arch }}-latest.rpm
             cp -r ${{ secrets.REPO_FRONT_PATH }}/release/*.AppImage ./oss_temp_file/${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.arch }}-latest.AppImage
           elif [[ "${{ runner.os }}" == "Windows" ]]; then
-            cp "${{ secrets.REPO_FRONT_PATH }}/release/"*".exe" "./oss_temp_file/${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.file_name }}"
+            cp -r ${{ secrets.REPO_FRONT_PATH }}/release/*${{ matrix.file_extension }} ./oss_temp_file/${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}${{ matrix.file_extension }}
+            cp -r ${{ secrets.REPO_FRONT_PATH }}/release/*${{ matrix.file_extension }} ${{ github.workspace }}/${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}${{ matrix.file_extension }}
+
           else
             cp -r ${{ secrets.REPO_FRONT_PATH }}/release/*${{ matrix.file_extension }} ./oss_temp_file/${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.file_name }}
           fi
-          
 
       # 上传文件到远程服务器
       - name: Copy files to remote server
         if: ${{ runner.os == 'Windows' }}
         continue-on-error: true
-        timeout-minutes: 15  
+        timeout-minutes: 15
         env:
           SCP_PASSWORD: ${{ secrets.WIN_SSH_PRIVATE_KEY }}
           REMOTE_HOST: ${{ secrets.WIN_SERVER_IP }}
@@ -301,8 +298,7 @@ jobs:
       - name: Prepare upload for OSS on winodows
         if: ${{ runner.os == 'Windows' }}
         run: |
-          cp -r ${{ github.workspace }}/${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}.exe ./oss_temp_file/${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.file_name }}
-
+          cp -r ${{ github.workspace }}/${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}.exe ./oss_temp_file/${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}.exe
 
       # 设置OSS
       - name: Set up oss utils
@@ -313,7 +309,6 @@ jobs:
           access-key-secret: ${{ secrets.OSS_ACCESS_KEY_SECRET }}
           ossutil-version: "1.7.16"
 
-
       # 上传到OSS
       - name: Upload to OSS
         run: |
@@ -322,7 +317,6 @@ jobs:
             ossutil cp -rf --acl=public-read "$file" oss://${{ secrets.TEST_BUCKET_NAME }}/$filename
           done
         shell: bash
-
 
       # 发送到DingTalk
       - name: Send dingtalk message
@@ -378,6 +372,3 @@ jobs:
                     text: "下载地址: ${{secrets.CDN_URL}}/test/${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.arch }}-latest.rpm"
                 - - tag: text
                     text: "下载地址: ${{secrets.CDN_URL}}/test/${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.arch }}-latest.AppImage"
-
-
-
