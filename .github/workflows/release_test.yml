@@ -18,10 +18,29 @@ jobs:
       matrix:
         include:
           - os: macos-latest
+            arch: x86_64
+            file_name: "latest.dmg"
+            file_extension: ".dmg"
+            build_arg: "--mac --x64"
+          - os: windows-latest
+            file_extension: ".exe"
+            file_name: "latest.exe"
+            build_arg: "--win --x64"
+          - os: macos-latest
             arch: arm64
             file_name: "arm64-latest.dmg"
             file_extension: ".dmg"
             build_arg: "--mac --arm64"
+          - os: ubuntu-latest
+            arch: arm64
+            file_names: ["arm64-latest.deb", "arm64-latest.rpm", "arm64-latest.AppImage"]
+            file_extensions: [".deb", ".rpm", ".AppImage"]
+            build_arg: "--linux --arm64"
+          - os: ubuntu-latest
+            arch: x86_64
+            file_names: ["latest.deb", "latest.rpm", "latest.AppImage"]
+            file_extensions: [".deb", ".rpm", ".AppImage"]
+            build_arg: "--linux --x64"
     runs-on: ${{ matrix.os }}
 
     # 将release_test分支的代码检出（即复制）到 GitHub Actions 的运行环境中。
@@ -241,15 +260,13 @@ jobs:
       - name: Prepare upload for OSS
         run: |
           mkdir -p oss_temp_file
-          cp -r ${{ secrets.REPO_FRONT_PATH }}/release/   ./oss_temp_file/
+          ls -la ${{ secrets.REPO_FRONT_PATH }}/release/
           if [[ "${{ runner.os }}" == "Linux" ]]; then
-            ls -la ${{ secrets.REPO_FRONT_PATH }}/release/
             cp -r ${{ secrets.REPO_FRONT_PATH }}/release/*.deb ./oss_temp_file/${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}-${{ matrix.arch }}.deb
             cp -r ${{ secrets.REPO_FRONT_PATH }}/release/*.rpm ./oss_temp_file/${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}-${{ matrix.arch }}.rpm
             cp -r ${{ secrets.REPO_FRONT_PATH }}/release/*.AppImage ./oss_temp_file/${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}-${{ matrix.arch }}.AppImage
           else
-            ls -la ${{ secrets.REPO_FRONT_PATH }}/release/
-            cp -r ${{ secrets.REPO_FRONT_PATH }}/release/*${{ matrix.file_extension }} ./oss_temp_file/${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}${{ matrix.file_extension }}
+            cp -r ${{ secrets.REPO_FRONT_PATH }}/release/*${{ matrix.file_extension }} ./oss_temp_file/${{ secrets.TEST_PRODUCT_NAME }}-${{ secrets.file_name }}
           fi
 
       # 上传文件到远程服务器
