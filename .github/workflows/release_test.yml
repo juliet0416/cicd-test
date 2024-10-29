@@ -267,8 +267,7 @@ jobs:
             cp -r ${{ secrets.REPO_FRONT_PATH }}/release/*.rpm ./oss_temp_file/${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.arch }}-latest.rpm
             cp -r ${{ secrets.REPO_FRONT_PATH }}/release/*.AppImage ./oss_temp_file/${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.arch }}-latest.AppImage
           elif [[ "${{ runner.os }}" == "Windows" ]]; then
-            cp -r ${{ secrets.REPO_FRONT_PATH }}/release/*${{ matrix.file_extension }} ./oss_temp_file/${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}.exe
-            cp -r ${{ secrets.REPO_FRONT_PATH }}/release/*${{ matrix.file_extension }} ${{ github.workspace }}/${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}.exe
+            cp "${{ secrets.REPO_FRONT_PATH }}/release/"*".exe" "./oss_temp_file/${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.file_name }}"
           else
             cp -r ${{ secrets.REPO_FRONT_PATH }}/release/*${{ matrix.file_extension }} ./oss_temp_file/${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.file_name }}
           fi
