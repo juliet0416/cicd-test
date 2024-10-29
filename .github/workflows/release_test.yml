@@ -21,7 +21,7 @@ jobs:
             file_extension: ".exe"
             file_name: "latest.exe"
             build_arg: "--win --x64"
-
+          
     runs-on: ${{ matrix.os }}
 
     # 将release_test分支的代码检出（即复制）到 GitHub Actions 的运行环境中。
@@ -260,11 +260,11 @@ jobs:
           SCP_PASSWORD: ${{ secrets.WIN_SSH_PRIVATE_KEY }}
           REMOTE_HOST: ${{ secrets.WIN_SERVER_IP }}
           REMOTE_USER: ${{ secrets.WIN_SERVER_USER }}
-          REMOTE_PATH: "${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.file_name }}"
+          REMOTE_PATH: "${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}.exe"
           HOST_KEY: ${{ secrets.HOST_KEY }}
-          FILE_TO_UPLOAD: "${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.file_name }}"
-          REMOTE_SCRIPT_PATH: "${{ secrets.REMOTE_SIGN_SCRIPT }} ${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.file_name }}"
-          LOCAL_DOWNLOAD_PATH: "${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.file_name }}"
+          FILE_TO_UPLOAD: "${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}.exe"
+          REMOTE_SCRIPT_PATH: "${{ secrets.REMOTE_SIGN_SCRIPT }} ${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}.exe"
+          LOCAL_DOWNLOAD_PATH: "${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}.exe"
         run: |
           winscp.com /log=winscp.log /command `
             "option batch abort" `
@@ -279,7 +279,7 @@ jobs:
       - name: Prepare upload for OSS on winodows
         if: ${{ runner.os == 'Windows' }}
         run: |
-          cp -r ${{ github.workspace }}/${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.file_name }} ./oss_temp_file/${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.file_name }}
+          cp -r ${{ github.workspace }}/${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}.exe ./oss_temp_file/${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.file_name }}
 
 
       # 设置OSS
