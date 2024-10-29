@@ -369,5 +369,5 @@ jobs:
                     text: "${{ github.run_id }}"
                     href: "https://github.com/juliet0416/cicd-test/actions/runs/${{ github.run_id }}"
                 - - tag: text
-                    text: "Download Links:\n${{ join(matrix.file_names[*], '\n') | prepend: secrets.CDN_URL | prepend: '/test/' | prepend: secrets.TEST_PRODUCT_NAME | prepend: '-' }}"
+                    text: "Download Links:\n${{secrets.CDN_URL}}/test/${{secrets.TEST_PRODUCT_NAME}}-${{ join(matrix.file_names, '\n' + secrets.CDN_URL + '/test/' + secrets.TEST_PRODUCT_NAME + '-') }}"
 
