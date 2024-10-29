@@ -31,16 +31,6 @@ jobs:
             file_name: "arm64-latest.dmg"
             file_extension: ".dmg"
             build_arg: "--mac --arm64"
-          - os: ubuntu-latest
-            arch: arm64
-            file_names: ["arm64-latest.deb", "arm64-latest.rpm", "arm64-latest.AppImage"]
-            file_extensions: [".deb", ".rpm", ".AppImage"]
-            build_arg: "--linux --arm64"
-          - os: ubuntu-latest
-            arch: x86_64
-            file_names: ["latest.deb", "latest.rpm", "latest.AppImage"]
-            file_extensions: [".deb", ".rpm", ".AppImage"]
-            build_arg: "--linux --x64"
     runs-on: ${{ matrix.os }}
 
     # 将release_test分支的代码检出（即复制）到 GitHub Actions 的运行环境中。
@@ -345,12 +335,12 @@ jobs:
                 title: "${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.file_name }} 打包完成通知"
                 content:
                 - - tag: text
-                    text: "Task ID: "
+                    text: "任务ID: "
                   - tag: a
                     text: "${{ github.run_id }}"
                     href: "https://github.com/juliet0416/cicd-test/actions/runs/${{ github.run_id }}"
                 - - tag: text
-                    text: "Download Links: ${{secrets.CDN_URL}}/test/${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.file_name }}"
+                    text: "下载地址: ${{secrets.CDN_URL}}/test/${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.file_name }}"
 
       - name: Send feishu message
         uses: foxundermoon/feishu-action@v2
@@ -364,10 +354,9 @@ jobs:
                 title: "${{ secrets.TEST_PRODUCT_NAME }} ${{ runner.os }} 打包完成通知"
                 content:
                 - - tag: text
-                    text: "Task ID: "
+                    text: "任务ID: "
                   - tag: a
                     text: "${{ github.run_id }}"
                     href: "https://github.com/juliet0416/cicd-test/actions/runs/${{ github.run_id }}"
-                - - tag: text
-                    text: "Download Links:\n${{secrets.CDN_URL}}/test/${{secrets.TEST_PRODUCT_NAME}}-${{ join(matrix.file_names, '\n' + secrets.CDN_URL + '/test/' + secrets.TEST_PRODUCT_NAME + '-') }}"
+
 
