@@ -247,7 +247,7 @@ jobs:
             cp -r ${{ secrets.REPO_FRONT_PATH }}/release/*.rpm ./oss_temp_file/${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}-${{ matrix.arch }}.rpm
             cp -r ${{ secrets.REPO_FRONT_PATH }}/release/*.AppImage ./oss_temp_file/${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}-${{ matrix.arch }}.AppImage
           else
-            cp -r ${{ secrets.REPO_FRONT_PATH }}/release/*${{ matrix.file_extension }} ./oss_temp_file/${{ secrets.TEST_PRODUCT_NAME }}-${{ secrets.file_name }}
+            cp -r ${{ secrets.REPO_FRONT_PATH }}/release/*${{ matrix.file_extension }} ./oss_temp_file/${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.file_name }}
           fi
 
       # 上传文件到远程服务器
