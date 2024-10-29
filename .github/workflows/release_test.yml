@@ -18,6 +18,11 @@ jobs:
       matrix:
         include:
           - os: macos-latest
+            arch: x86_64
+            file_name: "latest.dmg"
+            file_extension: ".dmg"
+            build_arg: "--mac --x64"
+          - os: macos-latest
             arch: arm64
             file_name: "arm64-latest.dmg"
             file_extension: ".dmg"
@@ -309,27 +314,11 @@ jobs:
           msgtype: markdown
           content: |
             {
-              "title": "${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.file_name }}-打包完成通知",
+              "title": "${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.file_name }} 打包完成通知",
               "text": "# ${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.file_name }}-打包完成通知\n ###  任务id：[${{ github.run_id }}](https://github.com/juliet0416/cicd-test/actions/runs/${{ github.run_id }})\n ### 下载地址：${{secrets.CDN_URL}}/test/${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.file_name }}"
             }
 
       # 发送到飞书
-      - name: Prepare Feishu message content
-        id: feishu_content
-        run: |
-          if [[ "${{ runner.os }}" == "Linux" ]]; then
-            content=""
-            for file_name in ${{ join(matrix.file_names, ' ') }}; do
-              content="${content}- - tag: a\n    text: \"${file_name}\"\n    href: \"${{secrets.CDN_URL}}/test/${{ secrets.TEST_PRODUCT_NAME }}-${file_name}\"\n"
-            done
-          else
-            content="- - tag: a\n    text: \"${{ matrix.file_name }}\"\n    href: \"${{secrets.CDN_URL}}/test/${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.file_name }}\"\n"
-          fi
-          echo "download_links<<EOF" >> $GITHUB_OUTPUT
-          echo "$content" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-        shell: bash
-
       - name: Send feishu message
         uses: foxundermoon/feishu-action@v2
         with:
@@ -338,7 +327,8 @@ jobs:
           content: |
             post:
               zh_cn:
-                title: "${{ secrets.TEST_PRODUCT_NAME }} - ${{ runner.os }} Build Complete"
+              
+                title: "${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.file_name }} 打包完成通知"
                 content:
                 - - tag: text
                     text: "Task ID: "
@@ -346,6 +336,5 @@ jobs:
                     text: "${{ github.run_id }}"
                     href: "https://github.com/juliet0416/cicd-test/actions/runs/${{ github.run_id }}"
                 - - tag: text
-                    text: "Download Links:"
-                ${{ steps.feishu_content.outputs.download_links }}
+                    text: "Download Links: ${{secrets.CDN_URL}}/test/${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.file_name }}"
 
