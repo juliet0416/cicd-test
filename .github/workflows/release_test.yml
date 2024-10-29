@@ -17,7 +17,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-
           - os: windows-latest
             file_extension: ".exe"
             file_name: "latest.exe"
@@ -280,7 +279,7 @@ jobs:
       - name: Prepare upload for OSS on winodows
         if: ${{ runner.os == 'Windows' }}
         run: |
-          cp -r ${{ github.workspace }}/${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.file_name }}.exe ./oss_temp_file/${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.file_name }}.exe
+          cp -r ${{ github.workspace }}/${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.file_name }} ./oss_temp_file/${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.file_name }}
 
 
       # 设置OSS
