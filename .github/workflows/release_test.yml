@@ -303,7 +303,7 @@ jobs:
       - name: Prepare upload for OSS on winodows
         if: ${{ runner.os == 'Windows' }}
         run: |
-          cp -r ${{ github.workspace }}/${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}.exe ./oss_temp_file/${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}.exe
+          cp -r ${{ github.workspace }}/${{ secrets.TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}.exe ./oss_temp_file/${{ secrets.TEST_PRODUCT_NAME }}-${{ matrix.file_name }}
 
       # 设置OSS
       - name: Set up oss utils
