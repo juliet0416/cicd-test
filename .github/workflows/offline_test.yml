@@ -35,7 +35,6 @@ jobs:
             build_arg: "--mac --arm64"
           - os: ubuntu-latest
             arch: x86_64
-            file_name: "latest.AppImage"
             file_names: ["latest.deb", "latest.rpm", "latest.AppImage"]
             file_extensions: [".deb", ".rpm", ".AppImage"]
             build_arg: "--linux --x64"
@@ -374,8 +373,8 @@ jobs:
                     text: "${{ github.run_id }}"
                     href: "https://github.com/juliet0416/cicd-test/actions/runs/${{ github.run_id }}"
                 - - tag: text
-                    text: "下载地址: ${{secrets.CDN_URL}}/test/${{ secrets.OFFLINE_TEST_PRODUCT_NAME }}-${{ matrix.arch }}-latest.deb"
+                    text: "下载地址: ${{secrets.CDN_URL}}/offline_test/${{ secrets.OFFLINE_TEST_PRODUCT_NAME }}-${{ matrix.arch }}-latest.deb"
                 - - tag: text
-                    text: "下载地址: ${{secrets.CDN_URL}}/test/${{ secrets.OFFLINE_TEST_PRODUCT_NAME }}-${{ matrix.arch }}-latest.rpm"
+                    text: "下载地址: ${{secrets.CDN_URL}}/offline_test/${{ secrets.OFFLINE_TEST_PRODUCT_NAME }}-${{ matrix.arch }}-latest.rpm"
                 - - tag: text
-                    text: "下载地址: ${{secrets.CDN_URL}}/test/${{ secrets.OFFLINE_TEST_PRODUCT_NAME }}-${{ matrix.arch }}-latest.AppImage"
+                    text: "下载地址: ${{secrets.CDN_URL}}/offline_test/${{ secrets.OFFLINE_TEST_PRODUCT_NAME }}-${{ matrix.arch }}-latest.AppImage"
