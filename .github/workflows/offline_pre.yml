@@ -400,18 +400,18 @@ jobs:
         if: matrix.os == 'ubuntu-latest' && matrix.arch == 'x86_64'
         run: |
           ls -la ${{ secrets.REPO_FRONT_PATH }}/release/
-          ossutil cp -rf ${{ secrets.REPO_FRONT_PATH }}/release/*.deb "oss://${{ secrets.OFFLINE_BUCKET_NAME }}/${{ github.event.inputs.version }}/"
-          ossutil cp -rf ${{ secrets.REPO_FRONT_PATH }}/release/*.rpm "oss://${{ secrets.OFFLINE_BUCKET_NAME }}/${{ github.event.inputs.version }}/"
-          ossutil cp -rf ${{ secrets.REPO_FRONT_PATH }}/release/*.AppImage "oss://${{ secrets.OFFLINE_BUCKET_NAME }}/${{ github.event.inputs.version }}/"
+          ossutil cp -rf ${{ secrets.REPO_FRONT_PATH }}/release/*.deb "oss://${{ secrets.OFFLINE_BUCKET_NAME }}/${{ github.event.inputs.version }}/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x86_64.deb"
+          ossutil cp -rf ${{ secrets.REPO_FRONT_PATH }}/release/*.rpm "oss://${{ secrets.OFFLINE_BUCKET_NAME }}/${{ github.event.inputs.version }}/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x86_64.rpm"
+          ossutil cp -rf ${{ secrets.REPO_FRONT_PATH }}/release/*.AppImage "oss://${{ secrets.OFFLINE_BUCKET_NAME }}/${{ github.event.inputs.version }}/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x86_64.AppImage"
           # ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x86_64.AppImage" "oss://${{ secrets.OFFLINE_BUCKET_NAME }}/${{ github.event.inputs.version }}/"
 
       - name: Upload to OSS for linux arm64
         if: matrix.os == 'ubuntu-latest' && matrix.arch == 'arm64'
         run: |
           ls -la ${{ secrets.REPO_FRONT_PATH }}/release/
-          ossutil cp -rf ${{ secrets.REPO_FRONT_PATH }}/release/*.deb "oss://${{ secrets.OFFLINE_BUCKET_NAME }}/${{ github.event.inputs.version }}/"
-          ossutil cp -rf ${{ secrets.REPO_FRONT_PATH }}/release/*.rpm "oss://${{ secrets.OFFLINE_BUCKET_NAME }}/${{ github.event.inputs.version }}/"
-          ossutil cp -rf ${{ secrets.REPO_FRONT_PATH }}/release/*.AppImage "oss://${{ secrets.OFFLINE_BUCKET_NAME }}/${{ github.event.inputs.version }}/"
+          ossutil cp -rf ${{ secrets.REPO_FRONT_PATH }}/release/*.deb "oss://${{ secrets.OFFLINE_BUCKET_NAME }}/${{ github.event.inputs.version }}/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.deb"
+          ossutil cp -rf ${{ secrets.REPO_FRONT_PATH }}/release/*.rpm "oss://${{ secrets.OFFLINE_BUCKET_NAME }}/${{ github.event.inputs.version }}/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.rpm"
+          ossutil cp -rf ${{ secrets.REPO_FRONT_PATH }}/release/*.AppImage "oss://${{ secrets.OFFLINE_BUCKET_NAME }}/${{ github.event.inputs.version }}/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.AppImage"
           # ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.AppImage" "oss://${{ secrets.OFFLINE_BUCKET_NAME }}/${{ github.event.inputs.version }}/"
 
       # 发送到DingTalk
