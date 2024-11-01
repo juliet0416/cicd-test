@@ -1,4 +1,4 @@
-name: Build Offline Release Client
+name: Build Offline Pre Release Client
 
 on:
   workflow_dispatch:
