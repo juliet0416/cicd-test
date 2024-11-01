@@ -18,15 +18,15 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - os: windows-latest
+            file_extension: ".exe"
+            file_name: "latest.exe"
+            build_arg: "--win --x64"
           - os: macos-latest
             arch: x86_64
             file_name: "latest.dmg"
             file_extension: "-x64.dmg"
             build_arg: "--mac --x64"
-          - os: windows-latest
-            file_extension: ".exe"
-            file_name: "latest.exe"
-            build_arg: "--win --x64"
           - os: macos-latest
             arch: arm64
             file_name: "arm64-latest.dmg"
@@ -34,13 +34,13 @@ jobs:
             build_arg: "--mac --arm64"
           - os: ubuntu-latest
             arch: x86_64
-            file_name: "latest.AppImage"
-            file_extension: "-x86_64.AppImage"
+            file_names: ["latest.deb", "latest.rpm", "latest.AppImage"]
+            file_extensions: [".deb", ".rpm", ".AppImage"]
             build_arg: "--linux --x64"
           - os: ubuntu-latest
             arch: arm64
-            file_name: "arm64-latest.AppImage"
-            file_extension: "-arm64.AppImage"
+            file_names: ["arm64-latest.deb", "arm64-latest.rpm", "arm64-latest.AppImage"]
+            file_extensions: [".deb", ".rpm", ".AppImage"]
             build_arg: "--linux --arm64"
 
     runs-on: ${{ matrix.os }}
@@ -410,18 +410,41 @@ jobs:
       - name: Upload to OSS for linux x86_64
         if: matrix.os == 'ubuntu-latest' && matrix.arch == 'x86_64'
         run: |
-          ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x86_64.AppImage" "oss://${{ secrets.OFFLINE_BUCKET_NAME }}/${{ github.event.inputs.version }}/"
-          ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x86_64.AppImage" "oss://${{ secrets.OFFLINE_BUCKET_NAME }}/latest/linux/x86_64/"
+          ls -la ${{ secrets.REPO_FRONT_PATH }}/release/
+          
+          ossutil cp -rf ${{ secrets.REPO_FRONT_PATH }}/release/*.deb "oss://${{ secrets.OFFLINE_BUCKET_NAME }}/${{ github.event.inputs.version }}/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x86_64.deb"
+          ossutil cp -rf ${{ secrets.REPO_FRONT_PATH }}/release/*.rpm "oss://${{ secrets.OFFLINE_BUCKET_NAME }}/${{ github.event.inputs.version }}/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x86_64.rpm"
+          ossutil cp -rf ${{ secrets.REPO_FRONT_PATH }}/release/*.AppImage "oss://${{ secrets.OFFLINE_BUCKET_NAME }}/${{ github.event.inputs.version }}/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x86_64.AppImage"
+          
+          ossutil cp -rf ${{ secrets.REPO_FRONT_PATH }}/release/*.deb "oss://${{ secrets.OFFLINE_BUCKET_NAME }}/latest/linux/x86_64/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x86_64.deb"
+          ossutil cp -rf ${{ secrets.REPO_FRONT_PATH }}/release/*.rpm "oss://${{ secrets.OFFLINE_BUCKET_NAME }}/latest/linux/x86_64/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x86_64.rpm"
+          ossutil cp -rf ${{ secrets.REPO_FRONT_PATH }}/release/*.AppImage "oss://${{ secrets.OFFLINE_BUCKET_NAME }}/latest/linux/x86_64/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x86_64.AppImage"
+
           ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/latest-linux.yml" "oss://${{ secrets.OFFLINE_BUCKET_NAME }}/latest/linux/x86_64/"
-          ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x86_64.AppImage" "oss://${{ secrets.OFFLINE_BUCKET_NAME }}/latest/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-latest.AppImage"
+
+          ossutil cp -rf ${{ secrets.REPO_FRONT_PATH }}/release/*.deb "oss://${{ secrets.OFFLINE_BUCKET_NAME }}/latest/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-latest-x86_64.deb"
+          ossutil cp -rf ${{ secrets.REPO_FRONT_PATH }}/release/*.rpm "oss://${{ secrets.OFFLINE_BUCKET_NAME }}/latest/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-latest-x86_64.rpm"
+          ossutil cp -rf ${{ secrets.REPO_FRONT_PATH }}/release/*.AppImage "oss://${{ secrets.OFFLINE_BUCKET_NAME }}/latest/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-latest-x86_64.AppImage"
 
       - name: Upload to OSS for linux arm64
         if: matrix.os == 'ubuntu-latest' && matrix.arch == 'arm64'
         run: |
-          ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.AppImage" "oss://${{ secrets.OFFLINE_BUCKET_NAME }}/${{ github.event.inputs.version }}/"
-          ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.AppImage" "oss://${{ secrets.OFFLINE_BUCKET_NAME }}/latest/linux/arm64/"
+          ls -la ${{ secrets.REPO_FRONT_PATH }}/release/
+          ossutil cp -rf ${{ secrets.REPO_FRONT_PATH }}/release/*.deb "oss://${{ secrets.OFFLINE_BUCKET_NAME }}/${{ github.event.inputs.version }}/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.deb"
+          ossutil cp -rf ${{ secrets.REPO_FRONT_PATH }}/release/*.rpm "oss://${{ secrets.OFFLINE_BUCKET_NAME }}/${{ github.event.inputs.version }}/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.rpm"
+          ossutil cp -rf ${{ secrets.REPO_FRONT_PATH }}/release/*.AppImage "oss://${{ secrets.OFFLINE_BUCKET_NAME }}/${{ github.event.inputs.version }}/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.AppImage"
+         
+          ossutil cp -rf ${{ secrets.REPO_FRONT_PATH }}/release/*.deb "oss://${{ secrets.OFFLINE_BUCKET_NAME }}/latest/linux/arm64/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.deb"
+          ossutil cp -rf ${{ secrets.REPO_FRONT_PATH }}/release/*.rpm "oss://${{ secrets.OFFLINE_BUCKET_NAME }}/latest/linux/arm64/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.rpm"
+          ossutil cp -rf ${{ secrets.REPO_FRONT_PATH }}/release/*.AppImage "oss://${{ secrets.OFFLINE_BUCKET_NAME }}/latest/linux/arm64/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.AppImage"
+          
+
           ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/latest-linux-arm64.yml" "oss://${{ secrets.OFFLINE_BUCKET_NAME }}/latest/linux/arm64/"
-          ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.AppImage" "oss://${{ secrets.OFFLINE_BUCKET_NAME }}/latest/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-arm64-latest.AppImage"
+          
+          ossutil cp -rf ${{ secrets.REPO_FRONT_PATH }}/release/*.deb "oss://${{ secrets.OFFLINE_BUCKET_NAME }}/latest/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-arm64-latest.deb"
+          ossutil cp -rf ${{ secrets.REPO_FRONT_PATH }}/release/*.rpm "oss://${{ secrets.OFFLINE_BUCKET_NAME }}/latest/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-arm64-latest.rpm"
+          ossutil cp -rf ${{ secrets.REPO_FRONT_PATH }}/release/*.AppImage "oss://${{ secrets.OFFLINE_BUCKET_NAME }}/latest/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-arm64-latest.AppImage"
+          
 
       # 发送到DingTalk
       - name: Send dingtalk message
@@ -438,13 +461,14 @@ jobs:
       # 发送到飞书
       - name: Send feishu message
         uses: foxundermoon/feishu-action@v2
+        if: ${{ runner.os != 'Linux' }}
         with:
           url: ${{ secrets.FEISHU_WEBHOOK }}
           msg_type: post
           content: |
             post:
               zh_cn:
-                title: "${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}${{ matrix.file_extension }}-打包完成通知"
+                title: "${{ secrets.OFFLINE_PRODUCT_APP_NAME }} ${{ github.event.inputs.version }} ${{ runner.os }} ${{ matrix.arch }} 打包完成通知"
                 content:
                 - - tag: text
                     text: "任务id："
@@ -453,3 +477,26 @@ jobs:
                     href: "https://github.com/juliet0416/cicd-test/actions/runs/${{ github.run_id }}"
                 - - tag: text
                     text: "下载地址：${{secrets.CDN_URL}}/offline/${{ github.event.inputs.version }}/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}${{ matrix.file_extension }}"
+
+      - name: Send feishu message
+        uses: foxundermoon/feishu-action@v2
+        if: ${{ runner.os == 'Linux' }}
+        with:
+          url: ${{ secrets.FEISHU_WEBHOOK }}
+          msg_type: post
+          content: |
+            post:
+              zh_cn:
+                title: "${{ secrets.OFFLINE_PRODUCT_APP_NAME }} ${{ github.event.inputs.version }} ${{ runner.os }} ${{ matrix.arch }} 打包完成通知"
+                content:
+                - - tag: text
+                    text: "任务ID: "
+                  - tag: a
+                    text: "${{ github.run_id }}"
+                    href: "https://github.com/juliet0416/cicd-test/actions/runs/${{ github.run_id }}"
+                - - tag: text
+                    text: "下载地址: ${{secrets.CDN_URL}}/offline/${{ github.event.inputs.version }}/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-${{ matrix.arch }}.deb"
+                - - tag: text
+                    text: "下载地址: ${{secrets.CDN_URL}}/offline/${{ github.event.inputs.version }}/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-${{ matrix.arch }}.rpm"
+                - - tag: text
+                    text: "下载地址: ${{secrets.CDN_URL}}/offline/${{ github.event.inputs.version }}/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-${{ matrix.arch }}.AppImage"
