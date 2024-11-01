@@ -258,6 +258,7 @@ jobs:
 
       # 准备发往OSS的文件
       - name: Prepare upload for OSS
+        if: ${{ runner.os != 'Linux' }}
         run: |
           mkdir -p oss_temp_file
           cp -r ${{ secrets.REPO_FRONT_PATH }}/release/*${{ matrix.file_extension }} ./oss_temp_file/${{ secrets.OFFLINE_TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}${{ matrix.file_extension }}
