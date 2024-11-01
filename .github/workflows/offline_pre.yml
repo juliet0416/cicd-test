@@ -399,6 +399,7 @@ jobs:
       - name: Upload to OSS for linux x86_64
         if: matrix.os == 'ubuntu-latest' && matrix.arch == 'x86_64'
         run: |
+          ls -la ${{ secrets.REPO_FRONT_PATH }}/release/
           ossutil cp -rf ${{ secrets.REPO_FRONT_PATH }}/release/*.deb "oss://${{ secrets.OFFLINE_BUCKET_NAME }}/${{ github.event.inputs.version }}/"
           ossutil cp -rf ${{ secrets.REPO_FRONT_PATH }}/release/*.rpm "oss://${{ secrets.OFFLINE_BUCKET_NAME }}/${{ github.event.inputs.version }}/"
           ossutil cp -rf ${{ secrets.REPO_FRONT_PATH }}/release/*.AppImage "oss://${{ secrets.OFFLINE_BUCKET_NAME }}/${{ github.event.inputs.version }}/"
@@ -407,6 +408,7 @@ jobs:
       - name: Upload to OSS for linux arm64
         if: matrix.os == 'ubuntu-latest' && matrix.arch == 'arm64'
         run: |
+          ls -la ${{ secrets.REPO_FRONT_PATH }}/release/
           ossutil cp -rf ${{ secrets.REPO_FRONT_PATH }}/release/*.deb "oss://${{ secrets.OFFLINE_BUCKET_NAME }}/${{ github.event.inputs.version }}/"
           ossutil cp -rf ${{ secrets.REPO_FRONT_PATH }}/release/*.rpm "oss://${{ secrets.OFFLINE_BUCKET_NAME }}/${{ github.event.inputs.version }}/"
           ossutil cp -rf ${{ secrets.REPO_FRONT_PATH }}/release/*.AppImage "oss://${{ secrets.OFFLINE_BUCKET_NAME }}/${{ github.event.inputs.version }}/"
