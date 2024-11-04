@@ -421,9 +421,9 @@ jobs:
       - name: Upload to OSS for linux x86_64
         if: matrix.os == 'ubuntu-latest' && matrix.arch == 'x86_64'
         run: |
-          ossutil cp -rf ${{ secrets.REPO_FRONT_PATH }}/release/*.deb "oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/"
-          ossutil cp -rf ${{ secrets.REPO_FRONT_PATH }}/release/*.rpm "oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/"
-          ossutil cp -rf ${{ secrets.REPO_FRONT_PATH }}/release/*.AppImage "oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/"
+          ossutil cp -rf ${{ secrets.REPO_FRONT_PATH }}/release/*.deb "oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x86_64.deb"
+          ossutil cp -rf ${{ secrets.REPO_FRONT_PATH }}/release/*.rpm "oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x86_64.rpm"
+          ossutil cp -rf ${{ secrets.REPO_FRONT_PATH }}/release/*.AppImage "oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x86_64.AppImage"
          
           # ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x86_64.AppImage" "oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/"
           # ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x86_64.AppImage" "oss://${{ secrets.BUCKET_NAME }}/download/test/latest/linux/x86_64/"
@@ -433,9 +433,9 @@ jobs:
       - name: Upload to OSS for linux arm64
         if: matrix.os == 'ubuntu-latest' && matrix.arch == 'arm64'
         run: |
-          ossutil cp -rf ${{ secrets.REPO_FRONT_PATH }}/release/*.deb "oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/"
-          ossutil cp -rf ${{ secrets.REPO_FRONT_PATH }}/release/*.rpm "oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/"
-          ossutil cp -rf ${{ secrets.REPO_FRONT_PATH }}/release/*.AppImage "oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/"
+          ossutil cp -rf ${{ secrets.REPO_FRONT_PATH }}/release/*.deb "oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.deb"
+          ossutil cp -rf ${{ secrets.REPO_FRONT_PATH }}/release/*.rpm "oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.rpm"
+          ossutil cp -rf ${{ secrets.REPO_FRONT_PATH }}/release/*.AppImage "oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.AppImage"
           
           # ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.AppImage" "oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/"
           # ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.AppImage" "oss://${{ secrets.BUCKET_NAME }}/download/test/latest/linux/arm64/"
