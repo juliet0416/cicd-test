@@ -460,6 +460,7 @@ jobs:
       # 发送到飞书
       - name: Send feishu message
         uses: foxundermoon/feishu-action@v2
+        if: ${{ runner.os != 'Linux' }}
         with:
           url: ${{ secrets.FEISHU_WEBHOOK }}
           msg_type: post
@@ -485,7 +486,7 @@ jobs:
           content: |
             post:
               zh_cn:
-                title: "${{ secrets.PRODUCT_APP_NAME }} ${{ github.event.inputs.version }} ${{ runner.os }} ${{ matrix.arch }} 打包完成通知"
+                title: "${{ secrets.OFFLINE_PRODUCT_APP_NAME }} ${{ github.event.inputs.version }} ${{ runner.os }} ${{ matrix.arch }} 打包完成通知"
                 content:
                 - - tag: text
                     text: "任务ID: "
