@@ -18,15 +18,15 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: windows-latest
-            file_extension: ".exe"
-            file_name: "latest.exe"
-            build_arg: "--win --x64"
           - os: macos-latest
             arch: x86_64
             file_name: "latest.dmg"
             file_extension: "-x64.dmg"
             build_arg: "--mac --x64"
+          - os: windows-latest
+            file_extension: ".exe"
+            file_name: "latest.exe"
+            build_arg: "--win --x64"
           - os: macos-latest
             arch: arm64
             file_name: "arm64-latest.dmg"
@@ -34,15 +34,14 @@ jobs:
             build_arg: "--mac --arm64"
           - os: ubuntu-latest
             arch: x86_64
-            file_names: ["latest.deb", "latest.rpm", "latest.AppImage"]
-            file_extensions: [".deb", ".rpm", ".AppImage"]
+            file_name: "latest.AppImage"
+            file_extension: "-x86_64.AppImage"
             build_arg: "--linux --x64"
           - os: ubuntu-latest
             arch: arm64
-            file_names: ["arm64-latest.deb", "arm64-latest.rpm", "arm64-latest.AppImage"]
-            file_extensions: [".deb", ".rpm", ".AppImage"]
+            file_name: "arm64-latest.AppImage"
+            file_extension: "-arm64.AppImage"
             build_arg: "--linux --arm64"
-
 
     runs-on: ${{ matrix.os }}
 
@@ -185,30 +184,17 @@ jobs:
           cache: "maven"
 
       # 打包依赖包
-      # - name: Check out first repository
-      #   uses: actions/checkout@v2
-      #   with:
-      #     repository: ${{ secrets.REPO_BASE_URL }}
-      #     ref: ${{ secrets.TEST_REPO_BASE_BRANCH }}
-      #     path: ${{ secrets.REPO_BASE_PATH }}
-          
-      - name: Check out sqlParser repository
+      - name: Check out first repository
         uses: actions/checkout@v2
         with:
-          repository: ${{ secrets.SQL_PARSER_BASE_URL }}
-          ref: ${{ secrets.SQL_PARSER_REPO_BASE_BRANCH }}
-          path: ${{ secrets.SQL_PARSER_REPO_BASE_PATH }}
-          token: ${{ secrets.ACCESS_TOKEN }}
+          repository: ${{ secrets.REPO_BASE_URL }}
+          ref: ${{ secrets.REPO_BASE_BRANCH }}
+          path: ${{ secrets.REPO_BASE_PATH }}
 
-          
-      # - name: MVN Build plugins1
-      #   run: |
-      #     mvn clean install -B '-Dmaven.test.skip=true' -f ${{ secrets.REPO_BASE_POM_PATH }}
-
-      - name: MVN Build sqlparse plugins
+      - name: MVN Build plugins1
         run: |
-          mvn clean install -B '-Dmaven.test.skip=true' -f ${{ secrets.SQL_PARSER_REPO_BASE_POM_PATH }}
-          
+          mvn clean install -B '-Dmaven.test.skip=true' -f ${{ secrets.REPO_BASE_POM_PATH }}
+
       - name: MVN Build plugins2
         run: |
           mvn clean install -B '-Dmaven.test.skip=true' -f ${{ github.workspace }}/${{ secrets.REPO_PKG_POM_PATH }}
@@ -279,7 +265,13 @@ jobs:
         if: ${{ runner.os == 'Windows' }}
         run: |
           choco install winscp
-      
+
+      # 上传文件到OSS准备
+      - name: Upload to OSS for windows
+        if: matrix.os == 'windows-latest'
+        run: |
+          ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe" "oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/temp/"
+
       # 上传文件到远程服务器
       - name: Copy files to remote server
         if: ${{ runner.os == 'Windows' }}
@@ -290,6 +282,7 @@ jobs:
           REMOTE_HOST: ${{ secrets.WIN_SERVER_IP }}
           REMOTE_USER: ${{ secrets.WIN_SERVER_USER }}
           REMOTE_PATH: "${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe"
+          REMOTE_OSS: ${{ secrets.REMOTE_SIGN_SCRIPT_OSS }}
           HOST_KEY: ${{ secrets.HOST_KEY }}
           FILE_TO_UPLOAD: "${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe"
           REMOTE_SCRIPT_PATH_1: "${{ secrets.REMOTE_SIGN_SCRIPT }} --alg SHA-1 ${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe"
@@ -300,17 +293,17 @@ jobs:
             "option batch abort" `
             "option confirm off" `
             "open scp://${{ env.REMOTE_USER }}:${{ env.SCP_PASSWORD }}@${{ env.REMOTE_HOST }} -hostkey=*" `
-            "put ${env:FILE_TO_UPLOAD} ${env:REMOTE_PATH}" `
+            "call ${{ env.REMOTE_OSS }} oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/temp/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe ${env:REMOTE_PATH}" `
             "call ${env:REMOTE_SCRIPT_PATH_1}" `
             "call ${env:REMOTE_SCRIPT_PATH_2}" `
-            "get ${env:REMOTE_PATH} ${env:LOCAL_DOWNLOAD_PATH}" `
+            "call ${{ env.REMOTE_OSS }} ${env:REMOTE_PATH} oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe " `
             "exit"
 
-      # 准备发往OSS的文件
+      # 拉取OSS文件
       - name: Prepare upload for OSS on windows
         if: ${{ runner.os == 'Windows' }}
         run: |
-          cp -r ${{ github.workspace }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe ${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe 
+          ossutil cp -rf oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe ${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe 
 
       # 修改windows加签后的yml文件
       - name: Calculate file hash
@@ -368,7 +361,7 @@ jobs:
           # 替换哈希值
           $newHash = '${{ steps.hash.outputs.sha512_base64 }}'
           $content = Get-Content -Path ${{ secrets.REPO_FRONT_PATH }}/release/latest.yml -Raw
-          $content = $content -replace '(sha512: ).*', "sha512: $newHash"
+          $content = $content -replace '(sha512: ).*', "`$1$newHash"
           
           # 打印新的 sha512 值以确认
           Write-Output "New Hash: $newHash"
@@ -413,7 +406,7 @@ jobs:
       - name: Upload to OSS for windows
         if: matrix.os == 'windows-latest'
         run: |
-          ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe" "oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/"
+          ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/latest.yml" "oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/"
           # ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/latest.yml" "oss://${{ secrets.BUCKET_NAME }}/download/test/latest/windows/"
           # ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe" "oss://${{ secrets.BUCKET_NAME }}/download/test/latest/windows/"
           # ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe" "oss://${{ secrets.BUCKET_NAME }}/download/test/latest/${{ secrets.PRODUCT_APP_NAME }}-latest.exe"
@@ -421,11 +414,7 @@ jobs:
       - name: Upload to OSS for linux x86_64
         if: matrix.os == 'ubuntu-latest' && matrix.arch == 'x86_64'
         run: |
-          ossutil cp -rf ${{ secrets.REPO_FRONT_PATH }}/release/*.deb "oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x86_64.deb"
-          ossutil cp -rf ${{ secrets.REPO_FRONT_PATH }}/release/*.rpm "oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x86_64.rpm"
-          ossutil cp -rf ${{ secrets.REPO_FRONT_PATH }}/release/*.AppImage "oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x86_64.AppImage"
-         
-          # ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x86_64.AppImage" "oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/"
+          ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x86_64.AppImage" "oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/"
           # ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x86_64.AppImage" "oss://${{ secrets.BUCKET_NAME }}/download/test/latest/linux/x86_64/"
           # ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/latest-linux.yml" "oss://${{ secrets.BUCKET_NAME }}/download/test/latest/linux/x86_64/"
           # ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x86_64.AppImage" "oss://${{ secrets.BUCKET_NAME }}/download/test/latest/${{ secrets.PRODUCT_APP_NAME }}-latest.AppImage"
@@ -433,11 +422,7 @@ jobs:
       - name: Upload to OSS for linux arm64
         if: matrix.os == 'ubuntu-latest' && matrix.arch == 'arm64'
         run: |
-          ossutil cp -rf ${{ secrets.REPO_FRONT_PATH }}/release/*.deb "oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.deb"
-          ossutil cp -rf ${{ secrets.REPO_FRONT_PATH }}/release/*.rpm "oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.rpm"
-          ossutil cp -rf ${{ secrets.REPO_FRONT_PATH }}/release/*.AppImage "oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.AppImage"
-          
-          # ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.AppImage" "oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/"
+          ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.AppImage" "oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/"
           # ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.AppImage" "oss://${{ secrets.BUCKET_NAME }}/download/test/latest/linux/arm64/"
           # ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/latest-linux-arm64.yml" "oss://${{ secrets.BUCKET_NAME }}/download/test/latest/linux/arm64/"
           # ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.AppImage" "oss://${{ secrets.BUCKET_NAME }}/download/test/latest/${{ secrets.PRODUCT_APP_NAME }}-arm64-latest.AppImage"
@@ -452,51 +437,8 @@ jobs:
           content: |
             {
               "title": "${{ secrets.PRODUCT_APP_NAME }}-Pre-${{ github.event.inputs.version }}${{ matrix.file_extension }}-打包完成通知",
-              "text": "# ${{ secrets.PRODUCT_APP_NAME }}-Pre-${{ github.event.inputs.version }}${{ matrix.file_extension }}-打包完成通知\n ###  任务id：[Pre-${{ github.event.inputs.version }}](https://github.com/juliet0416/cicd-test/actions/runs/${{ github.run_id }})\n ### 下载地址：${{secrets.CDN_URL}}/download/${{ github.event.inputs.version }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}${{ matrix.file_extension }}"
+              "text": "# ${{ secrets.PRODUCT_APP_NAME }}-Pre-${{ github.event.inputs.version }}${{ matrix.file_extension }}-打包完成通知\n ###  任务id：[Pre-${{ github.event.inputs.version }}](https://github.com/juliet0416/cicd-test/actions/runs/${{ github.run_id }})\n ### 下载地址：[${{ secrets.PRODUCT_APP_NAME }}-${{ matrix.file_name }}](${{secrets.CDN_URL}}/download/${{ github.event.inputs.version }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}${{ matrix.file_extension }})"
             }
-
-      # 发送到飞书
-      - name: Send feishu message
-        uses: foxundermoon/feishu-action@v2
-        if: ${{ runner.os != 'Linux' }}
-        with:
-          url: ${{ secrets.FEISHU_WEBHOOK }}
-          msg_type: post
-          content: |
-            post:
-              zh_cn:
-                title: "${{ secrets.PRODUCT_APP_NAME }} ${{ github.event.inputs.version }} ${{ runner.os }} ${{ matrix.arch }} 打包完成通知"
-                content:
-                - - tag: text
-                    text: "任务id："
-                  - tag: a
-                    text: "Pre-${{ github.event.inputs.version }}"
-                    href: "https://github.com/juliet0416/cicd-test/actions/runs/${{ github.run_id }}"
-                - - tag: text
-                    text: "下载地址：${{secrets.CDN_URL}}/download/${{ github.event.inputs.version }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}${{ matrix.file_extension }}"
-
-      - name: Send feishu message
-        uses: foxundermoon/feishu-action@v2
-        if: ${{ runner.os == 'Linux' }}
-        with:
-          url: ${{ secrets.FEISHU_WEBHOOK }}
-          msg_type: post
-          content: |
-            post:
-              zh_cn:
-                title: "${{ secrets.PRODUCT_APP_NAME }} ${{ github.event.inputs.version }} ${{ runner.os }} ${{ matrix.arch }} 打包完成通知"
-                content:
-                - - tag: text
-                    text: "任务ID: "
-                  - tag: a
-                    text: "${{ github.run_id }}"
-                    href: "https://github.com/juliet0416/cicd-test/actions/runs/${{ github.run_id }}"
-                - - tag: text
-                    text: "下载地址: ${{secrets.CDN_URL}}/download/${{ github.event.inputs.version }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-${{ matrix.arch }}.deb"
-                - - tag: text
-                    text: "下载地址: ${{secrets.CDN_URL}}/download/${{ github.event.inputs.version }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-${{ matrix.arch }}.rpm"
-                - - tag: text
-                    text: "下载地址: ${{secrets.CDN_URL}}/download/${{ github.event.inputs.version }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-${{ matrix.arch }}.AppImage"
 
 
 
