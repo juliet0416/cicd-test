@@ -280,6 +280,15 @@ jobs:
         run: |
           choco install winscp
 
+      # 设置OSS
+      - name: Set up oss utils
+        uses: yizhoumo/setup-ossutil@v1
+        with:
+          endpoint: ${{ secrets.OSS_ENDPOINT }}
+          access-key-id: ${{ secrets.OSS_ACCESS_KEY_ID }}
+          access-key-secret: ${{ secrets.OSS_ACCESS_KEY_SECRET }}
+          ossutil-version: "1.7.16"
+
       # 上传文件到OSS准备
       - name: Upload to OSS for windows
         if: matrix.os == 'windows-latest'
@@ -386,16 +395,6 @@ jobs:
         shell: powershell
         env:
           new_hash: ${{ steps.hash.outputs.sha512_base64 }}
-
-
-      # 设置OSS
-      - name: Set up oss utils
-        uses: yizhoumo/setup-ossutil@v1
-        with:
-          endpoint: ${{ secrets.OSS_ENDPOINT }}
-          access-key-id: ${{ secrets.OSS_ACCESS_KEY_ID }}
-          access-key-secret: ${{ secrets.OSS_ACCESS_KEY_SECRET }}
-          ossutil-version: "1.7.16"
 
 
       # 上传到OSS
