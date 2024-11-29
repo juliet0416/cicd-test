@@ -279,7 +279,13 @@ jobs:
         if: ${{ runner.os == 'Windows' }}
         run: |
           choco install winscp
-      
+
+      # 上传文件到OSS准备
+      - name: Upload to OSS for windows
+        if: matrix.os == 'windows-latest'
+        run: |
+          ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe" "oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/temp/"
+
       # 上传文件到远程服务器
       - name: Copy files to remote server
         if: ${{ runner.os == 'Windows' }}
@@ -290,6 +296,7 @@ jobs:
           REMOTE_HOST: ${{ secrets.WIN_SERVER_IP }}
           REMOTE_USER: ${{ secrets.WIN_SERVER_USER }}
           REMOTE_PATH: "${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe"
+          REMOTE_OSS: ${{ secrets.REMOTE_SIGN_SCRIPT_OSS }}
           HOST_KEY: ${{ secrets.HOST_KEY }}
           FILE_TO_UPLOAD: "${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe"
           REMOTE_SCRIPT_PATH_1: "${{ secrets.REMOTE_SIGN_SCRIPT }} --alg SHA-1 ${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe"
@@ -300,17 +307,17 @@ jobs:
             "option batch abort" `
             "option confirm off" `
             "open scp://${{ env.REMOTE_USER }}:${{ env.SCP_PASSWORD }}@${{ env.REMOTE_HOST }} -hostkey=*" `
-            "put ${env:FILE_TO_UPLOAD} ${env:REMOTE_PATH}" `
+            "call ${{ env.REMOTE_OSS }} oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/temp/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe ${env:REMOTE_PATH}" `
             "call ${env:REMOTE_SCRIPT_PATH_1}" `
             "call ${env:REMOTE_SCRIPT_PATH_2}" `
-            "get ${env:REMOTE_PATH} ${env:LOCAL_DOWNLOAD_PATH}" `
+            "call ${{ env.REMOTE_OSS }} ${env:REMOTE_PATH} oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe " `
             "exit"
 
-      # 准备发往OSS的文件
+      # 拉取OSS文件
       - name: Prepare upload for OSS on windows
         if: ${{ runner.os == 'Windows' }}
         run: |
-          cp -r ${{ github.workspace }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe ${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe 
+          ossutil cp -rf oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe ${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe 
 
       # 修改windows加签后的yml文件
       - name: Calculate file hash
@@ -413,7 +420,7 @@ jobs:
       - name: Upload to OSS for windows
         if: matrix.os == 'windows-latest'
         run: |
-          ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe" "oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/"
+          ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/latest.yml" "oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/"
           # ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/latest.yml" "oss://${{ secrets.BUCKET_NAME }}/download/test/latest/windows/"
           # ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe" "oss://${{ secrets.BUCKET_NAME }}/download/test/latest/windows/"
           # ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe" "oss://${{ secrets.BUCKET_NAME }}/download/test/latest/${{ secrets.PRODUCT_APP_NAME }}-latest.exe"
