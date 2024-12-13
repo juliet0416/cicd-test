@@ -22,26 +22,26 @@ jobs:
             file_extension: ".exe"
             file_name: "latest.exe"
             build_arg: "--win --x64"
-          # - os: macos-latest
-          #   arch: x86_64
-          #   file_name: "latest.dmg"
-          #   file_extension: "-x64.dmg"
-          #   build_arg: "--mac --x64"
-          # - os: macos-latest
-          #   arch: arm64
-          #   file_name: "arm64-latest.dmg"
-          #   file_extension: "-arm64.dmg"
-          #   build_arg: "--mac --arm64"
-          # - os: ubuntu-latest
-          #   arch: x86_64
-          #   file_names: ["latest.deb", "latest.rpm", "latest.AppImage"]
-          #   file_extensions: [".deb", ".rpm", ".AppImage"]
-          #   build_arg: "--linux --x64"
-          # - os: ubuntu-latest
-          #   arch: arm64
-          #   file_names: ["arm64-latest.deb", "arm64-latest.rpm", "arm64-latest.AppImage"]
-          #   file_extensions: [".deb", ".rpm", ".AppImage"]
-          #   build_arg: "--linux --arm64"
+          - os: macos-latest
+            arch: x86_64
+            file_name: "latest.dmg"
+            file_extension: "-x64.dmg"
+            build_arg: "--mac --x64"
+          - os: macos-latest
+            arch: arm64
+            file_name: "arm64-latest.dmg"
+            file_extension: "-arm64.dmg"
+            build_arg: "--mac --arm64"
+          - os: ubuntu-latest
+            arch: x86_64
+            file_names: ["latest.deb", "latest.rpm", "latest.AppImage"]
+            file_extensions: [".deb", ".rpm", ".AppImage"]
+            build_arg: "--linux --x64"
+          - os: ubuntu-latest
+            arch: arm64
+            file_names: ["arm64-latest.deb", "arm64-latest.rpm", "arm64-latest.AppImage"]
+            file_extensions: [".deb", ".rpm", ".AppImage"]
+            build_arg: "--linux --arm64"
 
     runs-on: ${{ matrix.os }}
 
@@ -437,20 +437,22 @@ jobs:
       # 发送到飞书
       - name: Send feishu message
         uses: foxundermoon/feishu-action@v2
-        if: ${{ runner.os != 'Linux' }}
+        if: ${{ runner.os != 'Linux' }} && always()
         with:
           url: ${{ secrets.FEISHU_WEBHOOK }}
           msg_type: post
           content: |
             post:
               zh_cn:
-                title: "${{ secrets.OFFLINE_PRODUCT_APP_NAME }} ${{ github.event.inputs.version }} ${{ runner.os }} ${{ matrix.arch }} 打包完成通知"
+                title: "${{ secrets.OFFLINE_PRODUCT_APP_NAME }} ${{ github.event.inputs.version }} ${{ runner.os }} ${{ matrix.arch }} 打包${{ job.status == 'success' && '完成' || '失败' }}通知"
                 content:
                 - - tag: text
                     text: "任务id："
                   - tag: a
-                    text: "${{ github.event.inputs.version }}"
+                    text: "Pre-${{ github.event.inputs.version }}"
                     href: "https://github.com/juliet0416/cicd-test/actions/runs/${{ github.run_id }}"
+                - - tag: text
+                    text: "状态: ${{ job.status == 'success' && '✅ 成功' || '❌ 失败' }}"
                 - - tag: text
                     text: "下载地址：${{secrets.CDN_URL}}/offline/${{ github.event.inputs.version }}/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}${{ matrix.file_extension }}"
 
