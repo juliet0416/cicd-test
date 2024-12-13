@@ -361,6 +361,7 @@ jobs:
 
       - name: Extract, replace, and print hash value
         if: ${{ runner.os == 'Windows' }}
+        continue-on-error: false
         run: |
           # 引入 powershell-yaml 模块
           Import-Module powershell-yaml
@@ -383,6 +384,14 @@ jobs:
           
           # 打印新的 sha512 值以确认
           Write-Output "New Hash: $newHash"
+
+          # 比较旧值和新值
+          if ($oldHash -ne $newHash) {
+              Write-Error "❌ Old Hash ($oldHash) and New Hash ($newHash) do not match."
+              exit 1  # 标记当前步骤失败
+          } else {
+              Write-Output "✅ Old Hash and New Hash match. Proceeding with update..."
+          }
           
           # 将更改写回 YAML 文件
           Set-Content -Path ${{ secrets.REPO_FRONT_PATH }}/release/latest.yml -Value $content
@@ -471,7 +480,7 @@ jobs:
       # 发送到飞书
       - name: Send feishu message
         uses: foxundermoon/feishu-action@v2
-        if: ${{ runner.os != 'Linux' }}
+        if: always()
         with:
           url: ${{ secrets.FEISHU_WEBHOOK }}
           msg_type: post
@@ -485,6 +494,8 @@ jobs:
                   - tag: a
                     text: "${{ github.event.inputs.version }}"
                     href: "https://github.com/juliet0416/cicd-test/actions/runs/${{ github.run_id }}"
+                - - tag: text
+                    text: "状态: ${{ job.status == 'success' && '✅ 成功' || '❌ 失败' }}"
                 - - tag: text
                     text: "下载地址：${{secrets.CDN_URL}}/download/${{ github.event.inputs.version }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}${{ matrix.file_extension }}"
 
