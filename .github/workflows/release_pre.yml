@@ -49,7 +49,7 @@ jobs:
 
 
     runs-on: ${{ matrix.os }}
-    if: ${{ inputs.systemType == 'all' || contains(matrix.os, inputs.systemType, {{ignoreCase=true}}) }}
+    if: ${{ inputs.systemType == 'all' || inputs.systemType == matrix.os  }}
 
     # 将release_test分支的代码检出（即复制）到 GitHub Actions 的运行环境中。
     steps:
