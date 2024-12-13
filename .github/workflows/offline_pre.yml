@@ -480,7 +480,7 @@ jobs:
                 - - tag: text
                     text: "任务ID: "
                   - tag: a
-                    text: "${{ github.run_id }}"
+                    text: "Pre-${{ github.event.inputs.version }}"
                     href: "https://github.com/juliet0416/cicd-test/actions/runs/${{ github.run_id }}"
                 - - tag: text
                     text: "下载地址: ${{secrets.CDN_URL}}/offline/${{ github.event.inputs.version }}/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-${{ matrix.arch }}.deb"
