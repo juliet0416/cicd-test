@@ -357,6 +357,7 @@ jobs:
 
       - name: Extract, replace, and print hash value
         if: ${{ runner.os == 'Windows' }}
+        continue-on-error: false
         run: |
           # 引入 powershell-yaml 模块
           Import-Module powershell-yaml
@@ -379,6 +380,14 @@ jobs:
 
           # 打印新的 sha512 值以确认
           Write-Output "New Hash: $newHash"
+
+          # 比较旧值和新值
+          if ($oldHash -ne $newHash) {
+              Write-Error "❌ Old Hash ($oldHash) and New Hash ($newHash) do not match."
+              exit 1  # 标记当前步骤失败
+          } else {
+              Write-Output "✅ Old Hash and New Hash match. Proceeding with update..."
+          }
 
           # 将更改写回 YAML 文件
           Set-Content -Path ${{ secrets.REPO_FRONT_PATH }}/release/latest.yml -Value $content
