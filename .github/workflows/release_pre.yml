@@ -464,20 +464,22 @@ jobs:
       # 发送到飞书
       - name: Send feishu message
         uses: foxundermoon/feishu-action@v2
-        if: ${{ runner.os != 'Linux' }}
+        if: ${{ runner.os != 'Linux' }} && always()
         with:
           url: ${{ secrets.FEISHU_WEBHOOK }}
           msg_type: post
           content: |
             post:
               zh_cn:
-                title: "${{ secrets.PRODUCT_APP_NAME }} ${{ github.event.inputs.version }} ${{ runner.os }} ${{ matrix.arch }} 打包完成通知"
+                title: "${{ secrets.PRODUCT_APP_NAME }} ${{ github.event.inputs.version }} ${{ runner.os }} ${{ matrix.arch }} 打包${{ job.status == 'success' && '完成' || '失败' }}通知"
                 content:
                 - - tag: text
                     text: "任务id："
                   - tag: a
                     text: "Pre-${{ github.event.inputs.version }}"
                     href: "https://github.com/juliet0416/cicd-test/actions/runs/${{ github.run_id }}"
+                - - tag: text
+                    text: "状态: ${{ job.status == 'success' && '✅ 成功' || '❌ 失败' }}"
                 - - tag: text
                     text: "下载地址：${{secrets.CDN_URL}}/download/${{ github.event.inputs.version }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}${{ matrix.file_extension }}"
 
