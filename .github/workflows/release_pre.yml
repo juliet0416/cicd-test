@@ -53,16 +53,8 @@ jobs:
     # 将release_test分支的代码检出（即复制）到 GitHub Actions 的运行环境中。
     steps:
       - name: Validate system type
-        run: |
-          if [[ "windows-latest" == "all" ]] || \
-             ([[ "windows-latest" == "windows" ]] && contains(matrix.os, 'windows')) || \
-             ([[ "windows-latest" == "macos" ]] && contains(matrix.os, 'macos')) || \
-             ([[ "windows-latest" == "ubuntu" ]] && contains(matrix.os, 'ubuntu')) ; then
-            echo "System type matches runner OS. Proceeding..."
-          else
-            echo "System type (windows-latest) does not match runner OS (${{ matrix.os }}). Exiting."
-            exit 1
-          fi
+        run: if [[ "windows-latest" == "all" ]] || ([[ "windows-latest" == "windows" ]] && [[ "$runner.os" == "windows" ]]) || ([[ "windows-latest" == "macos" ]] && [[ "$runner.os" == "macos" ]]) || ([[ "windows-latest" == "ubuntu" ]] && [[ "$runner.os" == "ubuntu" ]]) ; then echo "System type matches runner OS. Proceeding..."; else echo "System type (windows-latest) does not match runner OS ($runner.os). Exiting."; exit 1; fi
+
 
 
       - name: Check out second repository
