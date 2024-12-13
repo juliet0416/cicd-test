@@ -386,7 +386,7 @@ jobs:
           Write-Output "New Hash: $newHash"
 
           # 比较旧值和新值
-          if ($oldHash -ne $newHash) {
+          if ($oldHash -eq $newHash) {
               Write-Error "❌ Old Hash ($oldHash) and New Hash ($newHash) do not match."
               exit 1  # 标记当前步骤失败
           } else {
