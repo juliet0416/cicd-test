@@ -47,9 +47,12 @@ jobs:
             file_extensions: [".deb", ".rpm", ".AppImage"]
             build_arg: "--linux --arm64"
 
+    if: >
+      github.event.inputs.systemType == 'all' || 
+      github.event.inputs.systemType == matrix.os
 
     runs-on: ${{ matrix.os }}
-    if: ${{ inputs.systemType == 'all' || (inputs.systemType == 'windows' && runner.os == 'windows-latest') || (inputs.systemType == 'macos' && startsWith(runner.os, 'macos')) || (inputs.systemType == 'ubuntu' && startsWith(runner.os, 'ubuntu')) }}
+    
 
     # 将release_test分支的代码检出（即复制）到 GitHub Actions 的运行环境中。
     steps:
