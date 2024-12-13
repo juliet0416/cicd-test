@@ -54,15 +54,16 @@ jobs:
     steps:
       - name: Validate system type
         run: |
-          if [[ "${{ github.event.inputs.systemType }}" == "all" ]] || \
-             ([[ "${{ github.event.inputs.systemType }}" == "windows" ]] && contains(matrix.os, 'windows')) || \
-             ([[ "${{ github.event.inputs.systemType }}" == "macos" ]] && contains(matrix.os, 'macos')) || \
-             ([[ "${{ github.event.inputs.systemType }}" == "ubuntu" ]] && contains(matrix.os, 'ubuntu')) ; then
+          if [[ "windows-latest" == "all" ]] || \
+             ([[ "windows-latest" == "windows" ]] && contains(matrix.os, 'windows')) || \
+             ([[ "windows-latest" == "macos" ]] && contains(matrix.os, 'macos')) || \
+             ([[ "windows-latest" == "ubuntu" ]] && contains(matrix.os, 'ubuntu')) ; then
             echo "System type matches runner OS. Proceeding..."
           else
-            echo "System type (${{ github.event.inputs.systemType }}) does not match runner OS (${{ matrix.os }}). Exiting."
+            echo "System type (windows-latest) does not match runner OS (${{ matrix.os }}). Exiting."
             exit 1
           fi
+
 
       - name: Check out second repository
         uses: actions/checkout@v2
