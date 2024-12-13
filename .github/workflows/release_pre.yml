@@ -52,12 +52,10 @@ jobs:
             file_extensions: [".deb", ".rpm", ".AppImage"]
             build_arg: "--linux --arm64"
     
-    # 使用 system_type 替代直接比较操作系统名称
-    if: >
-      github.event.inputs.systemType == 'all' || 
-      github.event.inputs.systemType == matrix.system_type
-
+    # 这里是作业级别的条件，用于筛选要运行的作业
     runs-on: ${{ matrix.os }}
+    if: ${{ github.event.inputs.systemType == 'all' || github.event.inputs.systemType == matrix.system_type }}
+
     
 
     # 将release_test分支的代码检出（即复制）到 GitHub Actions 的运行环境中。
