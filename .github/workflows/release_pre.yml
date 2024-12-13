@@ -52,6 +52,18 @@ jobs:
 
     # 将release_test分支的代码检出（即复制）到 GitHub Actions 的运行环境中。
     steps:
+      - name: Validate system type
+        run: |
+          if [[ "${{ github.event.inputs.systemType }}" == "all" ]] || \
+             ([[ "${{ github.event.inputs.systemType }}" == "windows" ]] && contains(matrix.os, 'windows')) || \
+             ([[ "${{ github.event.inputs.systemType }}" == "macos" ]] && contains(matrix.os, 'macos')) || \
+             ([[ "${{ github.event.inputs.systemType }}" == "ubuntu" ]] && contains(matrix.os, 'ubuntu')) ; then
+            echo "System type matches runner OS. Proceeding..."
+          else
+            echo "System type (${{ github.event.inputs.systemType }}) does not match runner OS (${{ matrix.os }}). Exiting."
+            exit 1
+          fi
+
       - name: Check out second repository
         uses: actions/checkout@v2
         with:
