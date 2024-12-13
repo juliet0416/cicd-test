@@ -54,8 +54,8 @@ jobs:
     steps:
       - name: Check system type compatibility
         run: |
-          $notAll = [ "${{ github.event.inputs.systemType }}" -ne "all" ]
-          $notMatch = [ ! "${{ matrix.os }}" -like "*${{ github.event.inputs.systemType }}*" ]
+          $notAll = "${{ github.event.inputs.systemType }}" -ne "all"
+          $notMatch = "${{ matrix.os }}" -notlike "*${{ github.event.inputs.systemType }}*"
           Write-Output "notAll ($notAll) and notMatch ($notMatch)"
           if ($notAll -and $notMatch) {
               Write-Error "❌ System type mismatch. Skipping build for system type: ${{ github.event.inputs.systemType }}"
