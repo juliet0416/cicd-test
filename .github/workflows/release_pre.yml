@@ -54,13 +54,13 @@ jobs:
     steps:
       - name: Check system type compatibility
         run: |
-          notAll=$(echo "${{ github.event.inputs.systemType }}" -ne "all")
-          notMatch=$(echo "${{ matrix.os }}" -notlike "*${{ github.event.inputs.systemType }}*")
-          echo "notAll ($notAll) and notMatch ($notMatch)"
-          if [ "$notAll" == "true" ] && [ "$notMatch" == "true" ]; then
-              echo "❌ System type mismatch. Skipping build for system type: ${{ github.event.inputs.systemType }}"
+          $notAll = "${{ github.event.inputs.systemType }}" -ne "all"
+          $notMatch = "${{ matrix.os }}" -notlike "*${{ github.event.inputs.systemType }}*"
+          Write-Output "notAll ($notAll) and notMatch ($notMatch)"
+          if ($notAll -and $notMatch) {
+              Write-Error "❌ System type mismatch. Skipping build for system type: ${{ github.event.inputs.systemType }}"
               exit 1  # 标记当前步骤失败
-          fi
+          }
 
       - name: Check out second repository
         uses: actions/checkout@v2
