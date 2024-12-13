@@ -23,33 +23,39 @@ jobs:
       matrix:
         include:
           - os: windows-latest
+            system_type: windows
             file_extension: ".exe"
             file_name: "latest.exe"
             build_arg: "--win --x64"
           - os: macos-latest
+            system_type: macos
             arch: x86_64
             file_name: "latest.dmg"
             file_extension: "-x64.dmg"
             build_arg: "--mac --x64"
           - os: macos-latest
+            system_type: macos
             arch: arm64
             file_name: "arm64-latest.dmg"
             file_extension: "-arm64.dmg"
             build_arg: "--mac --arm64"
           - os: ubuntu-latest
+            system_type: ubuntu
             arch: x86_64
             file_names: ["latest.deb", "latest.rpm", "latest.AppImage"]
             file_extensions: [".deb", ".rpm", ".AppImage"]
             build_arg: "--linux --x64"
           - os: ubuntu-latest
+            system_type: ubuntu
             arch: arm64
             file_names: ["arm64-latest.deb", "arm64-latest.rpm", "arm64-latest.AppImage"]
             file_extensions: [".deb", ".rpm", ".AppImage"]
             build_arg: "--linux --arm64"
-
+    
+    # 使用 system_type 替代直接比较操作系统名称
     if: >
       github.event.inputs.systemType == 'all' || 
-      github.event.inputs.systemType == matrix.os
+      github.event.inputs.systemType == matrix.system_type
 
     runs-on: ${{ matrix.os }}
     
