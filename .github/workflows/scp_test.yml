@@ -23,6 +23,11 @@ jobs:
 
     # 将release_test分支的代码检出（即复制）到 GitHub Actions 的运行环境中。
     steps:      
+      - name: Install WinSCP
+        if: ${{ runner.os == 'Windows' }}
+        run: |
+          choco install winscp
+          
       # 上传文件到远程服务器
       - name: Copy files to remote server
         if: ${{ runner.os == 'Windows' }}
