@@ -48,7 +48,7 @@ jobs:
           winscp.com /log=winscp.log /command `
             "option batch abort" `
             "option confirm off" `
-            "open scp://${{ env.REMOTE_USER }}:${{ env.SCP_PASSWORD }}@${{ env.REMOTE_HOST }}:6000 -hostkey=* " `
+            "open scp://${{ env.REMOTE_USER }}:${{ env.SCP_PASSWORD }}@${{ env.REMOTE_HOST }} -hostkey=* " `
             "call ${{ env.REMOTE_OSS }} oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/temp/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe ${env:REMOTE_PATH}" `
             "call ${env:REMOTE_SCRIPT_PATH_1}" `
             "call ${env:REMOTE_SCRIPT_PATH_2}" `
