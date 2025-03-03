@@ -190,7 +190,7 @@ jobs:
         uses: actions/checkout@v2
         with:
           repository: ${{ secrets.SQL_PARSER_BASE_URL }}
-          ref: ${{ secrets.SQL_PARSER_REPO_BASE_BRANCH_TEST }}
+          ref: ${{ secrets.SQL_PARSER_REPO_BASE_BRANCH }}
           path: ${{ secrets.SQL_PARSER_REPO_BASE_PATH }}
           token: ${{ secrets.ACCESS_TOKEN }}
 
