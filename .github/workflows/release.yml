@@ -206,16 +206,16 @@ jobs:
 
       - name: MVN Build sqlparse plugins
         run: |
-          mvn clean install -B '-Dmaven.test.skip=true' -f ${{ secrets.SQL_PARSER_REPO_BASE_POM_PATH }}
+          mvn clean install -U -B '-Dmaven.test.skip=true' -f ${{ secrets.SQL_PARSER_REPO_BASE_POM_PATH }}
           
       - name: MVN Build plugins2
         run: |
-          mvn clean install -B '-Dmaven.test.skip=true' -f ${{ github.workspace }}/${{ secrets.REPO_PKG_POM_PATH }}
+          mvn clean install -U -B '-Dmaven.test.skip=true' -f ${{ github.workspace }}/${{ secrets.REPO_PKG_POM_PATH }}
 
       # 打包后端工程 & 发送到前端
       - name: Build BE Static
         run: |
-          mvn clean install -B '-Dmaven.test.skip=true' -f ${{ secrets.REPO_POM_PATH }}
+          mvn clean install -U -B '-Dmaven.test.skip=true' -f ${{ secrets.REPO_POM_PATH }}
           cp ${{ secrets.REPO_JAR_PATH }} ${{ secrets.REPO_STATIC_JAR_PATH }}
 
       # 打包Web前端资源
