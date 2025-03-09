@@ -218,7 +218,7 @@ jobs:
           cd ${{ secrets.REPO_FRONT_PATH }}
           yarn
           yarn run modify:package:name qguard-test
-          yarn run build:web:qguard:client:test --app_version=99.0.${{ github.run_id }} --app_port=${{ secrets.OFFLINE_TEST_REPO_PORT }} --print_logs=true
+          yarn run build:web:qguard:client:test --app_version=99.0.${{ github.run_id }} --app_port=${{ secrets.qguard_test_REPO_PORT }} --print_logs=true
           cp -r dist ./static
 
       # 打包Electron
@@ -343,7 +343,7 @@ jobs:
                     text: "${{ github.run_id }}"
                     href: "https://github.com/juliet0416/cicd-test/actions/runs/${{ github.run_id }}"
                 - - tag: text
-                    text: "下载地址：${{secrets.CDN_URL}}/offline_test/${{ secrets.QGUARD_TEST_PRODUCT_NAME }}-${{ matrix.file_name }}"
+                    text: "下载地址：${{secrets.CDN_URL}}/qguard_test/${{ secrets.QGUARD_TEST_PRODUCT_NAME }}-${{ matrix.file_name }}"
 
       - name: Send feishu message
         uses: foxundermoon/feishu-action@v2
@@ -362,8 +362,8 @@ jobs:
                     text: "${{ github.run_id }}"
                     href: "https://github.com/juliet0416/cicd-test/actions/runs/${{ github.run_id }}"
                 - - tag: text
-                    text: "下载地址: ${{secrets.CDN_URL}}/offline_test/${{ secrets.QGUARD_TEST_PRODUCT_NAME }}-${{ matrix.arch }}-latest.deb"
+                    text: "下载地址: ${{secrets.CDN_URL}}/qguard_test/${{ secrets.QGUARD_TEST_PRODUCT_NAME }}-${{ matrix.arch }}-latest.deb"
                 - - tag: text
-                    text: "下载地址: ${{secrets.CDN_URL}}/offline_test/${{ secrets.QGUARD_TEST_PRODUCT_NAME }}-${{ matrix.arch }}-latest.rpm"
+                    text: "下载地址: ${{secrets.CDN_URL}}/qguard_test/${{ secrets.QGUARD_TEST_PRODUCT_NAME }}-${{ matrix.arch }}-latest.rpm"
                 - - tag: text
-                    text: "下载地址: ${{secrets.CDN_URL}}/offline_test/${{ secrets.QGUARD_TEST_PRODUCT_NAME }}-${{ matrix.arch }}-latest.AppImage"
+                    text: "下载地址: ${{secrets.CDN_URL}}/qguard_test/${{ secrets.QGUARD_TEST_PRODUCT_NAME }}-${{ matrix.arch }}-latest.AppImage"
