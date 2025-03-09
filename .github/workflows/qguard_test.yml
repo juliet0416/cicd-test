@@ -208,7 +208,7 @@ jobs:
           cd ${{ secrets.REPO_FRONT_PATH }} 
           cd src/main
           yarn
-          yarn run build:web:qguard:test
+          yarn run build:qguard:test
           cp -r electron ../../static
       
 
