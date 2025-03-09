@@ -208,7 +208,7 @@ jobs:
           cd ${{ secrets.REPO_FRONT_PATH }} 
           cd src/main
           yarn
-          yarn run build:offline:test
+          yarn run build:web:qguard:test
           cp -r electron ../../static
       
 
@@ -217,8 +217,8 @@ jobs:
         run: |
           cd ${{ secrets.REPO_FRONT_PATH }}
           yarn
-          yarn run modify:package:name chat2db-local-test Chat2DB-Local-Test
-          yarn run build:web:offline:test --app_version=99.0.${{ github.run_id }} --app_port=${{ secrets.OFFLINE_TEST_REPO_PORT }} --print_logs=true
+          yarn run modify:package:name qguard-test
+          yarn run build:web:qguard:client:test --app_version=99.0.${{ github.run_id }} --app_port=${{ secrets.OFFLINE_TEST_REPO_PORT }} --print_logs=true
           cp -r dist ./static
 
       # 打包Electron
@@ -231,10 +231,10 @@ jobs:
           mac_certs_password: ${{ secrets.MAC_CERTS_PASSWORD }}
           skip_build: true
           args: >
-            -c.appId=${{ secrets.OFFLINE_TEST_APP_ID }}
-            -c.productName=${{ secrets.OFFLINE_TEST_PRODUCT_NAME }}
+            -c.appId=${{ secrets.QGUARD_TEST_APP_ID }}
+            -c.productName=${{ secrets.QGUARD_TEST_PRODUCT_NAME }}
             -c.win.publisherName=${{ secrets.PUBLISHER_NAME }}
-            -c.nsis.shortcutName=${{ secrets.OFFLINE_TEST_PRODUCT_NAME }}
+            -c.nsis.shortcutName=${{ secrets.QGUARD_TEST_PRODUCT_NAME }}
             -c.extraMetadata.version=99.0.${{ github.run_id }}
             ${{ matrix.build_arg}}
 
@@ -249,17 +249,17 @@ jobs:
         if: ${{ runner.os != 'Linux' }}
         run: |
           mkdir -p oss_temp_file
-          cp -r ${{ secrets.REPO_FRONT_PATH }}/release/*${{ matrix.file_extension }} ./oss_temp_file/${{ secrets.OFFLINE_TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}${{ matrix.file_extension }}
-          cp -r ${{ secrets.REPO_FRONT_PATH }}/release/*${{ matrix.file_extension }} ${{ github.workspace }}/${{ secrets.OFFLINE_TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}${{ matrix.file_extension }}
+          cp -r ${{ secrets.REPO_FRONT_PATH }}/release/*${{ matrix.file_extension }} ./oss_temp_file/${{ secrets.QGUARD_TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}${{ matrix.file_extension }}
+          cp -r ${{ secrets.REPO_FRONT_PATH }}/release/*${{ matrix.file_extension }} ${{ github.workspace }}/${{ secrets.QGUARD_TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}${{ matrix.file_extension }}
 
       # 准备发往OSS的文件
       - name: Prepare upload for OSS
         if: ${{ runner.os == 'Linux' }}
         run: |
           mkdir -p oss_temp_file
-          cp -r ${{ secrets.REPO_FRONT_PATH }}/release/*.deb ./oss_temp_file/${{ secrets.OFFLINE_TEST_PRODUCT_NAME }}-${{ matrix.arch }}-latest.deb
-          cp -r ${{ secrets.REPO_FRONT_PATH }}/release/*.rpm ./oss_temp_file/${{ secrets.OFFLINE_TEST_PRODUCT_NAME }}-${{ matrix.arch }}-latest.rpm
-          cp -r ${{ secrets.REPO_FRONT_PATH }}/release/*.AppImage ./oss_temp_file/${{ secrets.OFFLINE_TEST_PRODUCT_NAME }}-${{ matrix.arch }}-latest.AppImage          
+          cp -r ${{ secrets.REPO_FRONT_PATH }}/release/*.deb ./oss_temp_file/${{ secrets.QGUARD_TEST_PRODUCT_NAME }}-${{ matrix.arch }}-latest.deb
+          cp -r ${{ secrets.REPO_FRONT_PATH }}/release/*.rpm ./oss_temp_file/${{ secrets.QGUARD_TEST_PRODUCT_NAME }}-${{ matrix.arch }}-latest.rpm
+          cp -r ${{ secrets.REPO_FRONT_PATH }}/release/*.AppImage ./oss_temp_file/${{ secrets.QGUARD_TEST_PRODUCT_NAME }}-${{ matrix.arch }}-latest.AppImage          
 
 
       # 上传文件到远程服务器
@@ -271,11 +271,11 @@ jobs:
           SCP_PASSWORD: ${{ secrets.WIN_SSH_PRIVATE_KEY }}
           REMOTE_HOST: ${{ secrets.WIN_SERVER_IP }}
           REMOTE_USER: ${{ secrets.WIN_SERVER_USER }}
-          REMOTE_PATH: "${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.OFFLINE_TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}.exe"
+          REMOTE_PATH: "${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.QGUARD_TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}.exe"
           HOST_KEY: ${{ secrets.HOST_KEY }}
-          FILE_TO_UPLOAD: "${{ secrets.OFFLINE_TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}.exe"
-          REMOTE_SCRIPT_PATH: "${{ secrets.REMOTE_SIGN_SCRIPT }} ${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.OFFLINE_TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}.exe"
-          LOCAL_DOWNLOAD_PATH: "${{ secrets.OFFLINE_TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}.exe"
+          FILE_TO_UPLOAD: "${{ secrets.QGUARD_TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}.exe"
+          REMOTE_SCRIPT_PATH: "${{ secrets.REMOTE_SIGN_SCRIPT }} ${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.QGUARD_TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}.exe"
+          LOCAL_DOWNLOAD_PATH: "${{ secrets.QGUARD_TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}.exe"
         run: |
           winscp.com /log=winscp.log /command `
             "option batch abort" `
@@ -290,8 +290,8 @@ jobs:
       - name: Prepare upload for OSS on winodows
         if: ${{ runner.os == 'Windows' }}
         run: |
-          cp -r ${{ github.workspace }}/${{ secrets.OFFLINE_TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}.exe ./oss_temp_file/${{ secrets.OFFLINE_TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}.exe
-          cp -r ${{ secrets.REPO_FRONT_PATH }}/release/*${{ matrix.zip_extension }} ./oss_temp_file/${{ secrets.OFFLINE_TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}${{ matrix.zip_extension }}
+          cp -r ${{ github.workspace }}/${{ secrets.QGUARD_TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}.exe ./oss_temp_file/${{ secrets.QGUARD_TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}.exe
+          cp -r ${{ secrets.REPO_FRONT_PATH }}/release/*${{ matrix.zip_extension }} ./oss_temp_file/${{ secrets.QGUARD_TEST_PRODUCT_NAME }}-99.0.${{ github.run_id }}${{ matrix.zip_extension }}
           
       # 设置OSS
       - name: Set up oss utils
@@ -321,8 +321,8 @@ jobs:
           msgtype: markdown
           content: |
             {
-              "title": "${{ secrets.OFFLINE_TEST_PRODUCT_NAME }}-${{ matrix.file_name }}-打包完成通知",
-              "text": "# ${{ secrets.OFFLINE_TEST_PRODUCT_NAME }}-${{ matrix.file_name }}-打包完成通知\n ###  任务id：[${{ github.run_id }}](https://github.com/juliet0416/cicd-test/actions/runs/${{ github.run_id }})\n ### 下载地址：${{secrets.CDN_URL}}/test/${{ secrets.OFFLINE_TEST_PRODUCT_NAME }}-${{ matrix.file_name }}"
+              "title": "${{ secrets.QGUARD_TEST_PRODUCT_NAME }}-${{ matrix.file_name }}-打包完成通知",
+              "text": "# ${{ secrets.QGUARD_TEST_PRODUCT_NAME }}-${{ matrix.file_name }}-打包完成通知\n ###  任务id：[${{ github.run_id }}](https://github.com/juliet0416/cicd-test/actions/runs/${{ github.run_id }})\n ### 下载地址：${{secrets.CDN_URL}}/test/${{ secrets.QGUARD_TEST_PRODUCT_NAME }}-${{ matrix.file_name }}"
             }
 
       # 发送到飞书
@@ -335,7 +335,7 @@ jobs:
           content: |
             post:
               zh_cn:
-                title: "${{ secrets.OFFLINE_TEST_PRODUCT_NAME }} ${{ runner.os }} ${{ matrix.arch }} 打包完成通知"
+                title: "${{ secrets.QGUARD_TEST_PRODUCT_NAME }} ${{ runner.os }} ${{ matrix.arch }} 打包完成通知"
                 content:
                 - - tag: text
                     text: "任务id："
@@ -343,7 +343,7 @@ jobs:
                     text: "${{ github.run_id }}"
                     href: "https://github.com/juliet0416/cicd-test/actions/runs/${{ github.run_id }}"
                 - - tag: text
-                    text: "下载地址：${{secrets.CDN_URL}}/offline_test/${{ secrets.OFFLINE_TEST_PRODUCT_NAME }}-${{ matrix.file_name }}"
+                    text: "下载地址：${{secrets.CDN_URL}}/offline_test/${{ secrets.QGUARD_TEST_PRODUCT_NAME }}-${{ matrix.file_name }}"
 
       - name: Send feishu message
         uses: foxundermoon/feishu-action@v2
@@ -354,7 +354,7 @@ jobs:
           content: |
             post:
               zh_cn:
-                title: "${{ secrets.OFFLINE_TEST_PRODUCT_NAME }} ${{ runner.os }} ${{ matrix.arch }} 打包完成通知"
+                title: "${{ secrets.QGUARD_TEST_PRODUCT_NAME }} ${{ runner.os }} ${{ matrix.arch }} 打包完成通知"
                 content:
                 - - tag: text
                     text: "任务ID: "
@@ -362,8 +362,8 @@ jobs:
                     text: "${{ github.run_id }}"
                     href: "https://github.com/juliet0416/cicd-test/actions/runs/${{ github.run_id }}"
                 - - tag: text
-                    text: "下载地址: ${{secrets.CDN_URL}}/offline_test/${{ secrets.OFFLINE_TEST_PRODUCT_NAME }}-${{ matrix.arch }}-latest.deb"
+                    text: "下载地址: ${{secrets.CDN_URL}}/offline_test/${{ secrets.QGUARD_TEST_PRODUCT_NAME }}-${{ matrix.arch }}-latest.deb"
                 - - tag: text
-                    text: "下载地址: ${{secrets.CDN_URL}}/offline_test/${{ secrets.OFFLINE_TEST_PRODUCT_NAME }}-${{ matrix.arch }}-latest.rpm"
+                    text: "下载地址: ${{secrets.CDN_URL}}/offline_test/${{ secrets.QGUARD_TEST_PRODUCT_NAME }}-${{ matrix.arch }}-latest.rpm"
                 - - tag: text
-                    text: "下载地址: ${{secrets.CDN_URL}}/offline_test/${{ secrets.OFFLINE_TEST_PRODUCT_NAME }}-${{ matrix.arch }}-latest.AppImage"
+                    text: "下载地址: ${{secrets.CDN_URL}}/offline_test/${{ secrets.QGUARD_TEST_PRODUCT_NAME }}-${{ matrix.arch }}-latest.AppImage"
