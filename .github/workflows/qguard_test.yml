@@ -1,4 +1,4 @@
-name: Build QGuard Client
+name: Build QGuard Test Client
 on:
   workflow_dispatch:
     inputs:
