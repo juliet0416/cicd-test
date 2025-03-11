@@ -343,7 +343,7 @@ jobs:
                     text: "${{ github.run_id }}"
                     href: "https://github.com/juliet0416/cicd-test/actions/runs/${{ github.run_id }}"
                 - - tag: text
-                    text: "下载地址：${{secrets.CDN_URL}}/qguard_test/${{ secrets.ENTERPRISE_TEST_PRODUCT_NAME }}-${{ matrix.file_name }}"
+                    text: "下载地址：${{secrets.CDN_URL}}/enterprise_test/${{ secrets.ENTERPRISE_TEST_PRODUCT_NAME }}-${{ matrix.file_name }}"
 
       - name: Send feishu message
         uses: foxundermoon/feishu-action@v2
@@ -362,8 +362,8 @@ jobs:
                     text: "${{ github.run_id }}"
                     href: "https://github.com/juliet0416/cicd-test/actions/runs/${{ github.run_id }}"
                 - - tag: text
-                    text: "下载地址: ${{secrets.CDN_URL}}/qguard_test/${{ secrets.ENTERPRISE_TEST_PRODUCT_NAME }}-${{ matrix.arch }}-latest.deb"
+                    text: "下载地址: ${{secrets.CDN_URL}}/enterprise_test/${{ secrets.ENTERPRISE_TEST_PRODUCT_NAME }}-${{ matrix.arch }}-latest.deb"
                 - - tag: text
-                    text: "下载地址: ${{secrets.CDN_URL}}/qguard_test/${{ secrets.ENTERPRISE_TEST_PRODUCT_NAME }}-${{ matrix.arch }}-latest.rpm"
+                    text: "下载地址: ${{secrets.CDN_URL}}/enterprise_test/${{ secrets.ENTERPRISE_TEST_PRODUCT_NAME }}-${{ matrix.arch }}-latest.rpm"
                 - - tag: text
-                    text: "下载地址: ${{secrets.CDN_URL}}/qguard_test/${{ secrets.ENTERPRISE_TEST_PRODUCT_NAME }}-${{ matrix.arch }}-latest.AppImage"
+                    text: "下载地址: ${{secrets.CDN_URL}}/enterprise_test/${{ secrets.ENTERPRISE_TEST_PRODUCT_NAME }}-${{ matrix.arch }}-latest.AppImage"
