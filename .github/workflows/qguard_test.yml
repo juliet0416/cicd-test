@@ -308,7 +308,7 @@ jobs:
         run: |
           for file in ./oss_temp_file/*; do
             filename=$(basename "$file")
-            ossutil cp -rf --acl=public-read "$file" oss://${{ secrets.ENTERPRISE_TEST_PRODUCT_NAME }}/$filename
+            ossutil cp -rf --acl=public-read "$file" oss://${{ secrets.ENTERPRISE_TEST_BUCKET_NAME }}/$filename
           done
         shell: bash
 
