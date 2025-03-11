@@ -218,7 +218,7 @@ jobs:
           cd ${{ secrets.REPO_FRONT_PATH }}
           yarn
           yarn run modify:package:name enterprise-test
-          yarn run build:web:enterprise:client:test --app_version=99.0.${{ github.run_id }} --app_port=${{ secrets.ENTERPRISE_TEST_REPO_PORT }} --print_logs=true
+          yarn run build:web:enterprise:client:test --print_logs=true
           cp -r dist ./static
 
       # 打包Electron
