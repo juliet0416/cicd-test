@@ -29,16 +29,16 @@ jobs:
             file_name: "arm64-latest.dmg"
             file_extension: "-arm64.dmg"
             build_arg: "--mac --arm64"
-          - os: ubuntu-latest
-            arch: x86_64
-            file_names: ["latest.deb", "latest.rpm", "latest.AppImage"]
-            file_extensions: [".deb", ".rpm", ".AppImage"]
-            build_arg: "--linux --x64"
-          - os: ubuntu-latest
-            arch: arm64
-            file_names: ["arm64-latest.deb", "arm64-latest.rpm", "arm64-latest.AppImage"]
-            file_extensions: [".deb", ".rpm", ".AppImage"]
-            build_arg: "--linux --arm64"
+          # - os: ubuntu-latest
+          #   arch: x86_64
+          #   file_names: ["latest.deb", "latest.rpm", "latest.AppImage"]
+          #   file_extensions: [".deb", ".rpm", ".AppImage"]
+          #   build_arg: "--linux --x64"
+          # - os: ubuntu-latest
+          #   arch: arm64
+          #   file_names: ["arm64-latest.deb", "arm64-latest.rpm", "arm64-latest.AppImage"]
+          #   file_extensions: [".deb", ".rpm", ".AppImage"]
+          #   build_arg: "--linux --arm64"
     runs-on: ${{ matrix.os }}
 
     # 将release_test分支的代码检出（即复制）到 GitHub Actions 的运行环境中。
