@@ -250,8 +250,16 @@ jobs:
 
       # 打印release目录下的文件
       - name: List release directory
+        if: matrix.os == 'macos-latest'
         run: |
           ls -la ${{ secrets.REPO_FRONT_PATH }}/release/
+
+      # Windows下打印release目录文件
+      - name: List release directory (Windows)
+        if: matrix.os == 'windows-latest' 
+        run: |
+          dir "${{ secrets.REPO_FRONT_PATH }}\release"
+
       # 公证&签名 Mac App
       - name: Notarize MacOS x86_64 App
         if: matrix.os == 'macos-latest' && matrix.arch == 'x86_64'
