@@ -52,8 +52,8 @@ jobs:
         uses: actions/checkout@v2
         with:
           repository: ${{ secrets.REPO_URL }}
-          path: ${{ secrets.ENTERPRISE_REPO_BRANCH }}
-          ref: ${{ secrets.REPO_PATH }}
+          ref: ${{ secrets.ENTERPRISE_TEST_REPO_BRANCH }}
+          path: ${{ secrets.REPO_PATH }}
           token: ${{ secrets.ACCESS_TOKEN }}
 
 
