@@ -1,0 +1,493 @@
+name: Build Release Client
+
+on:
+  workflow_dispatch:
+    inputs:
+      logLevel:
+        description: 'Log level'
+        required: true
+        default: 'warning'
+      version:
+        description: 'Version number'
+        required: true
+        default: '1.0.0'
+
+jobs:
+  release:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            arch: x86_64
+            file_name: 'latest.dmg'
+            file_extension: '-x64.dmg'
+            build_arg: '--mac --x64'
+          - os: windows-latest
+            file_extension: '.exe'
+            file_name: 'latest.exe'
+            build_arg: '--win --x64'
+          - os: macos-latest
+            arch: arm64
+            file_name: 'arm64-latest.dmg'
+            file_extension: '-arm64.dmg'
+            build_arg: '--mac --arm64'
+          - os: ubuntu-latest
+            arch: x86_64
+            file_name: 'latest.AppImage'
+            file_extension: '-x86_64.AppImage'
+            build_arg: '--linux --x64'
+          - os: ubuntu-latest
+            arch: arm64
+            file_name: 'arm64-latest.AppImage'
+            file_extension: '-arm64.AppImage'
+            build_arg: '--linux --arm64'
+
+    runs-on: ${{ matrix.os }}
+
+    # 将release_test分支的代码检出（即复制）到 GitHub Actions 的运行环境中。
+    steps:
+      - name: Check out second repository
+        uses: actions/checkout@v2
+        with:
+          repository: ${{ secrets.REPO_URL }}
+          path: ${{ secrets.REPO_PATH }}
+          ref: ${{ secrets.REPO_BRANCH }}
+          token: ${{ secrets.ACCESS_TOKEN }}
+
+      # Output basic information
+      - name: Print basic information
+        run: |
+          echo "current version: ${{ github.run_id }}"
+
+      # Install jre Windows
+      - name: Install Jre for Windows
+        if: ${{ runner.os == 'Windows' }}
+        uses: actions/setup-java@main
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          java-package: 'jre'
+
+      # Install jre MacOS X64
+      - name: Install Jre MacOS X64
+        if: ${{ runner.os == 'macOS' && matrix.arch == 'x86_64' }}
+        uses: actions/setup-java@v2
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          java-package: 'jre'
+          architecture: 'x64'
+
+      # Install jre MacOS arm64
+      - name: Install Jre MacOS arm64
+        if: ${{ runner.os == 'macOS' && matrix.arch == 'arm64' }}
+        uses: actions/setup-java@main
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          java-package: 'jre'
+          architecture: 'aarch64'
+
+      # Install jre Linux x64
+      - name: Install Jre for Linux
+        if: ${{ runner.os == 'Linux' && matrix.arch == 'x86_64' }}
+        uses: actions/setup-java@main
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          java-package: 'jre'
+
+      # Install jre Linux arm64
+      - name: Install Jre for Linux
+        if: ${{ runner.os == 'Linux' && matrix.arch == 'arm64' }}
+        uses: actions/setup-java@main
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          java-package: 'jre'
+          architecture: 'aarch64'
+
+      # java.security open tls1 Windows
+      - name: Enable tls1
+        if: ${{ runner.os == 'Windows' }}
+        run: |
+          # sed -i '' "s/\(^jdk.tls.disabledAlgorithms=\)\(.*\)\( TLSv1, TLSv1.1,\)\(.*\)/\1\2\4/" "${{ env.JAVA_HOME }}/conf/security/java.security"
+          $filePath = "${{ env.JAVA_HOME }}\conf\security\java.security"
+          $content = Get-Content $filePath -Raw
+          $updatedContent = $content -replace '(?s)(jdk.tls.disabledAlgorithms\s*=\s*)(.*?)(\s*TLSv1,\s*TLSv1\.1,)(.*?)(?=[,\r\n])', '$1$2$4'
+
+          $updatedContent | Set-Content $filePath
+          Write-Output "Original content:"
+          Write-Output $content
+
+          # 打印修改后的内容确认替换是否生效
+          Write-Output "Updated content:"
+          Write-Output $updatedContent
+
+        shell: pwsh
+
+      # java.security open tls1 macOS
+      - name: Enable tls1
+        if: ${{ runner.os == 'macOS' }}
+        run: |
+          sed -i '' "s/\(^jdk.tls.disabledAlgorithms=\)\(.*\)\( TLSv1, TLSv1.1,\)\(.*\)/\1\2\4/" $JAVA_HOME/conf/security/java.security
+
+      # Copy jre Windows
+      - name: Copy Jre for Windows
+        if: ${{ runner.os == 'Windows' }}
+        run: |
+          mkdir -p ${{ secrets.REPO_STATIC_PATH }} 
+          cp -r "${{ env.JAVA_HOME }}" ${{ secrets.REPO_JRE_PATH }}
+
+      # Copy jre macOS
+      - name: Copy Jre for macOS
+        if: ${{ runner.os == 'macOS' }}
+        run: |
+          mkdir -p ${{ secrets.REPO_STATIC_PATH }} 
+          cp -r $JAVA_HOME ${{ secrets.REPO_JRE_PATH }} 
+          chmod -R 777 ${{ secrets.REPO_JRE_PATH }}
+
+      # Copy jre Linux
+      - name: Copy Jre for Linux
+        if: ${{ runner.os == 'Linux' }}
+        run: |
+          mkdir -p ${{ secrets.REPO_STATIC_PATH }} 
+          cp -r $JAVA_HOME ${{ secrets.REPO_JRE_PATH }} 
+          chmod -R 777 ${{ secrets.REPO_JRE_PATH }}
+
+      # Linux
+      - name: Delete File
+        if: ${{ runner.os == 'Linux' }}
+        run: |
+          cd ${{ secrets.REPO_JRE_PATH }} 
+          ls -la
+          rm -rf legal
+          ls -la
+
+      # 安装Node.js
+      - name: Install Node.js
+        uses: actions/setup-node@main
+        with:
+          node-version: '18.17.0'
+          cache: 'yarn'
+          cache-dependency-path: ${{ secrets.REPO_YARN_PATH }}
+
+      # 安装Maven
+      - name: Install Java and Maven
+        uses: actions/setup-java@main
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: 'maven'
+
+        # 打包依赖包
+      # - name: Check out first repository
+      #   uses: actions/checkout@v2
+      #   with:
+      #     repository: ${{ secrets.REPO_BASE_URL }}
+      #     ref: ${{ secrets.TEST_REPO_BASE_BRANCH }}
+      #     path: ${{ secrets.REPO_BASE_PATH }}
+
+      - name: Check out sqlParser repository
+        uses: actions/checkout@v2
+        with:
+          repository: ${{ secrets.SQL_PARSER_BASE_URL }}
+          ref: ${{ secrets.SQL_PARSER_REPO_BASE_BRANCH }}
+          path: ${{ secrets.SQL_PARSER_REPO_BASE_PATH }}
+          token: ${{ secrets.ACCESS_TOKEN }}
+
+      # 设置OSS
+      - name: Set up oss utils
+        uses: yizhoumo/setup-ossutil@v1
+        with:
+          endpoint: ${{ secrets.OSS_ENDPOINT }}
+          access-key-id: ${{ secrets.OSS_ACCESS_KEY_ID }}
+          access-key-secret: ${{ secrets.OSS_ACCESS_KEY_SECRET }}
+          ossutil-version: '1.7.16'
+
+      # 打包后端工程 & 发送到前端
+      - name: Build BE Static
+        run: |
+          mvn clean install -U -B '-Dmaven.test.skip=true' -f ${{ secrets.REPO_POM_PATH }}
+          ossutil cp -rf ${{ secrets.REPO_JAR_PATH }} "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/"
+          cp ${{ secrets.REPO_JAR_PATH }} ${{ secrets.REPO_STATIC_JAR_PATH }}
+
+      # 打包桌面端前端资源
+      - name: Prepare Build Electron
+        run: |
+          cd ${{ secrets.REPO_FRONT_PATH }}
+          yarn
+          yarn run build:web:desktop --app_version=${{ github.event.inputs.version }}
+          zip -r dist.zip dist
+          ossutil cp -rf dist.zip "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/"
+          cp -r dist ./static/
+
+      # # 打包Electron
+      # - name: Build/release Electron app
+      #   uses: samuelmeuli/action-electron-builder@v1
+      #   with:
+      #     package_root: ${{ secrets.REPO_FRONT_PATH }}
+      #     GITHUB_TOKEN: ${{ secrets.ACCESS_TOKEN }}
+      #     mac_certs: ${{ secrets.MAC_CERTS }}
+      #     mac_certs_password: ${{ secrets.MAC_CERTS_PASSWORD }}
+      #     skip_build: true
+      #     args: >
+      #       -c.appId=${{ secrets.APP_ID }} -c.productName="${{ secrets.PRODUCT_NAME }}" -c.win.publisherName="${{ secrets.PUBLISHER_NAME }}" -c.nsis.shortcutName="${{ secrets.PRODUCT_NAME }}" -c.extraMetadata.version=${{ github.event.inputs.version }} ${{ matrix.build_arg }}
+
+      # # 公证&签名 Mac App
+      # - name: Notarize MacOS x86_64 App
+      #   if: matrix.os == 'macos-latest' && matrix.arch == 'x86_64'
+      #   run: |
+      #     xcrun notarytool store-credentials ${{ secrets.PRODUCT_BASE_NAME }} --apple-id "${{ secrets.MAC_APPLE_ID }}" --password "${{ secrets.MAC_APPLE_PASSWORD }}" --team-id "${{ secrets.MAC_TEAM_ID }}"
+      #     xcrun notarytool submit ${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.dmg --keychain-profile ${{ secrets.PRODUCT_BASE_NAME }}
+
+      # # 公证&签名 Mac App
+      # - name: Notarize MacOS ARM App
+      #   if: matrix.os == 'macos-latest' && matrix.arch == 'arm64'
+      #   run: |
+      #     xcrun notarytool store-credentials ${{ secrets.PRODUCT_BASE_NAME }} --apple-id "${{ secrets.MAC_APPLE_ID }}" --password "${{ secrets.MAC_APPLE_PASSWORD }}" --team-id "${{ secrets.MAC_TEAM_ID }}"
+      #     xcrun notarytool submit ${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg --keychain-profile ${{ secrets.PRODUCT_BASE_NAME }}
+
+      # # 准备发往OSS的文件
+      # - name: Prepare upload for OSS
+      #   if: ${{ runner.os == 'Windows' }}
+      #   run: |
+      #     cp -r ${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe ${{ github.workspace }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe
+
+      # - name: Install WinSCP
+      #   if: ${{ runner.os == 'Windows' }}
+      #   run: |
+      #     choco install winscp
+
+      # # 上传文件到OSS准备
+      # - name: Upload to OSS for windows
+      #   if: matrix.os == 'windows-latest'
+      #   run: |
+      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe" "oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/temp/"
+
+      # # 上传文件到远程服务器
+      # - name: Copy files to remote server
+      #   if: ${{ runner.os == 'Windows' }}
+      #   timeout-minutes: 15
+      #   env:
+      #     SCP_PASSWORD: ${{ secrets.WIN_SSH_PRIVATE_KEY }}
+      #     REMOTE_HOST: ${{ secrets.WIN_SERVER_IP }}
+      #     REMOTE_USER: ${{ secrets.WIN_SERVER_USER }}
+      #     REMOTE_PATH: '${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe'
+      #     REMOTE_OSS: ${{ secrets.REMOTE_SIGN_SCRIPT_OSS }}
+      #     HOST_KEY: ${{ secrets.HOST_KEY }}
+      #     FILE_TO_UPLOAD: '${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe'
+      #     REMOTE_SCRIPT_PATH_1: '${{ secrets.REMOTE_SIGN_SCRIPT }} --alg SHA-1 ${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe'
+      #     REMOTE_SCRIPT_PATH_2: '${{ secrets.REMOTE_SIGN_SCRIPT }} --alg SHA-256 ${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe'
+      #     LOCAL_DOWNLOAD_PATH: '${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe'
+      #   run: |
+      #     winscp.com /log=winscp.log /command `
+      #       "option batch abort" `
+      #       "option confirm off" `
+      #       "open scp://${{ env.REMOTE_USER }}:${{ env.SCP_PASSWORD }}@${{ env.REMOTE_HOST }} -hostkey=*" `
+      #       "call ${{ env.REMOTE_OSS }} oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/temp/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe ${env:REMOTE_PATH}" `
+      #       "call ${env:REMOTE_SCRIPT_PATH_1}" `
+      #       "call ${env:REMOTE_SCRIPT_PATH_2}" `
+      #       "call ${{ env.REMOTE_OSS }} ${env:REMOTE_PATH} oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe " `
+      #       "exit"
+
+      # # 拉取OSS文件
+      # - name: Prepare upload for OSS on windows
+      #   if: ${{ runner.os == 'Windows' }}
+      #   run: |
+      #     ossutil cp -rf oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe ${{ secrets.REPO_FRONT_PATH }}/release/
+
+      # # 修改windows加签后的yml文件
+      # - name: Calculate file hash
+      #   if: ${{ runner.os == 'Windows' }}
+      #   id: hash
+      #   run: |
+      #     # Step 1: Get the SHA512 hash of the file using CertUtil
+      #     $hashOutput = Certutil -hashfile "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe" SHA512
+      #     Write-Output "CertUtil Output: $hashOutput"
+
+      #     # Extract the hash value (second line of the output)
+      #     $hashValue = $hashOutput[1].Trim() -replace ' ', ''
+
+      #     # Step 2: Convert hex string to bytes and then to Base64
+      #     $hashBytes = [byte[]]::new($hashValue.Length / 2)
+      #     for ($i = 0; $i -lt $hashValue.Length; $i += 2) {
+      #       $hashBytes[$i / 2] = [Convert]::ToByte($hashValue.Substring($i, 2), 16)
+      #     }
+      #     $base64 = [Convert]::ToBase64String($hashBytes)
+      #     Write-Output "Base64 Encoded Hash: $base64"
+
+      #     # Set the output variable
+      #     echo "::set-output name=sha512_base64::$base64"
+
+      # # 安装yq解析yml
+      # - name: Install powershell-yaml module
+      #   if: ${{ runner.os == 'Windows' }}
+      #   run: |
+      #     # Set the execution policy to bypass the prompt about installation from untrusted sources
+      #     Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process -Force
+      #     # Install the powershell-yaml module
+      #     Install-Module -Name powershell-yaml -Force -SkipPublisherCheck
+      #   shell: powershell
+
+      # - name: Extract, replace, and print hash value
+      #   if: ${{ runner.os == 'Windows' }}
+      #   continue-on-error: false
+      #   run: |
+      #     # 引入 powershell-yaml 模块
+      #     Import-Module powershell-yaml
+
+      #     # 读取 YAML 文件
+      #     $yamlContent = Get-Content -Path ${{ secrets.REPO_FRONT_PATH }}/release/latest.yml -Raw | ConvertFrom-Yaml
+
+      #     # Extract and print the old hash value
+      #     Write-Output "Old Hash: $($yamlContent.sha512)"
+
+      #     # 修改 sha512 值
+      #     # $yamlContent.sha512 = '${{ steps.hash.outputs.sha512_base64 }}'
+
+      #     # 可选：如果有嵌套的结构，如 files 数组
+      #     # $yamlContent.files[0].sha512 = '${{ steps.hash.outputs.sha512_base64 }}'
+      #     # 替换哈希值
+      #     $newHash = '${{ steps.hash.outputs.sha512_base64 }}'
+      #     $content = Get-Content -Path ${{ secrets.REPO_FRONT_PATH }}/release/latest.yml -Raw
+      #     $content = $content -replace '(sha512: ).*', "sha512: $newHash"
+
+      #     # 打印新的 sha512 值以确认
+      #     Write-Output "New Hash: $newHash"
+
+      #     # 比较旧值和新值
+      #     if ($oldHash -eq $newHash) {
+      #         Write-Error "❌ Old Hash ($oldHash) and New Hash ($newHash) do not match."
+      #         exit 1  # 标记当前步骤失败
+      #     } else {
+      #         Write-Output "✅ Old Hash and New Hash match. Proceeding with update..."
+      #     }
+
+      #     # 将更改写回 YAML 文件
+      #     Set-Content -Path ${{ secrets.REPO_FRONT_PATH }}/release/latest.yml -Value $content
+      #     # $yamlContent | ConvertTo-Yaml | Set-Content -Path ${{ secrets.REPO_FRONT_PATH }}/release/latest.yml
+      #   shell: powershell
+      #   env:
+      #     new_hash: ${{ steps.hash.outputs.sha512_base64 }}
+
+      # # 上传到OSS
+      # - name: Upload to OSS for Mac
+      #   if: matrix.os == 'macos-latest' && matrix.arch == 'x86_64'
+      #   run: |
+      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.dmg" "oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/"
+      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.zip" "oss://${{ secrets.BUCKET_NAME }}/download/latest/mac/x64/"
+      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.zip.blockmap" "oss://${{ secrets.BUCKET_NAME }}/download/latest/mac/x64/"
+      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/latest-mac.yml" "oss://${{ secrets.BUCKET_NAME }}/download/latest/mac/x64/"
+      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.dmg" "oss://${{ secrets.BUCKET_NAME }}/download/latest/${{ secrets.PRODUCT_APP_NAME }}-latest.dmg"
+
+      # - name: Upload to OSS for Mac arm64
+      #   if: matrix.os == 'macos-latest' && matrix.arch == 'arm64'
+      #   run: |
+      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg" "oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/"
+      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.zip" "oss://${{ secrets.BUCKET_NAME }}/download/latest/mac/arm64/"
+      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.zip.blockmap" "oss://${{ secrets.BUCKET_NAME }}/download/latest/mac/arm64/"
+      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/latest-mac.yml" "oss://${{ secrets.BUCKET_NAME }}/download/latest/mac/arm64/"
+      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg" "oss://${{ secrets.BUCKET_NAME }}/download/latest/${{ secrets.PRODUCT_APP_NAME }}-arm64-latest.dmg"
+
+      # - name: Upload to OSS for windows
+      #   if: matrix.os == 'windows-latest'
+      #   run: |
+      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe" "oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/"
+      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/latest.yml" "oss://${{ secrets.BUCKET_NAME }}/download/latest/windows/"
+      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe" "oss://${{ secrets.BUCKET_NAME }}/download/latest/windows/"
+      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe" "oss://${{ secrets.BUCKET_NAME }}/download/latest/${{ secrets.PRODUCT_APP_NAME }}-latest.exe"
+
+      # - name: Upload to OSS for linux x86_64
+      #   if: matrix.os == 'ubuntu-latest' && matrix.arch == 'x86_64'
+      #   run: |
+      #     ls -la ${{ secrets.REPO_FRONT_PATH }}/release/
+      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x86_64.AppImage" "oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x86_64.AppImage"
+      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x86_64.AppImage" "oss://${{ secrets.BUCKET_NAME }}/download/latest/${{ secrets.PRODUCT_APP_NAME }}-latest.AppImage"
+      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x86_64.AppImage" "oss://${{ secrets.BUCKET_NAME }}/download/latest/linux/x86_64/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x86_64.AppImage"
+
+      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-amd64.deb" "oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x86_64.deb"
+      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-amd64.deb" "oss://${{ secrets.BUCKET_NAME }}/download/latest/${{ secrets.PRODUCT_APP_NAME }}-latest.deb"
+      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-amd64.deb" "oss://${{ secrets.BUCKET_NAME }}/download/latest/linux/x86_64/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-amd64.deb"
+
+      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x86_64.rpm" "oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x86_64.rpm"
+      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x86_64.rpm" "oss://${{ secrets.BUCKET_NAME }}/download/latest/${{ secrets.PRODUCT_APP_NAME }}-latest.rpm"
+      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x86_64.rpm" "oss://${{ secrets.BUCKET_NAME }}/download/latest/linux/x86_64/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x86_64.rpm"
+
+      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/latest-linux.yml" "oss://${{ secrets.BUCKET_NAME }}/download/latest/linux/x86_64/"
+
+      # - name: Upload to OSS for linux arm64
+      #   if: matrix.os == 'ubuntu-latest' && matrix.arch == 'arm64'
+      #   run: |
+      #     ls -la ${{ secrets.REPO_FRONT_PATH }}/release/
+      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.AppImage" "oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.AppImage"
+      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.AppImage" "oss://${{ secrets.BUCKET_NAME }}/download/latest/${{ secrets.PRODUCT_APP_NAME }}-arm64-latest.AppImage"
+      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.AppImage" "oss://${{ secrets.BUCKET_NAME }}/download/latest/linux/arm64/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.AppImage"
+
+      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.deb" "oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.deb"
+      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.deb" "oss://${{ secrets.BUCKET_NAME }}/download/latest/${{ secrets.PRODUCT_APP_NAME }}-arm64-latest.deb"
+      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.deb" "oss://${{ secrets.BUCKET_NAME }}/download/latest/linux/arm64/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.deb"
+
+      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-aarch64.rpm" "oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.rpm"
+      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-aarch64.rpm" "oss://${{ secrets.BUCKET_NAME }}/download/latest/${{ secrets.PRODUCT_APP_NAME }}-arm64-latest.rpm"
+      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-aarch64.rpm" "oss://${{ secrets.BUCKET_NAME }}/download/latest/linux/arm64/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-aarch64.rpm"
+
+      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/latest-linux-arm64.yml" "oss://${{ secrets.BUCKET_NAME }}/download/latest/linux/arm64/"
+
+      # # 发送到DingTalk
+      # - name: Send dingtalk message
+      #   uses: ghostoy/dingtalk-action@master
+      #   with:
+      #     webhook: ${{ secrets.DINGTALK_WEBHOOK }}
+      #     msgtype: markdown
+      #     content: |
+      #       {
+      #         "title": "${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}${{ matrix.file_extension }}-打包完成通知",
+      #         "text": "# ${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}${{ matrix.file_extension }}-打包完成通知\n ###  任务id：[${{ github.event.inputs.version }}](https://github.com/juliet0416/cicd-test/actions/runs/${{ github.run_id }})\n ### 下载地址：${{secrets.CDN_URL}}/download/${{ github.event.inputs.version }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}${{ matrix.file_extension }}"
+      #       }
+
+      # # 发送到飞书
+      # - name: Send feishu message
+      #   uses: foxundermoon/feishu-action@v2
+      #   if: always()
+      #   with:
+      #     url: ${{ secrets.FEISHU_WEBHOOK }}
+      #     msg_type: post
+      #     content: |
+      #       post:
+      #         zh_cn:
+      #           title: "${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}${{ matrix.file_extension }}-打包完成通知"
+      #           content:
+      #           - - tag: text
+      #               text: "任务id："
+      #             - tag: a
+      #               text: "${{ github.event.inputs.version }}"
+      #               href: "https://github.com/juliet0416/cicd-test/actions/runs/${{ github.run_id }}"
+      #           - - tag: text
+      #               text: "状态: ${{ job.status == 'success' && '✅ 成功' || '❌ 失败' }}"
+      #           - - tag: text
+      #               text: "下载地址：${{secrets.CDN_URL}}/download/${{ github.event.inputs.version }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}${{ matrix.file_extension }}"
+
+      # - name: Send feishu message
+      #   uses: foxundermoon/feishu-action@v2
+      #   if: ${{ runner.os == 'Linux' }}
+      #   with:
+      #     url: ${{ secrets.FEISHU_WEBHOOK }}
+      #     msg_type: post
+      #     content: |
+      #       post:
+      #         zh_cn:
+      #           title: "${{ secrets.PRODUCT_APP_NAME }} ${{ github.event.inputs.version }} ${{ runner.os }} ${{ matrix.arch }} 打包完成通知"
+      #           content:
+      #           - - tag: text
+      #               text: "任务ID: "
+      #             - tag: a
+      #               text: "${{ github.run_id }}"
+      #               href: "https://github.com/juliet0416/cicd-test/actions/runs/${{ github.run_id }}"
+      #           - - tag: text
+      #               text: "下载地址: ${{secrets.CDN_URL}}/download/${{ github.event.inputs.version }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-${{ matrix.arch }}.deb"
+      #           - - tag: text
+      #               text: "下载地址: ${{secrets.CDN_URL}}/download/${{ github.event.inputs.version }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-${{ matrix.arch }}.rpm"
+      #           - - tag: text
+      #               text: "下载地址: ${{secrets.CDN_URL}}/download/${{ github.event.inputs.version }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-${{ matrix.arch }}.AppImage"
