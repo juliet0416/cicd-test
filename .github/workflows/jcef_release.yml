@@ -18,30 +18,30 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-latest
-            arch: x86_64
-            file_name: 'latest.dmg'
-            file_extension: '-x64.dmg'
-            build_arg: '--mac --x64'
-          - os: windows-latest
-            file_extension: '.exe'
-            file_name: 'latest.exe'
-            build_arg: '--win --x64'
+          # - os: macos-latest
+          #   arch: x86_64
+          #   file_name: 'latest.dmg'
+          #   file_extension: '-x64.dmg'
+          #   build_arg: '--mac --x64'
+          # - os: windows-latest
+          #   file_extension: '.exe'
+          #   file_name: 'latest.exe'
+          #   build_arg: '--win --x64'
           - os: macos-latest
             arch: arm64
             file_name: 'arm64-latest.dmg'
             file_extension: '-arm64.dmg'
             build_arg: '--mac --arm64'
-          - os: ubuntu-latest
-            arch: x86_64
-            file_name: 'latest.AppImage'
-            file_extension: '-x86_64.AppImage'
-            build_arg: '--linux --x64'
-          - os: ubuntu-latest
-            arch: arm64
-            file_name: 'arm64-latest.AppImage'
-            file_extension: '-arm64.AppImage'
-            build_arg: '--linux --arm64'
+          # - os: ubuntu-latest
+          #   arch: x86_64
+          #   file_name: 'latest.AppImage'
+          #   file_extension: '-x86_64.AppImage'
+          #   build_arg: '--linux --x64'
+          # - os: ubuntu-latest
+          #   arch: arm64
+          #   file_name: 'arm64-latest.AppImage'
+          #   file_extension: '-arm64.AppImage'
+          #   build_arg: '--linux --arm64'
 
     runs-on: ${{ matrix.os }}
 
@@ -213,8 +213,8 @@ jobs:
           ossutil cp -rf ${{ secrets.REPO_JAR_PATH }} "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/"
           cp ${{ secrets.REPO_JAR_PATH }} ${{ secrets.REPO_STATIC_JAR_PATH }}
 
-      # 打包桌面端前端资源
-      - name: Prepare Build Electron
+      # 打包前端资源
+      - name: Build FE Static
         run: |
           cd ${{ secrets.REPO_FRONT_PATH }}
           yarn
