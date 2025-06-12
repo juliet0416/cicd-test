@@ -279,8 +279,8 @@ jobs:
           
           cp -r dist ./static/
           cp -r dist ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/mac
-          cp -r dist ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/win
-          cp -r dist ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/linux
+          # cp -r dist ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/win
+          # cp -r dist ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/linux
 
           popd
           echo "Returned to the original directory. Current path is:"
