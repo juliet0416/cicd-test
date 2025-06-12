@@ -79,28 +79,49 @@ jobs:
           java-package: 'jre'
           architecture: 'x64'
 
+      - name: Debug PATH before setup
+        if: ${{ runner.os == 'macOS' && matrix.arch == 'arm64' }}
+        run: |
+          echo "--- Current PATH variable ---"
+          echo $PATH
+          echo "--- Which java is active? ---"
+          which java
+
       - name: Install and Setup JetBrains Runtime (JBR) 17
         if: ${{ runner.os == 'macOS' && matrix.arch == 'arm64' }}
         run: |
-          # 1. 下载和解压 (步骤省略)
+          # 1. 下载和解压
           echo "Downloading and extracting JBR..."
           curl -L -o jbr.tar.gz "https://cache-redirector.jetbrains.com/intellij-jbr/jbr_jcef-17.0.12-osx-aarch64-b1207.37.tar.gz"
           mkdir jbr-17
           tar -xzf jbr.tar.gz -C jbr-17 --strip-components=1
 
-          # 2. 设置环境变量
-          # 正确设置 JAVA_HOME
+          # 2. 设置环境变量 (这是最关键的一步)
+          echo "Setting up environment variables..."
+          # 设置 JAVA_HOME, 供 Maven/Gradle 等工具使用
           echo "JAVA_HOME=$GITHUB_WORKSPACE/jbr-17" >> $GITHUB_ENV
           
-          # 关键：将 JBR 的 bin 目录添加到 PATH 的最前面
+          # 使用 $GITHUB_PATH 将 JBR 的 bin 目录【添加】到 PATH 环境变量的【最前面】
+          # 这是 GitHub Actions 推荐的、保证最高优先级的方法
           echo "$GITHUB_WORKSPACE/jbr-17/bin" >> $GITHUB_PATH
           
           echo "JBR setup complete."
 
-      - name: Verify JDK Installation
+      - name: Verify JDK Installation and PATH
+        if: ${{ runner.os == 'macOS' && matrix.arch == 'arm64' }}
         run: |
-          # 验证步骤现在应该会显示正确的版本
-          echo "JAVA_HOME is set to: $JAVA_HOME"
+          echo "--- Verifying setup ---"
+          echo "JAVA_HOME is now: $JAVA_HOME"
+
+          echo "--- Current PATH variable (after modification) ---"
+          echo $PATH
+
+          echo "--- Which java is active now? ---"
+          # 这条命令会显示当前 'java' 命令的绝对路径，它现在应该指向 jbr-17 目录
+          which java
+          
+          echo "--- Final Java version check ---"
+          # 现在这里应该会正确显示 JBR 17 的版本信息
           java -version
           
       # Install jre MacOS arm64
