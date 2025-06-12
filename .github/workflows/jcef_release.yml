@@ -79,15 +79,46 @@ jobs:
           java-package: 'jre'
           architecture: 'x64'
 
-      # Install jre MacOS arm64
-      - name: Install Jre MacOS arm64
+      - name: Install and Setup JetBrains Runtime (JBR) 17 for mac arm64
         if: ${{ runner.os == 'macOS' && matrix.arch == 'arm64' }}
-        uses: actions/setup-java@main
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-          java-package: 'jre'
-          architecture: 'aarch64'
+        run: |
+          # Step 1: Download the specified JBR package
+          # Using curl with -L to follow redirects from the JetBrains cache URL
+          echo "Downloading JBR..."
+          curl -L -o jbr.tar.gz "https://cache-redirector.jetbrains.com/intellij-jbr/jbr_jcef-17.0.12-osx-aarch64-b1207.37.tar.gz"
+          
+          # Step 2: Create a directory for the JBR and extract the archive
+          # The JDK will be placed in a directory named 'jbr-17'
+          echo "Extracting JBR..."
+          mkdir jbr-17
+          tar -xzf jbr.tar.gz -C jbr-17 --strip-components=1
+          
+          # Step 3: Set the JAVA_HOME and PATH environment variables
+          # This tells subsequent steps where to find the 'java' executable
+          # We use $GITHUB_ENV to make these variables available to all following steps in the job
+          echo "Setting up environment variables..."
+          JBR_HOME=$GITHUB_WORKSPACE/jbr-17
+          echo "JAVA_HOME=$JBR_HOME" >> $GITHUB_ENV
+          echo "$JBR_HOME/bin" >> $GITHUB_PATH
+          
+          echo "JBR setup complete."
+
+      - name: Verify JDK Installation
+        if: ${{ runner.os == 'macOS' && matrix.arch == 'arm64' }}
+        run: |
+          # This step confirms that the correct Java version is now active
+          echo "JAVA_HOME is set to: $JAVA_HOME"
+          java -version
+          
+      # Install jre MacOS arm64
+      # - name: Install Jre MacOS arm64
+      #   if: ${{ runner.os == 'macOS' && matrix.arch == 'arm64' }}
+      #   uses: actions/setup-java@main
+      #   with:
+      #     java-version: '17'
+      #     distribution: 'temurin'
+      #     java-package: 'jre'
+      #     architecture: 'aarch64'
 
       # Install jre Linux x64
       - name: Install Jre for Linux
