@@ -290,12 +290,13 @@ jobs:
           cd ${{secrets.JCEF_PROJECT_ROOT}}
           find jpackage -print | sed -e 's;[^/]*/;|____;g;s;____|; |;g'
           sh package_macos.sh
-          ossutil cp -rf jpackage/output/Chat2DB-Pro-3.99.2.dmg "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/"
-          echo "oss successful"
+          
           # sign
           xcrun notarytool store-credentials ${{ secrets.PRODUCT_BASE_NAME }} --apple-id "${{ secrets.MAC_APPLE_ID }}" --password "${{ secrets.MAC_APPLE_PASSWORD }}" --team-id "${{ secrets.MAC_TEAM_ID }}"
           xcrun notarytool submit jpackage/output/Chat2DB-Pro-3.99.2.dmg --keychain-profile ${{ secrets.PRODUCT_BASE_NAME }}
 
+          ossutil cp -rf jpackage/output/Chat2DB-Pro-3.99.2.dmg "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/"
+          echo "oss successful"
           
           
       # # 打包Electron
