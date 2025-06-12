@@ -278,13 +278,14 @@ jobs:
           ossutil cp -rf dist.zip "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/"
           
           cp -r dist ./static/
-          cp -r dist ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/mac
-          # cp -r dist ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/win
-          # cp -r dist ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/linux
-
+          
           popd
           echo "Returned to the original directory. Current path is:"
           pwd
+          
+          cp -r ${{ secrets.REPO_FRONT_PATH }}/dist ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/mac
+          # cp -r dist ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/win
+          # cp -r dist ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/linux
 
           cd ${{secrets.JCEF_PROJECT_ROOT}}
           find ${{secrets.JCEF_PROJECT_ROOT}}/jpackage -print | sed -e 's;[^/]*/;|____;g;s;____|; |;g'
