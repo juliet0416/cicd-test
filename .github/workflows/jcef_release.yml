@@ -219,14 +219,25 @@ jobs:
           node-version: '18.17.0'
           cache: 'yarn'
           cache-dependency-path: ${{ secrets.REPO_YARN_PATH }}
-
-      # 安装Maven
-      - name: Install Java and Maven
-        uses: actions/setup-java@main
+          
+      - name: Cache Maven packages
+        uses: actions/cache@v4
         with:
-          java-version: '17'
-          distribution: 'temurin'
-          cache: 'maven'
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-maven-
+          run: 
+            echo "Verifying Maven's Java version..."
+            mvn -v
+            
+      # 安装Maven
+      # - name: Install Java and Maven
+      #   uses: actions/setup-java@main
+      #   with:
+      #     java-version: '17'
+      #     distribution: 'temurin'
+      #     cache: 'maven'
 
         # 打包依赖包
       # - name: Check out first repository
