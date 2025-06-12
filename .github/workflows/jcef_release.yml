@@ -256,6 +256,7 @@ jobs:
       # 打包后端工程 & 发送到前端
       - name: Build BE Static
         run: |
+          pwd
           mvn -v 
           mvn clean install -U -B '-Dmaven.test.skip=true' -f ${{ secrets.REPO_POM_PATH }}
           ossutil cp -rf ${{ secrets.REPO_JAR_PATH }} "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/"
