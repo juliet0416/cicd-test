@@ -79,34 +79,27 @@ jobs:
           java-package: 'jre'
           architecture: 'x64'
 
-      - name: Install and Setup JetBrains Runtime (JBR) 17 for mac arm64
+      - name: Install and Setup JetBrains Runtime (JBR) 17
         if: ${{ runner.os == 'macOS' && matrix.arch == 'arm64' }}
         run: |
-          # Step 1: Download the specified JBR package
-          # Using curl with -L to follow redirects from the JetBrains cache URL
-          echo "Downloading JBR..."
+          # 1. 下载和解压 (步骤省略)
+          echo "Downloading and extracting JBR..."
           curl -L -o jbr.tar.gz "https://cache-redirector.jetbrains.com/intellij-jbr/jbr_jcef-17.0.12-osx-aarch64-b1207.37.tar.gz"
-          
-          # Step 2: Create a directory for the JBR and extract the archive
-          # The JDK will be placed in a directory named 'jbr-17'
-          echo "Extracting JBR..."
           mkdir jbr-17
           tar -xzf jbr.tar.gz -C jbr-17 --strip-components=1
+
+          # 2. 设置环境变量
+          # 正确设置 JAVA_HOME
+          echo "JAVA_HOME=$GITHUB_WORKSPACE/jbr-17" >> $GITHUB_ENV
           
-          # Step 3: Set the JAVA_HOME and PATH environment variables
-          # This tells subsequent steps where to find the 'java' executable
-          # We use $GITHUB_ENV to make these variables available to all following steps in the job
-          echo "Setting up environment variables..."
-          JBR_HOME=$GITHUB_WORKSPACE/jbr-17
-          echo "JAVA_HOME=$JBR_HOME" >> $GITHUB_ENV
-          echo "$JBR_HOME/bin" >> $GITHUB_PATH
+          # 关键：将 JBR 的 bin 目录添加到 PATH 的最前面
+          echo "$GITHUB_WORKSPACE/jbr-17/bin" >> $GITHUB_PATH
           
           echo "JBR setup complete."
 
       - name: Verify JDK Installation
-        if: ${{ runner.os == 'macOS' && matrix.arch == 'arm64' }}
         run: |
-          # This step confirms that the correct Java version is now active
+          # 验证步骤现在应该会显示正确的版本
           echo "JAVA_HOME is set to: $JAVA_HOME"
           java -version
           
