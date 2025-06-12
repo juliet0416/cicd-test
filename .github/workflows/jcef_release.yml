@@ -54,14 +54,6 @@ jobs:
           path: ${{ secrets.REPO_PATH }}
           ref: ${{ secrets.JCEF_REPO_BRANCH }}
           token: ${{ secrets.ACCESS_TOKEN }}
-           # 新增下面這個步驟來打印分支名稱
-      - name: Print Checked Out Branch Name
-        env:
-          # 將 secret 的值賦予一個新的、非機密的環境變數
-          BRANCH_NAME: ${{ secrets.JCEF_REPO_BRANCH }}
-        run: |
-          # 打印這個新的環境變數，日誌就會顯示其內容
-          echo "The branch checked out from the second repository is: $BRANCH_NAME"
           
       # Output basic information
       - name: Print basic information
@@ -227,17 +219,6 @@ jobs:
           node-version: '18.17.0'
           cache: 'yarn'
           cache-dependency-path: ${{ secrets.REPO_YARN_PATH }}
-          
-      - name: Cache Maven packages
-        uses: actions/cache@v4
-        with:
-          path: ~/.m2/repository
-          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
-          restore-keys: |
-            ${{ runner.os }}-maven-
-          run: 
-            echo "Verifying Maven's Java version..."
-            mvn -v
             
       # 安装Maven
       # - name: Install Java and Maven
@@ -275,6 +256,7 @@ jobs:
       # 打包后端工程 & 发送到前端
       - name: Build BE Static
         run: |
+          mvn -v 
           mvn clean install -U -B '-Dmaven.test.skip=true' -f ${{ secrets.REPO_POM_PATH }}
           ossutil cp -rf ${{ secrets.REPO_JAR_PATH }} "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/"
           cp ${{ secrets.REPO_JAR_PATH }} ${{ secrets.REPO_STATIC_JAR_PATH }}
