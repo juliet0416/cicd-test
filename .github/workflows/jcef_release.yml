@@ -54,7 +54,15 @@ jobs:
           path: ${{ secrets.REPO_PATH }}
           ref: ${{ secrets.JCEF_REPO_BRANCH }}
           token: ${{ secrets.ACCESS_TOKEN }}
-
+           # 新增下面這個步驟來打印分支名稱
+      - name: Print Checked Out Branch Name
+        env:
+          # 將 secret 的值賦予一個新的、非機密的環境變數
+          BRANCH_NAME: ${{ secrets.JCEF_REPO_BRANCH }}
+        run: |
+          # 打印這個新的環境變數，日誌就會顯示其內容
+          echo "The branch checked out from the second repository is: $BRANCH_NAME"
+          
       # Output basic information
       - name: Print basic information
         run: |
