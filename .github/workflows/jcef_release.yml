@@ -194,9 +194,9 @@ jobs:
           mkdir -p ${{ secrets.REPO_STATIC_PATH }} 
           cp -r $JAVA_HOME ${{ secrets.REPO_JRE_PATH }} 
           chmod -R 777 ${{ secrets.REPO_JRE_PATH }}
-          cp -r $JAVA_HOME ${{secrets.JCEF_PROJECT_ROOT}}/input/runtime/mac
-          chmod -R 777 ${{secrets.JCEF_PROJECT_ROOT}}/input/runtime/mac
-          cp -r $JAVA_HOME/../Frameworks ${{secrets.JCEF_PROJECT_ROOT}}/input/mac
+          cp -r $JAVA_HOME ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/runtime/mac
+          chmod -R 777 ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/runtime/mac
+          cp -r $JAVA_HOME/../Frameworks ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/mac
           
 
       # Copy jre Linux
@@ -277,9 +277,9 @@ jobs:
           ossutil cp -rf dist.zip "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/"
           
           cp -r dist ./static/
-          cp -r dist ${{secrets.JCEF_PROJECT_ROOT}}/input/mac
-          cp -r dist ${{secrets.JCEF_PROJECT_ROOT}}/input/win
-          cp -r dist ${{secrets.JCEF_PROJECT_ROOT}}/input/linux
+          cp -r dist ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/mac
+          cp -r dist ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/win
+          cp -r dist ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/linux
 
           popd
           echo "Returned to the original directory. Current path is:"
