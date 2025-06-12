@@ -87,42 +87,56 @@ jobs:
           echo "--- Which java is active? ---"
           which java
 
-      - name: Install and Setup JetBrains Runtime (JBR) 17
+      - name: Setup Custom JBR (Robust Method)
         if: ${{ runner.os == 'macOS' && matrix.arch == 'arm64' }}
         run: |
-          # 1. 下载和解压
+          # --------------------- 准备工作 ---------------------
           echo "Downloading and extracting JBR..."
           curl -L -o jbr.tar.gz "https://cache-redirector.jetbrains.com/intellij-jbr/jbr_jcef-17.0.12-osx-aarch64-b1207.37.tar.gz"
-          mkdir jbr-17
+          mkdir -p jbr-17
           tar -xzf jbr.tar.gz -C jbr-17 --strip-components=1
-
-          # 2. 设置环境变量 (这是最关键的一步)
-          echo "Setting up environment variables..."
-          # 设置 JAVA_HOME, 供 Maven/Gradle 等工具使用
-          echo "JAVA_HOME=$GITHUB_WORKSPACE/jbr-17" >> $GITHUB_ENV
           
-          # 使用 $GITHUB_PATH 将 JBR 的 bin 目录【添加】到 PATH 环境变量的【最前面】
-          # 这是 GitHub Actions 推荐的、保证最高优先级的方法
-          echo "$GITHUB_WORKSPACE/jbr-17/bin" >> $GITHUB_PATH
+          # --------------------- 核心配置步骤 ---------------------
+          echo "Configuring environment variables..."
           
-          echo "JBR setup complete."
+          # 步骤 1: 获取 JBR 的绝对路径，避免任何相对路径问题
+          JBR_HOME=$(cd jbr-17 && pwd)
+          echo "Absolute path for JBR_HOME is: $JBR_HOME"
 
-      - name: Verify JDK Installation and PATH
+          # 步骤 2: 设置 JAVA_HOME 环境变量
+          echo "JAVA_HOME=$JBR_HOME" >> $GITHUB_ENV
+
+          # 步骤 3: 使用 GITHUB_PATH 将 JBR 的 bin 目录强制置于 PATH 最前端
+          # 这是解决问题的最关键一步，也是 GitHub 官方推荐的做法
+          echo "$JBR_HOME/bin" >> $GITHUB_PATH
+          
+          echo "Configuration complete."
+
+      - name: Verify Final Java Configuration
         if: ${{ runner.os == 'macOS' && matrix.arch == 'arm64' }}
         run: |
-          echo "--- Verifying setup ---"
-          echo "JAVA_HOME is now: $JAVA_HOME"
-
-          echo "--- Current PATH variable (after modification) ---"
-          echo $PATH
-
-          echo "--- Which java is active now? ---"
-          # 这条命令会显示当前 'java' 命令的绝对路径，它现在应该指向 jbr-17 目录
-          which java
+          echo "--- Verifying final configuration ---"
           
-          echo "--- Final Java version check ---"
-          # 现在这里应该会正确显示 JBR 17 的版本信息
+          # 打印 JAVA_HOME 确认其正确性
+          echo "1. JAVA_HOME is: $JAVA_HOME"
+
+          # 打印 PATH 变量，检查 JBR 路径是否在最前面
+          echo "2. PATH is: $PATH"
+
+          # 使用 'which' 命令检查 'java' 命令到底指向哪个文件
+          # 这里必须输出指向 .../jbr-17/bin/java 的路径
+          WHICH_JAVA=$(which java)
+          echo "3. 'which java' points to: $WHICH_JAVA"
+
+          # 最终检查版本信息
+          echo "4. 'java -version' output:"
           java -version
+
+          # 添加一个最终断言，如果 which java 的结果不符合预期，就让工作流失败
+          if [[ ! "$WHICH_JAVA" == *"/jbr-17/bin/java"* ]]; then
+            echo "::error::Failed to set custom JBR path correctly!"
+            exit 1
+          fi
           
       # Install jre MacOS arm64
       # - name: Install Jre MacOS arm64
