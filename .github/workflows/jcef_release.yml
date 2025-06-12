@@ -194,7 +194,7 @@ jobs:
           mkdir -p ${{ secrets.REPO_STATIC_PATH }} 
           cp -r $JAVA_HOME ${{ secrets.REPO_JRE_PATH }} 
           chmod -R 777 ${{ secrets.REPO_JRE_PATH }}
-          makir -p ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/runtime/mac
+          mkdir -p ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/runtime/mac
           cp -r $JAVA_HOME ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/runtime/mac
           chmod -R 777 ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/runtime/mac
           cp -r $JAVA_HOME/../Frameworks ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/mac
