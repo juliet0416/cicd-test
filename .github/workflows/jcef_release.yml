@@ -78,16 +78,64 @@ jobs:
           distribution: 'temurin'
           java-package: 'jre'
           architecture: 'x64'
+
+      - name: Setup Custom JBR (Inspired by setup-java)
+        if: ${{ runner.os == 'macOS' && matrix.arch == 'arm64' }}
+        run: |
+          # 模仿第 18 步: 下载指定的 JBR 压缩包
+          echo "Downloading Custom JBR from JetBrains..."
+          curl -L -o jbr.tar.gz "https://cache-redirector.jetbrains.com/intellij-jbr/jbr_jcef-17.0.12-osx-aarch64-b1207.37.tar.gz"
+
+          # 模仿第 20 步: 解压 JBR 压缩包
+          echo "Extracting JBR archive..."
+          mkdir -p jbr-17
+          tar -xzf jbr.tar.gz -C jbr-17 --strip-components=1
+
+          # 模仿第 22 和 28 步: 设置 JBR 为默认 Java 环境
+          echo "Setting Custom JBR as the default..."
+          
+          # 1. 获取 JBR 的绝对路径
+          JBR_HOME=$(cd jbr-17 && pwd)
+          echo "JBR Path will be: $JBR_HOME"
+
+          # 2. 设置 JAVA_HOME 环境变量
+          echo "JAVA_HOME=$JBR_HOME" >> $GITHUB_ENV
+
+          # 3. 将 JBR 的 bin 目录添加到 PATH 环境变量的最前面 (这是最关键的一步)
+          echo "$JBR_HOME/bin" >> $GITHUB_PATH
+
+      - name: Verify JBR Configuration
+        if: ${{ runner.os == 'macOS' && matrix.arch == 'arm64' }}
+        run: |
+          echo "--- Verifying Java Configuration ---"
+          
+          # 检查 JAVA_HOME 是否已正确设置为 JBR 的路径
+          echo "JAVA_HOME is: $JAVA_HOME"
+
+          # 检查 'java' 命令现在指向哪个文件
+          # 它必须指向我们刚刚安装的 JBR 内部的 java 文件
+          WHICH_JAVA=$(which java)
+          echo "'which java' points to: $WHICH_JAVA"
+
+          # 检查最终的 Java 版本
+          echo "Final 'java -version' output:"
+          java -version
+
+          # 断言，如果'java'命令不是指向我们安装的JBR，就让工作流失败并报错
+          if [[ ! "$WHICH_JAVA" == *"/jbr-17/bin/java"* ]]; then
+            echo "::error::Failed to set custom JBR path correctly! The system is still using another Java."
+            exit 1
+          fi   
           
       # Install jre MacOS arm64
-      - name: Install Jre MacOS arm64
-        if: ${{ runner.os == 'macOS' && matrix.arch == 'arm64' }}
-        uses: actions/setup-java@main
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-          java-package: 'jre'
-          architecture: 'aarch64'
+      # - name: Install Jre MacOS arm64
+      #   if: ${{ runner.os == 'macOS' && matrix.arch == 'arm64' }}
+      #   uses: actions/setup-java@main
+      #   with:
+      #     java-version: '17'
+      #     distribution: 'temurin'
+      #     java-package: 'jre'
+      #     architecture: 'aarch64'
 
       # Install jre Linux x64
       - name: Install Jre for Linux
