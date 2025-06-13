@@ -300,13 +300,13 @@ jobs:
           cp jpackage/input/sourceFile/local_version.json jpackage/input/mac
           cp jpackage/input/sourceFile/local_version.json jpackage/input/win
           cp jpackage/input/sourceFile/local_version.json jpackage/input/linux
-          sh package_macos.sh
+          sh package_macos.sh  ${{ github.event.inputs.version }}
           
           # sign
           xcrun notarytool store-credentials ${{ secrets.PRODUCT_BASE_NAME }} --apple-id "${{ secrets.MAC_APPLE_ID }}" --password "${{ secrets.MAC_APPLE_PASSWORD }}" --team-id "${{ secrets.MAC_TEAM_ID }}"
-          xcrun notarytool submit jpackage/output/Chat2DB-Pro-3.99.2.dmg --keychain-profile ${{ secrets.PRODUCT_BASE_NAME }}
+          xcrun notarytool submit jpackage/output/Chat2DB-Pro-${{ github.event.inputs.version }}-arm64.dmg --keychain-profile ${{ secrets.PRODUCT_BASE_NAME }}
 
-          ossutil cp -rf jpackage/output/Chat2DB-Pro-3.99.2.dmg "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/"
+          ossutil cp -rf jpackage/output/Chat2DB-Pro-${{ github.event.inputs.version }}-arm64.dmg "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/"
           ossutil cp -rf jpackage/input/sourceFile/version.json "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/"
           ossutil cp -rf jpackage/input/sourceFile/*.jar "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/"
           ossutil cp -rf jpackage/input/sourceFile/*.zip "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/"
