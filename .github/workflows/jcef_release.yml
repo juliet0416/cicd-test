@@ -283,12 +283,22 @@ jobs:
           echo "Returned to the original directory. Current path is:"
           pwd
           
+          mkdir -p ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile
+          cp ${{ secrets.REPO_FRONT_PATH }}/dist.zip ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile
+        
+          mkdir -p ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/mac
+          mkdir -p ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/win
+          mkdir -p ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/linux
           cp -r ${{ secrets.REPO_FRONT_PATH }}/dist ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/mac
-          # cp -r dist ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/win
-          # cp -r dist ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/linux
+          cp -r ${{ secrets.REPO_FRONT_PATH }}/dist ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/win
+          cp -r ${{ secrets.REPO_FRONT_PATH }}/dist ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/linux
 
           cd ${{secrets.JCEF_PROJECT_ROOT}}
-          find jpackage -print | sed -e 's;[^/]*/;|____;g;s;____|; |;g'
+          echo "start build version file"
+          sh generate_metadata.sh  ${{ github.event.inputs.version }}  jpackage/input/sourceFile  https://cdn.chat2db-ai.com/download/updates
+          cp jpackage/input/sourceFile/local_version.json jpackage/input/mac
+          cp jpackage/input/sourceFile/local_version.json jpackage/input/win
+          cp jpackage/input/sourceFile/local_version.json jpackage/input/linux
           sh package_macos.sh
           
           # sign
