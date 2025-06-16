@@ -23,10 +23,10 @@ jobs:
           #   file_name: 'latest.dmg'
           #   file_extension: '-x64.dmg'
           #   build_arg: '--mac --x64'
-          # - os: windows-latest
-          #   file_extension: '.exe'
-          #   file_name: 'latest.exe'
-          #   build_arg: '--win --x64'
+          - os: windows-latest
+            file_extension: '.exe'
+            file_name: 'latest.exe'
+            build_arg: '--win --x64'
           - os: macos-latest
             arch: arm64
             file_name: 'arm64-latest.dmg'
@@ -61,13 +61,70 @@ jobs:
           echo "current version: ${{ github.run_id }}"
 
       # Install jre Windows
-      - name: Install Jre for Windows
-        if: ${{ runner.os == 'Windows' }}
-        uses: actions/setup-java@main
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-          java-package: 'jre'
+      # - name: Install Jre for Windows
+        # if: ${{ runner.os == 'Windows' }}
+        # uses: actions/setup-java@main
+        # with:
+          # java-version: '17'
+          # distribution: 'temurin'
+          # java-package: 'jre'
+      - name: Setup Custom JBR for Windows
+        if: runner.os == 'Windows'
+        # 显式指定使用 PowerShell
+        shell: pwsh
+        run: |
+          # --------------------- 准备工作 ---------------------
+          Write-Host "Downloading and extracting JBR for Windows..."
+          # 下载用户指定的 Windows JBR 版本
+          curl.exe -L -o jbr.tar.gz "https://cache-redirector.jetbrains.com/intellij-jbr/jbr_jcef-17.0.12-windows-x64-b1207.37.tar.gz"
+          
+          # 使用 PowerShell 原生命令创建目录
+          New-Item -Path "jbr-17" -ItemType Directory -Force
+          
+          # GitHub Actions 的 Windows 运行器支持 tar 命令
+          tar.exe -xzf jbr.tar.gz -C jbr-17 --strip-components=1
+          
+          # --------------------- 核心配置步骤 ---------------------
+          Write-Host "Configuring environment variables for Windows..."
+          
+          # 步骤 1: 获取 JBR Home 目录的绝对路径
+          # Windows JBR 的结构更简单，解压后就是 Home 目录
+          $jbrPath = Resolve-Path -Path "jbr-17"
+          Write-Host "Correct JAVA_HOME path will be: $jbrPath"
+
+          # 步骤 2: 设置 JAVA_HOME 环境变量，供后续步骤使用
+          echo "JAVA_HOME=$jbrPath" >> $env:GITHUB_ENV
+
+          # 步骤 3: 使用 GITHUB_PATH 将 JBR 的 bin 目录添加到 PATH 最前端
+          $jbrBinPath = Join-Path $jbrPath "bin"
+          echo "$jbrBinPath" >> $env:GITHUB_PATH
+          
+          Write-Host "Configuration complete."
+
+      - name: Verify Final Java Configuration for Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Write-Host "--- Verifying final configuration for Windows ---"
+          
+          # 1. 检查 JAVA_HOME 环境变量
+          Write-Host "JAVA_HOME is: $env:JAVA_HOME"
+
+          # 2. 检查 'java' 命令的指向
+          $javaPath = (Get-Command java).Source
+          Write-Host "'Get-Command java' points to: $javaPath"
+          
+          # 3. 检查 Java 版本
+          Write-Host "Final 'java -version' output:"
+          java -version
+
+          # 4. 最终断言，确保路径正确 (已更新为 Windows 路径格式)
+          $expectedPathPart = "jbr-17\bin\java.exe"
+          if (-not ($javaPath -like "*$expectedPathPart*")) {
+            Write-Error "Failed to set custom JBR path correctly! Expected path to contain '$expectedPathPart' but got '$javaPath'."
+            exit 1
+          }
+          Write-Host "JBR path verification successful."    
 
       # Install jre MacOS X64
       - name: Install Jre MacOS X64
@@ -186,6 +243,8 @@ jobs:
         run: |
           mkdir -p ${{ secrets.REPO_STATIC_PATH }} 
           cp -r "${{ env.JAVA_HOME }}" ${{ secrets.REPO_JRE_PATH }}
+          mkdir -p ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/runtime/win
+          cp -r $JAVA_HOME ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/runtime/win
 
       # Copy jre macOS
       - name: Copy Jre for macOS
