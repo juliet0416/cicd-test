@@ -27,11 +27,11 @@ jobs:
             file_extension: '.exe'
             file_name: 'latest.exe'
             build_arg: '--win --x64'
-          - os: macos-latest
-            arch: arm64
-            file_name: 'arm64-latest.dmg'
-            file_extension: '-arm64.dmg'
-            build_arg: '--mac --arm64'
+          # - os: macos-latest
+            # arch: arm64
+            # file_name: 'arm64-latest.dmg'
+            # file_extension: '-arm64.dmg'
+            # build_arg: '--mac --arm64'
           # - os: ubuntu-latest
           #   arch: x86_64
           #   file_name: 'latest.AppImage'
@@ -362,13 +362,13 @@ jobs:
           sh package_macos.sh  ${{ github.event.inputs.version }}
           
           # sign
-          xcrun notarytool store-credentials ${{ secrets.PRODUCT_BASE_NAME }} --apple-id "${{ secrets.MAC_APPLE_ID }}" --password "${{ secrets.MAC_APPLE_PASSWORD }}" --team-id "${{ secrets.MAC_TEAM_ID }}"
-          xcrun notarytool submit jpackage/output/Chat2DB-Pro-${{ github.event.inputs.version }}-arm64.dmg --keychain-profile ${{ secrets.PRODUCT_BASE_NAME }}
+          # xcrun notarytool store-credentials ${{ secrets.PRODUCT_BASE_NAME }} --apple-id "${{ secrets.MAC_APPLE_ID }}" --password "${{ secrets.MAC_APPLE_PASSWORD }}" --team-id "${{ secrets.MAC_TEAM_ID }}"
+          # xcrun notarytool submit jpackage/output/Chat2DB-Pro-${{ github.event.inputs.version }}-arm64.dmg --keychain-profile ${{ secrets.PRODUCT_BASE_NAME }}
 
-          ossutil cp -rf jpackage/output/Chat2DB-Pro-${{ github.event.inputs.version }}-arm64.dmg "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/"
-          ossutil cp -rf jpackage/input/sourceFile/version.json "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/"
-          ossutil cp -rf jpackage/input/sourceFile/*.jar "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/"
-          ossutil cp -rf jpackage/input/sourceFile/*.zip "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/"
+          # ossutil cp -rf jpackage/output/Chat2DB-Pro-${{ github.event.inputs.version }}-arm64.dmg "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/"
+          # ossutil cp -rf jpackage/input/sourceFile/version.json "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/"
+          # ossutil cp -rf jpackage/input/sourceFile/*.jar "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/"
+          # ossutil cp -rf jpackage/input/sourceFile/*.zip "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/"
           echo "oss successful"
           
           
