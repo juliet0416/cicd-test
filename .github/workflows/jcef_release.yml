@@ -403,7 +403,7 @@ jobs:
         if: ${{ runner.os == 'Windows' }}
         run: |
           pwd
-          cp -r chat2db-server/jpackage/output/Chat2DB-Pro-${{ github.event.inputs.version }}.exe ${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe
+          cp -r ${{ secrets.REPO_FRONT_PATH }}/../chat2db-server/jpackage/output/Chat2DB-Pro-${{ github.event.inputs.version }}.exe ${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe
           ls ${{ secrets.REPO_FRONT_PATH }}/release 
           cp -r ${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe ${{ github.workspace }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe
       - name: Install WinSCP
