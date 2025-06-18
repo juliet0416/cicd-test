@@ -23,15 +23,15 @@ jobs:
           #   file_name: 'latest.dmg'
           #   file_extension: '-x64.dmg'
           #   build_arg: '--mac --x64'
-          - os: windows-latest
-            file_extension: '.exe'
-            file_name: 'latest.exe'
-            build_arg: '--win --x64'
-          # - os: macos-latest
-            # arch: arm64
-            # file_name: 'arm64-latest.dmg'
-            # file_extension: '-arm64.dmg'
-            # build_arg: '--mac --arm64'
+          # - os: windows-latest
+            # file_extension: '.exe'
+            # file_name: 'latest.exe'
+            # build_arg: '--win --x64'
+          - os: macos-latest
+            arch: arm64
+            file_name: 'arm64-latest.dmg'
+            file_extension: '-arm64.dmg'
+            build_arg: '--mac --arm64'
           # - os: ubuntu-latest
           #   arch: x86_64
           #   file_name: 'latest.AppImage'
@@ -61,13 +61,14 @@ jobs:
           echo "current version: ${{ github.run_id }}"
 
       # Install jre Windows
-      # - name: Install Jre for Windows
-        # if: ${{ runner.os == 'Windows' }}
-        # uses: actions/setup-java@main
-        # with:
-          # java-version: '17'
-          # distribution: 'temurin'
-          # java-package: 'jre'
+      - name: Install Jre for Windows
+        if: ${{ runner.os == 'Windows' }}
+        uses: actions/setup-java@main
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          java-package: 'jre'
+          
       - name: Setup Custom JBR for Windows
         if: runner.os == 'Windows'
         # 显式指定使用 PowerShell
@@ -127,16 +128,16 @@ jobs:
           Write-Host "JBR path verification successful."    
 
       # Install jre MacOS X64
-      - name: Install Jre MacOS X64
-        if: ${{ runner.os == 'macOS' && matrix.arch == 'x86_64' }}
-        uses: actions/setup-java@v2
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-          java-package: 'jre'
-          architecture: 'x64'
+      # - name: Install Jre MacOS X64
+        # if: ${{ runner.os == 'macOS' && matrix.arch == 'x86_64' }}
+        # uses: actions/setup-java@v2
+        # with:
+          # java-version: '17'
+          # distribution: 'temurin'
+          # java-package: 'jre'
+          # architecture: 'x64'
 
-      - name: Setup Custom JBR (Final Correct Path)
+      - name: Setup Custom JBR For Mac arm (Final Correct Path)
         if: ${{ runner.os == 'macOS' && matrix.arch == 'arm64' }}
         run: |
           # --------------------- 准备工作 ---------------------
@@ -247,8 +248,8 @@ jobs:
           # cp -r $JAVA_HOME ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/runtime/win
 
       # Copy jre macOS
-      - name: Copy Jre for macOS
-        if: ${{ runner.os == 'macOS' }}
+      - name: Copy Jre for macOS arm64
+        if: ${{ runner.os == 'macOS' && matrix.arch == 'arm64' }}
         run: |
           mkdir -p ${{ secrets.REPO_STATIC_PATH }} 
           cp -r $JAVA_HOME ${{ secrets.REPO_JRE_PATH }} 
@@ -317,49 +318,49 @@ jobs:
           access-key-secret: ${{ secrets.OSS_ACCESS_KEY_SECRET }}
           ossutil-version: '1.7.16'
 
-      # 打包后端工程 & 发送到前端
-      # - name: Build BE Static
-        # run: |
-          # pwd
-          # mvn -v 
-          # mvn clean install -U -B '-Dmaven.test.skip=true' -f ${{ secrets.REPO_POM_PATH }}
+      # 打包后端工程
+      - name: Build BE Static
+        run: |
+          pwd
+          mvn -v 
+          mvn clean install -U -B '-Dmaven.test.skip=true' -f ${{ secrets.REPO_POM_PATH }}
           # ossutil cp -rf ${{ secrets.REPO_JAR_PATH }} "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/"
           # cp ${{ secrets.REPO_JAR_PATH }} ${{ secrets.REPO_STATIC_JAR_PATH }}
           
 
       # 打包前端资源
-      # - name: Build FE Static
-        # run: |
-          # pushd ${{ secrets.REPO_FRONT_PATH }}
-          # yarn
-          # yarn run build:web:desktop --app_version=${{ github.event.inputs.version }}
-          # zip -r dist.zip dist
-          # ossutil cp -rf dist.zip "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/"
+      - name: Build FE Static
+        run: |
+          pushd ${{ secrets.REPO_FRONT_PATH }}
+          yarn
+          yarn run build:web:desktop --app_version=${{ github.event.inputs.version }}
+          zip -r dist.zip dist
+          ossutil cp -rf dist.zip "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/"
           
-          # cp -r dist ./static/
+          cp -r dist ./static/
           
-          # popd
-          # echo "Returned to the original directory. Current path is:"
-          # pwd
+          popd
+          echo "Returned to the original directory. Current path is:"
+          pwd
           
-          # mkdir -p ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile
-          # cp ${{ secrets.REPO_FRONT_PATH }}/dist.zip ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile
+          mkdir -p ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile
+          cp ${{ secrets.REPO_FRONT_PATH }}/dist.zip ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile
         
-          # mkdir -p ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/mac
-          # mkdir -p ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/win
-          # mkdir -p ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/linux
-          # cp -r ${{ secrets.REPO_FRONT_PATH }}/dist ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/mac
-          # cp -r ${{ secrets.REPO_FRONT_PATH }}/dist ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/win
-          # cp -r ${{ secrets.REPO_FRONT_PATH }}/dist ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/linux
+          mkdir -p ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/mac
+          mkdir -p ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/win
+          mkdir -p ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/linux
+          cp -r ${{ secrets.REPO_FRONT_PATH }}/dist ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/mac
+          cp -r ${{ secrets.REPO_FRONT_PATH }}/dist ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/win
+          cp -r ${{ secrets.REPO_FRONT_PATH }}/dist ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/linux
 
-          # cd ${{secrets.JCEF_PROJECT_ROOT}}
-          # echo "start build version file"
-          # sh generate_metadata.sh  ${{ github.event.inputs.version }}  jpackage/input/sourceFile  https://cdn.chat2db-ai.com/download/updates
-          # cp jpackage/input/sourceFile/version.json   jpackage/input/sourceFile/local_version.json
-          # cp jpackage/input/sourceFile/local_version.json jpackage/input/mac
-          # cp jpackage/input/sourceFile/local_version.json jpackage/input/win
-          # cp jpackage/input/sourceFile/local_version.json jpackage/input/linux
-          # sh package_macos.sh  ${{ github.event.inputs.version }}
+          echo "start build version file"
+          sh ${{secrets.JCEF_PROJECT_ROOT}}/generate_metadata.sh  ${{ github.event.inputs.version }}  jpackage/input/sourceFile  https://cdn.chat2db-ai.com/download/updates
+          cp ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/version.json   jpackage/input/sourceFile/local_version.json
+          cp ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/local_version.json jpackage/input/mac
+          cp ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/local_version.json jpackage/input/win
+          cp ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/local_version.json jpackage/input/linux
+          
+          
           
           # sign
           # xcrun notarytool store-credentials ${{ secrets.PRODUCT_BASE_NAME }} --apple-id "${{ secrets.MAC_APPLE_ID }}" --password "${{ secrets.MAC_APPLE_PASSWORD }}" --team-id "${{ secrets.MAC_TEAM_ID }}"
@@ -370,7 +371,20 @@ jobs:
           # ossutil cp -rf jpackage/input/sourceFile/*.jar "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/"
           # ossutil cp -rf jpackage/input/sourceFile/*.zip "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/"
           # echo "oss successful"
+
+      - name: package mac arm64
+        if: ${{ runner.os == 'macOS' && matrix.arch == 'arm64' }}
+        run: |
+          pwd
+          sh ${{secrets.JCEF_PROJECT_ROOT}}/package_macos.sh  ${{ github.event.inputs.version }} "${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg"
+          ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/*-arm64.dmg "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/"
           
+      - name: package mac x86_64   
+        if: ${{ runner.os == 'macOS' && matrix.arch == 'x86_64' }}
+        run: |
+          pwd
+          sh ${{secrets.JCEF_PROJECT_ROOT}}/package_macos.sh  ${{ github.event.inputs.version }} ${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.dmg
+            
           
       # # 打包Electron
       # - name: Build/release Electron app
