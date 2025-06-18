@@ -354,11 +354,11 @@ jobs:
           cp -r ${{ secrets.REPO_FRONT_PATH }}/dist ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/linux
 
           echo "start build version file"
-          sh ${{secrets.JCEF_PROJECT_ROOT}}/generate_metadata.sh  ${{ github.event.inputs.version }}  jpackage/input/sourceFile  https://cdn.chat2db-ai.com/download/updates
-          cp ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/version.json   jpackage/input/sourceFile/local_version.json
-          cp ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/local_version.json jpackage/input/mac
-          cp ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/local_version.json jpackage/input/win
-          cp ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/local_version.json jpackage/input/linux
+          sh ${{secrets.JCEF_PROJECT_ROOT}}/generate_metadata.sh  ${{ github.event.inputs.version }}  ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile  https://cdn.chat2db-ai.com/download/updates
+          cp ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/version.json   ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/local_version.json
+          cp ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/local_version.json ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/mac
+          cp ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/local_version.json ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/win
+          cp ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/local_version.json ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/linux
           
           
           
