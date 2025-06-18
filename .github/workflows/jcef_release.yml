@@ -387,17 +387,6 @@ jobs:
           cp ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/local_version.json ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/linux
           
           
-          
-          # sign
-          # xcrun notarytool store-credentials ${{ secrets.PRODUCT_BASE_NAME }} --apple-id "${{ secrets.MAC_APPLE_ID }}" --password "${{ secrets.MAC_APPLE_PASSWORD }}" --team-id "${{ secrets.MAC_TEAM_ID }}"
-          # xcrun notarytool submit jpackage/output/Chat2DB-Pro-${{ github.event.inputs.version }}-arm64.dmg --keychain-profile ${{ secrets.PRODUCT_BASE_NAME }}
-
-          # ossutil cp -rf jpackage/output/Chat2DB-Pro-${{ github.event.inputs.version }}-arm64.dmg "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/"
-          # ossutil cp -rf jpackage/input/sourceFile/version.json "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/"
-          # ossutil cp -rf jpackage/input/sourceFile/*.jar "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/"
-          # ossutil cp -rf jpackage/input/sourceFile/*.zip "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/"
-          # echo "oss successful"
-          
       - name: Import Code-Signing Certificate
         if: ${{ runner.os == 'macOS' }}
         run: |
@@ -428,7 +417,10 @@ jobs:
           xcrun notarytool store-credentials ${{ secrets.PRODUCT_BASE_NAME }} --apple-id "${{ secrets.MAC_APPLE_ID }}" --password "${{ secrets.MAC_APPLE_PASSWORD }}" --team-id "${{ secrets.MAC_TEAM_ID }}"
           xcrun notarytool submit ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.dmg --keychain-profile ${{ secrets.PRODUCT_BASE_NAME }} --wait --verbose
           ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/*-x64.dmg "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/"
-          
+          # ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/version.json "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/"
+          # ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/*.jar "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/"
+          # ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/*.zip "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/"
+          echo "oss successful"
       # 公证&签名 Mac App
       - name: Notarize MacOS ARM App
         if: matrix.os == 'macos-latest' && matrix.arch == 'arm64'
@@ -436,7 +428,10 @@ jobs:
           xcrun notarytool store-credentials ${{ secrets.PRODUCT_BASE_NAME }} --apple-id "${{ secrets.MAC_APPLE_ID }}" --password "${{ secrets.MAC_APPLE_PASSWORD }}" --team-id "${{ secrets.MAC_TEAM_ID }}"
           xcrun notarytool submit ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg --keychain-profile ${{ secrets.PRODUCT_BASE_NAME }} --wait --verbose
           ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/*-arm64.dmg "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/"
-          
+          ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/version.json "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/"
+          ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/*.jar "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/"
+          ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/*.zip "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/"
+          echo "oss successful"
           
       # # 打包Electron
       # - name: Build/release Electron app
