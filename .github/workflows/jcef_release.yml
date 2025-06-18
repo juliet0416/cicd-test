@@ -58,6 +58,8 @@ jobs:
       # Output basic information
       - name: Print basic information
         run: |
+          cd  ${{secrets.JCEF_PROJECT_ROOT}}
+          pwd
           echo "current version: ${{ github.run_id }}"
 
       # Install jre Windows
@@ -345,7 +347,7 @@ jobs:
           
           mkdir -p ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile
           cp ${{ secrets.REPO_FRONT_PATH }}/dist.zip ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile
-        
+          
           mkdir -p ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/mac
           mkdir -p ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/win
           mkdir -p ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/linux
@@ -371,6 +373,19 @@ jobs:
           # ossutil cp -rf jpackage/input/sourceFile/*.jar "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/"
           # ossutil cp -rf jpackage/input/sourceFile/*.zip "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/"
           # echo "oss successful"
+          
+      - name: Import Code-Signing Certificate
+        if: ${{ runner.os == 'macOS' }}
+        run: |
+          echo "${{ secrets.MAC_CERTS }}" | base64 --decode > certificate.p12
+          KEYCHAIN_PATH=$RUNNER_TEMP/build.keychain
+          security create-keychain -p "${{ secrets.MAC_CERTS_PASSWORD }}" "$KEYCHAIN_PATH"
+          security default-keychain -s "$KEYCHAIN_PATH"
+          security unlock-keychain -p "${{ secrets.MAC_CERTS_PASSWORD }}" "$KEYCHAIN_PATH"
+          security import certificate.p12 -k "$KEYCHAIN_PATH" -P "${{ secrets.MAC_CERTS_PASSWORD }}" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "${{ secrets.MAC_CERTS_PASSWORD }}" "$KEYCHAIN_PATH"
+          echo "Certificate and key successfully installed."
+
 
       - name: package mac arm64
         if: ${{ runner.os == 'macOS' && matrix.arch == 'arm64' }}
