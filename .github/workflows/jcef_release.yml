@@ -58,8 +58,6 @@ jobs:
       # Output basic information
       - name: Print basic information
         run: |
-          cd  ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input
-          pwd
           echo "current version: ${{ github.run_id }}"
 
       # Install jre Windows
