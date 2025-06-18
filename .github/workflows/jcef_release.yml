@@ -18,11 +18,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # - os: macos-latest
-          #   arch: x86_64
-          #   file_name: 'latest.dmg'
-          #   file_extension: '-x64.dmg'
-          #   build_arg: '--mac --x64'
+          - os: macos-latest
+            arch: x86_64
+            file_name: 'latest.dmg'
+            file_extension: '-x64.dmg'
+            build_arg: '--mac --x64'
           # - os: windows-latest
             # file_extension: '.exe'
             # file_name: 'latest.exe'
@@ -162,8 +162,33 @@ jobs:
           
           echo "Configuration complete."
 
+      - name: Setup Custom JBR For Mac x64 (Final Correct Path)
+        if: ${{ runner.os == 'macOS' && matrix.arch == 'x86_64' }}
+        run: |
+          # --------------------- 准备工作 ---------------------
+          echo "Downloading and extracting JBR..."
+          curl -L -o jbr.tar.gz "https://cache-redirector.jetbrains.com/intellij-jbr/jbr_jcef-17.0.12-osx-x64-b1207.37.tar.gz"
+          mkdir -p jbr-17
+          tar -xzf jbr.tar.gz -C jbr-17 --strip-components=1
+          
+          # --------------------- 核心配置步骤 (已根据最终路径 jbr-17/Contents/Home 修正) ---------------------
+          echo "Configuring environment variables..."
+          
+          # 步骤 1: 获取 JBR 的 Home 目录的绝对路径 (关键修正)
+          # 我们进入 jbr-17/Contents/Home 目录后再获取路径
+          JBR_HOME=$(cd jbr-17/Contents/Home && pwd)
+          echo "Correct JAVA_HOME path will be: $JBR_HOME"
+
+          # 步骤 2: 设置 JAVA_HOME 环境变量
+          echo "JAVA_HOME=$JBR_HOME" >> $GITHUB_ENV
+
+          # 步骤 3: 使用 GITHUB_PATH 将 JBR 的 bin 目录添加到 PATH 最前端
+          echo "$JBR_HOME/bin" >> $GITHUB_PATH
+          
+          echo "Configuration complete."    
+
       - name: Verify Final Java Configuration
-        if: ${{ runner.os == 'macOS' && matrix.arch == 'arm64' }}
+        if: ${{ runner.os == 'macOS'}}
         run: |
           echo "--- Verifying final configuration ---"
           
