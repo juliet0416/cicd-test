@@ -562,54 +562,54 @@ jobs:
         run: |
           # sh ${{secrets.JCEF_PROJECT_ROOT}}/package_win.sh  ${{ github.event.inputs.version }} "${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg"
           sh ${{secrets.JCEF_PROJECT_ROOT}}/package_win.sh  ${{ github.event.inputs.version }}
-          ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/*.exe "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/"
-          echo "oss successful"
+          # ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/*.exe "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/"
+          # echo "oss successful"
     
       # 准备发往OSS的文件
-      # - name: Prepare upload for OSS
-      #   if: ${{ runner.os == 'Windows' }}
-      #   run: |
-      #     pwd
-      #     cp -r ${{ secrets.REPO_FRONT_PATH }}/../chat2db-server/jpackage/output/Chat2DB-Pro-${{ github.event.inputs.version }}.exe ${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe
-      #     ls ${{ secrets.REPO_FRONT_PATH }}/release 
-      #     cp -r ${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe ${{ github.workspace }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe
-      # - name: Install WinSCP
-      #   if: ${{ runner.os == 'Windows' }}
-      #   run: |
-      #     choco install winscp
+      - name: Prepare upload for OSS
+        if: ${{ runner.os == 'Windows' }}
+        run: |
+          pwd
+          cp -r ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe ${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe
+          ls ${{ secrets.REPO_FRONT_PATH }}/release 
+          cp -r ${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe ${{ github.workspace }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe
+      - name: Install WinSCP
+        if: ${{ runner.os == 'Windows' }}
+        run: |
+          choco install winscp
 
       # 上传文件到OSS准备
-      # - name: Upload to OSS for windows
-      #   if: matrix.os == 'windows-latest'
-      #   run: |
-      #     # ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe" "oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/temp/"
-      #     ossutil cp -rf "${{ github.workspace }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe" "oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/temp/"
+      - name: Upload to OSS for windows
+        if: matrix.os == 'windows-latest'
+        run: |
+          # ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe" "oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/temp/"
+          ossutil cp -rf "${{ github.workspace }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe" "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/temp/"
 
       # 上传文件到远程服务器
-      # - name: Copy files to remote server
-      #   if: ${{ runner.os == 'Windows' }}
-      #   timeout-minutes: 15
-      #   env:
-      #     SCP_PASSWORD: ${{ secrets.WIN_SSH_PRIVATE_KEY }}
-      #     REMOTE_HOST: ${{ secrets.WIN_SERVER_IP }}
-      #     REMOTE_USER: ${{ secrets.WIN_SERVER_USER }}
-      #     REMOTE_PATH: '${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe'
-      #     REMOTE_OSS: ${{ secrets.REMOTE_SIGN_SCRIPT_OSS }}
-      #     HOST_KEY: ${{ secrets.HOST_KEY }}
-      #     FILE_TO_UPLOAD: '${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe'
-      #     REMOTE_SCRIPT_PATH_1: '${{ secrets.REMOTE_SIGN_SCRIPT }} --alg SHA-1 ${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe'
-      #     REMOTE_SCRIPT_PATH_2: '${{ secrets.REMOTE_SIGN_SCRIPT }} --alg SHA-256 ${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe'
-      #     LOCAL_DOWNLOAD_PATH: '${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe'
-      #   run: |
-      #     winscp.com /log=winscp.log /command `
-      #       "option batch abort" `
-      #       "option confirm off" `
-      #       "open scp://${{ env.REMOTE_USER }}:${{ env.SCP_PASSWORD }}@${{ env.REMOTE_HOST }} -hostkey=*" `
-      #       "call ${{ env.REMOTE_OSS }} oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/temp/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe ${env:REMOTE_PATH}" `
-      #       "call ${env:REMOTE_SCRIPT_PATH_1}" `
-      #       "call ${env:REMOTE_SCRIPT_PATH_2}" `
-      #       "call ${{ env.REMOTE_OSS }} ${env:REMOTE_PATH} oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe " `
-      #       "exit"
+      - name: Copy files to remote server
+        if: ${{ runner.os == 'Windows' }}
+        timeout-minutes: 15
+        env:
+          SCP_PASSWORD: ${{ secrets.WIN_SSH_PRIVATE_KEY }}
+          REMOTE_HOST: ${{ secrets.WIN_SERVER_IP }}
+          REMOTE_USER: ${{ secrets.WIN_SERVER_USER }}
+          REMOTE_PATH: '${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe'
+          REMOTE_OSS: ${{ secrets.REMOTE_SIGN_SCRIPT_OSS }}
+          HOST_KEY: ${{ secrets.HOST_KEY }}
+          FILE_TO_UPLOAD: '${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe'
+          REMOTE_SCRIPT_PATH_1: '${{ secrets.REMOTE_SIGN_SCRIPT }} --alg SHA-1 ${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe'
+          REMOTE_SCRIPT_PATH_2: '${{ secrets.REMOTE_SIGN_SCRIPT }} --alg SHA-256 ${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe'
+          LOCAL_DOWNLOAD_PATH: '${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe'
+        run: |
+          winscp.com /log=winscp.log /command `
+            "option batch abort" `
+            "option confirm off" `
+            "open scp://${{ env.REMOTE_USER }}:${{ env.SCP_PASSWORD }}@${{ env.REMOTE_HOST }} -hostkey=*" `
+            "call ${{ env.REMOTE_OSS }} oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/temp/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe ${env:REMOTE_PATH}" `
+            "call ${env:REMOTE_SCRIPT_PATH_1}" `
+            "call ${env:REMOTE_SCRIPT_PATH_2}" `
+            "call ${{ env.REMOTE_OSS }} ${env:REMOTE_PATH} oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe " `
+            "exit"
 
       # # 拉取OSS文件
       # - name: Prepare upload for OSS on windows
@@ -654,42 +654,42 @@ jobs:
       #   if: ${{ runner.os == 'Windows' }}
       #   continue-on-error: false
       #   run: |
-        #   # 引入 powershell-yaml 模块
-        #   Import-Module powershell-yaml
+      #     # 引入 powershell-yaml 模块
+      #     Import-Module powershell-yaml
 
-        #   # 读取 YAML 文件
-        #   $yamlContent = Get-Content -Path ${{ secrets.REPO_FRONT_PATH }}/release/latest.yml -Raw | ConvertFrom-Yaml
+      #     # 读取 YAML 文件
+      #     $yamlContent = Get-Content -Path ${{ secrets.REPO_FRONT_PATH }}/release/latest.yml -Raw | ConvertFrom-Yaml
 
-        #   # Extract and print the old hash value
-        #   Write-Output "Old Hash: $($yamlContent.sha512)"
+      #     # Extract and print the old hash value
+      #     Write-Output "Old Hash: $($yamlContent.sha512)"
 
-        #   # 修改 sha512 值
-        #   # $yamlContent.sha512 = '${{ steps.hash.outputs.sha512_base64 }}'
+      #     # 修改 sha512 值
+      #     # $yamlContent.sha512 = '${{ steps.hash.outputs.sha512_base64 }}'
 
-        #   # 可选：如果有嵌套的结构，如 files 数组
-        #   # $yamlContent.files[0].sha512 = '${{ steps.hash.outputs.sha512_base64 }}'
-        #   # 替换哈希值
-        #   $newHash = '${{ steps.hash.outputs.sha512_base64 }}'
-        #   $content = Get-Content -Path ${{ secrets.REPO_FRONT_PATH }}/release/latest.yml -Raw
-        #   $content = $content -replace '(sha512: ).*', "sha512: $newHash"
+      #     # 可选：如果有嵌套的结构，如 files 数组
+      #     # $yamlContent.files[0].sha512 = '${{ steps.hash.outputs.sha512_base64 }}'
+      #     # 替换哈希值
+      #     $newHash = '${{ steps.hash.outputs.sha512_base64 }}'
+      #     $content = Get-Content -Path ${{ secrets.REPO_FRONT_PATH }}/release/latest.yml -Raw
+      #     $content = $content -replace '(sha512: ).*', "sha512: $newHash"
 
-        #   # 打印新的 sha512 值以确认
-        #   Write-Output "New Hash: $newHash"
+      #     # 打印新的 sha512 值以确认
+      #     Write-Output "New Hash: $newHash"
 
-        #   # 比较旧值和新值
-        #   if ($oldHash -eq $newHash) {
-        #       Write-Error "❌ Old Hash ($oldHash) and New Hash ($newHash) do not match."
-        #       exit 1  # 标记当前步骤失败
-        #   } else {
-        #       Write-Output "✅ Old Hash and New Hash match. Proceeding with update..."
-        #   }
+      #     # 比较旧值和新值
+      #     if ($oldHash -eq $newHash) {
+      #         Write-Error "❌ Old Hash ($oldHash) and New Hash ($newHash) do not match."
+      #         exit 1  # 标记当前步骤失败
+      #     } else {
+      #         Write-Output "✅ Old Hash and New Hash match. Proceeding with update..."
+      #     }
 
-        #   # 将更改写回 YAML 文件
-        #   Set-Content -Path ${{ secrets.REPO_FRONT_PATH }}/release/latest.yml -Value $content
-        #   # $yamlContent | ConvertTo-Yaml | Set-Content -Path ${{ secrets.REPO_FRONT_PATH }}/release/latest.yml
-        # shell: powershell
-        # env:
-        #   new_hash: ${{ steps.hash.outputs.sha512_base64 }}
+      #     # 将更改写回 YAML 文件
+      #     Set-Content -Path ${{ secrets.REPO_FRONT_PATH }}/release/latest.yml -Value $content
+      #     # $yamlContent | ConvertTo-Yaml | Set-Content -Path ${{ secrets.REPO_FRONT_PATH }}/release/latest.yml
+      #   shell: powershell
+      #   env:
+      #     new_hash: ${{ steps.hash.outputs.sha512_base64 }}
 
       # # 上传到OSS
       # - name: Upload to OSS for Mac
