@@ -449,6 +449,7 @@ jobs:
 
       - name: package win x64
         if: ${{ runner.os == 'Windows' }}
+        shell: bash 
         run: |
           # sh ${{secrets.JCEF_PROJECT_ROOT}}/package_win.sh  ${{ github.event.inputs.version }} "${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg"
           sh ${{secrets.JCEF_PROJECT_ROOT}}/package_win.sh  ${{ github.event.inputs.version }}
