@@ -271,7 +271,7 @@ jobs:
           # mkdir -p ${{ secrets.REPO_STATIC_PATH }} 
           # cp -r "${{ env.JAVA_HOME }}" ${{ secrets.REPO_JRE_PATH }}
           mkdir -p ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/runtime/win/Home
-          cp -r ${{ env.JAVA_HOME }} ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/runtime/win/Home
+          cp -r ${{ env.JAVA_HOME }}/* ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/runtime/win/Home
           ls ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/runtime/win/Home
 
       # Copy jre macOS
