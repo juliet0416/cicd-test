@@ -351,6 +351,7 @@ jobs:
       - name: Copy Jre for macOS arm64
         if: ${{ runner.os == 'macOS' }}
         run: |
+          echo $JAVA_HOME
           mkdir -p ${{ secrets.REPO_STATIC_PATH }} 
           cp -r $JAVA_HOME ${{ secrets.REPO_JRE_PATH }} 
           chmod -R 777 ${{ secrets.REPO_JRE_PATH }}
