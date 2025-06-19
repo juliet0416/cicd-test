@@ -570,6 +570,7 @@ jobs:
         if: ${{ runner.os == 'Windows' }}
         run: |
           pwd
+          mkdir -p  ${{ secrets.REPO_FRONT_PATH }}/release
           cp -r ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe ${{ secrets.REPO_FRONT_PATH }}/release
           ls ${{ secrets.REPO_FRONT_PATH }}/release 
           cp -r ${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe ${{ github.workspace }}
