@@ -61,13 +61,13 @@ jobs:
           echo "current version: ${{ github.run_id }}"
 
       # Install jre Windows
-      # - name: Install Jre for Windows
-      #   if: ${{ runner.os == 'Windows' }}
-      #   uses: actions/setup-java@main
-      #   with:
-      #     java-version: '17'
-      #     distribution: 'temurin'
-      #     java-package: 'jre'
+      - name: Install Jre for Windows
+        if: ${{ runner.os == 'Windows' }}
+        uses: actions/setup-java@main
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          java-package: 'jre'
           
       - name: Setup Custom JBR for Windows
         if: runner.os == 'Windows'
