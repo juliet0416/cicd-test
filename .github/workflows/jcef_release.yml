@@ -125,7 +125,8 @@ jobs:
             Write-Error "Failed to set custom JBR path correctly! Expected path to contain '$expectedPathPart' but got '$javaPath'."
             exit 1
           }
-          Write-Host "JBR path verification successful."    
+          
+          Write-Host "JBR path verification successful. $JAVA_HOME"    
 
       # Install jre MacOS X64
       # - name: Install Jre MacOS X64
