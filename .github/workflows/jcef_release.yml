@@ -91,6 +91,39 @@ jobs:
           # 设置 Maven 缓存以加速构建
           cache: 'maven'    
 
+      # =================================================================
+      # 【第一阶段】准备环境：将 JBR 设置为默认，并安装好 Temurin
+      # =================================================================
+      - name: Setup Custom JBR as Default JAVA_HOME
+        if: runner.os == 'macOS'
+        run: |
+          # 根据 matrix.arch 动态选择要下载的 JBR URL
+          if [ "${{ matrix.arch }}" == "arm64" ]; then
+            JBR_URL="https://cache-redirector.jetbrains.com/intellij-jbr/jbr_jcef-17.0.12-osx-aarch64-b1207.37.tar.gz"
+          else
+            JBR_URL="https://cache-redirector.jetbrains.com/intellij-jbr/jbr_jcef-17.0.12-osx-x64-b1207.37.tar.gz"
+          fi
+          
+          echo "Downloading JBR for ${{ matrix.arch }}..."
+          curl -L -o jbr.tar.gz "$JBR_URL"
+          mkdir -p jbr-default
+          tar -xzf jbr.tar.gz -C jbr-default --strip-components=1
+          
+          # 获取 JBR 的绝对路径并设置为默认的 JAVA_HOME
+          JBR_HOME_PATH=$(cd jbr-default/Contents/Home && pwd)
+          echo "Setting default JAVA_HOME to JBR: $JBR_HOME_PATH"
+          echo "JAVA_HOME=$JBR_HOME_PATH" >> $GITHUB_ENV
+          echo "$JBR_HOME_PATH/bin" >> $GITHUB_PATH
+        
+      - name: Setup Temurin JDK (for jpackage)
+        if: runner.os == 'macOS'
+        id: setup_temurin_mac
+        uses: actions/setup-java@main
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          java-package: 'jdk'
+          architecture: ${{ matrix.arch }}
           
       # # Install jre Windows
       # - name: Install Jre for Windows
@@ -160,87 +193,87 @@ jobs:
           
       #     Write-Host "JBR path verification successful."    
 
-      # Install jre MacOS X64
-      - name: Install Jre MacOS X64
-        if: ${{ runner.os == 'macOS' && matrix.arch == 'x86_64' }}
-        uses: actions/setup-java@v2
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-          java-package: 'jre'
-          architecture: 'x64'
+      # # Install jre MacOS X64
+      # - name: Install Jre MacOS X64
+      #   if: ${{ runner.os == 'macOS' && matrix.arch == 'x86_64' }}
+      #   uses: actions/setup-java@v2
+      #   with:
+      #     java-version: '17'
+      #     distribution: 'temurin'
+      #     java-package: 'jre'
+      #     architecture: 'x64'
 
-      - name: Setup Custom JBR For Mac arm (Final Correct Path)
-        if: ${{ runner.os == 'macOS' && matrix.arch == 'arm64' }}
-        run: |
-          # --------------------- 准备工作 ---------------------
-          echo "Downloading and extracting JBR..."
-          curl -L -o jbr.tar.gz "https://cache-redirector.jetbrains.com/intellij-jbr/jbr_jcef-17.0.12-osx-aarch64-b1207.37.tar.gz"
-          mkdir -p jbr-17
-          tar -xzf jbr.tar.gz -C jbr-17 --strip-components=1
+      # - name: Setup Custom JBR For Mac arm (Final Correct Path)
+      #   if: ${{ runner.os == 'macOS' && matrix.arch == 'arm64' }}
+      #   run: |
+      #     # --------------------- 准备工作 ---------------------
+      #     echo "Downloading and extracting JBR..."
+      #     curl -L -o jbr.tar.gz "https://cache-redirector.jetbrains.com/intellij-jbr/jbr_jcef-17.0.12-osx-aarch64-b1207.37.tar.gz"
+      #     mkdir -p jbr-17
+      #     tar -xzf jbr.tar.gz -C jbr-17 --strip-components=1
           
-          # --------------------- 核心配置步骤 (已根据最终路径 jbr-17/Contents/Home 修正) ---------------------
-          echo "Configuring environment variables..."
+      #     # --------------------- 核心配置步骤 (已根据最终路径 jbr-17/Contents/Home 修正) ---------------------
+      #     echo "Configuring environment variables..."
           
-          # 步骤 1: 获取 JBR 的 Home 目录的绝对路径 (关键修正)
-          # 我们进入 jbr-17/Contents/Home 目录后再获取路径
-          JBR_HOME=$(cd jbr-17/Contents/Home && pwd)
-          echo "Correct JAVA_HOME path will be: $JBR_HOME"
+      #     # 步骤 1: 获取 JBR 的 Home 目录的绝对路径 (关键修正)
+      #     # 我们进入 jbr-17/Contents/Home 目录后再获取路径
+      #     JBR_HOME=$(cd jbr-17/Contents/Home && pwd)
+      #     echo "Correct JAVA_HOME path will be: $JBR_HOME"
 
-          # 步骤 2: 设置 JAVA_HOME 环境变量
-          echo "JAVA_HOME=$JBR_HOME" >> $GITHUB_ENV
+      #     # 步骤 2: 设置 JAVA_HOME 环境变量
+      #     echo "JAVA_HOME=$JBR_HOME" >> $GITHUB_ENV
 
-          # 步骤 3: 使用 GITHUB_PATH 将 JBR 的 bin 目录添加到 PATH 最前端
-          echo "$JBR_HOME/bin" >> $GITHUB_PATH
+      #     # 步骤 3: 使用 GITHUB_PATH 将 JBR 的 bin 目录添加到 PATH 最前端
+      #     echo "$JBR_HOME/bin" >> $GITHUB_PATH
           
-          echo "Configuration complete."
+      #     echo "Configuration complete."
 
-      - name: Setup Custom JBR For Mac x64 (Final Correct Path)
-        if: ${{ runner.os == 'macOS' && matrix.arch == 'x86_64' }}
-        run: |
-          # --------------------- 准备工作 ---------------------
-          echo "Downloading and extracting JBR..."
-          curl -L -o jbr.tar.gz "https://cache-redirector.jetbrains.com/intellij-jbr/jbr_jcef-17.0.12-osx-x64-b1207.37.tar.gz"
-          mkdir -p jbr-17
-          tar -xzf jbr.tar.gz -C jbr-17 --strip-components=1
+      # - name: Setup Custom JBR For Mac x64 (Final Correct Path)
+      #   if: ${{ runner.os == 'macOS' && matrix.arch == 'x86_64' }}
+      #   run: |
+      #     # --------------------- 准备工作 ---------------------
+      #     echo "Downloading and extracting JBR..."
+      #     curl -L -o jbr.tar.gz "https://cache-redirector.jetbrains.com/intellij-jbr/jbr_jcef-17.0.12-osx-x64-b1207.37.tar.gz"
+      #     mkdir -p jbr-17
+      #     tar -xzf jbr.tar.gz -C jbr-17 --strip-components=1
           
-          # --------------------- 核心配置步骤 (已根据最终路径 jbr-17/Contents/Home 修正) ---------------------
-          echo "Configuring environment variables..."
+      #     # --------------------- 核心配置步骤 (已根据最终路径 jbr-17/Contents/Home 修正) ---------------------
+      #     echo "Configuring environment variables..."
           
-          # 步骤 1: 获取 JBR 的 Home 目录的绝对路径 (关键修正)
-          # 我们进入 jbr-17/Contents/Home 目录后再获取路径
-          JBR_HOME=$(cd jbr-17/Contents/Home && pwd)
-          echo "Correct JAVA_HOME path will be: $JBR_HOME"
+      #     # 步骤 1: 获取 JBR 的 Home 目录的绝对路径 (关键修正)
+      #     # 我们进入 jbr-17/Contents/Home 目录后再获取路径
+      #     JBR_HOME=$(cd jbr-17/Contents/Home && pwd)
+      #     echo "Correct JAVA_HOME path will be: $JBR_HOME"
 
-          # 步骤 2: 设置 JAVA_HOME 环境变量
-          echo "JAVA_HOME=$JBR_HOME" >> $GITHUB_ENV
+      #     # 步骤 2: 设置 JAVA_HOME 环境变量
+      #     echo "JAVA_HOME=$JBR_HOME" >> $GITHUB_ENV
 
-          # 步骤 3: 使用 GITHUB_PATH 将 JBR 的 bin 目录添加到 PATH 最前端
-          echo "$JBR_HOME/bin" >> $GITHUB_PATH
+      #     # 步骤 3: 使用 GITHUB_PATH 将 JBR 的 bin 目录添加到 PATH 最前端
+      #     echo "$JBR_HOME/bin" >> $GITHUB_PATH
           
-          echo "Configuration complete."    
+      #     echo "Configuration complete."    
 
-      - name: Verify Final Java Configuration
-        if: ${{ runner.os == 'macOS'}}
-        run: |
-          echo "--- Verifying final configuration ---"
+      # - name: Verify Final Java Configuration
+      #   if: ${{ runner.os == 'macOS'}}
+      #   run: |
+      #     echo "--- Verifying final configuration ---"
           
-          # 1. 检查 JAVA_HOME
-          echo "JAVA_HOME is: $JAVA_HOME"
+      #     # 1. 检查 JAVA_HOME
+      #     echo "JAVA_HOME is: $JAVA_HOME"
 
-          # 2. 检查 'java' 命令的指向
-          WHICH_JAVA=$(which java)
-          echo "'which java' points to: $WHICH_JAVA"
+      #     # 2. 检查 'java' 命令的指向
+      #     WHICH_JAVA=$(which java)
+      #     echo "'which java' points to: $WHICH_JAVA"
 
-          # 3. 检查 Java 版本
-          echo "Final 'java -version' output:"
-          java -version
+      #     # 3. 检查 Java 版本
+      #     echo "Final 'java -version' output:"
+      #     java -version
 
-          # 4. 最终断言，确保路径正确 (已更新断言路径)
-          if [[ ! "$WHICH_JAVA" == *"/jbr-17/Contents/Home/bin/java"* ]]; then
-            echo "::error::Failed to set custom JBR path correctly!"
-            exit 1
-          fi
+      #     # 4. 最终断言，确保路径正确 (已更新断言路径)
+      #     if [[ ! "$WHICH_JAVA" == *"/jbr-17/Contents/Home/bin/java"* ]]; then
+      #       echo "::error::Failed to set custom JBR path correctly!"
+      #       exit 1
+      #     fi
           
       # Install jre MacOS arm64
       # - name: Install Jre MacOS arm64
@@ -251,6 +284,8 @@ jobs:
       #     distribution: 'temurin'
       #     java-package: 'jre'
       #     architecture: 'aarch64'
+
+      
 
       # Install jre Linux x64
       - name: Install Jre for Linux
@@ -454,6 +489,24 @@ jobs:
           security import certificate.p12 -k "$KEYCHAIN_PATH" -P "${{ secrets.MAC_CERTS_PASSWORD }}" -T /usr/bin/codesign
           security set-key-partition-list -S apple-tool:,apple: -s -k "${{ secrets.MAC_CERTS_PASSWORD }}" "$KEYCHAIN_PATH"
           echo "Certificate and key successfully installed."
+
+      # =================================================================
+      # 【第三阶段】在打包前，将环境切换到 Temurin
+      # =================================================================
+      - name: Switch to Temurin JDK for Packaging
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          echo "Switching active Java environment to Temurin for jpackage..."
+          
+          # 从 setup_temurin 步骤的输出中，获取 Temurin JDK 的安装路径
+          TEMURIN_PATH="${{ steps.setup_temurin.outputs.jdk-path }}"
+          echo "Found Temurin JDK path: $TEMURIN_PATH"
+          
+          # 覆盖 GITHUB_ENV 和 GITHUB_PATH，让后续步骤使用 Temurin
+          echo "JAVA_HOME=$TEMURIN_PATH" >> $GITHUB_ENV
+          echo "$TEMURIN_PATH/bin" >> $GITHUB_PATH
+          echo "Environment switched. Subsequent steps will use Temurin JDK."    
 
 
       - name: package mac arm64
