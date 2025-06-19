@@ -126,7 +126,7 @@ jobs:
             exit 1
           }
           
-          Write-Host "JBR path verification successful. $JAVA_HOME"    
+          Write-Host "JBR path verification successful."    
 
       # Install jre MacOS X64
       # - name: Install Jre MacOS X64
@@ -271,7 +271,8 @@ jobs:
           # mkdir -p ${{ secrets.REPO_STATIC_PATH }} 
           # cp -r "${{ env.JAVA_HOME }}" ${{ secrets.REPO_JRE_PATH }}
           mkdir -p ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/runtime/win/Home
-          cp -r $JAVA_HOME ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/runtime/win/Home
+          cp -r ${{ env.JAVA_HOME }} ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/runtime/win/Home
+          ls ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/runtime/win/Home
 
       # Copy jre macOS
       - name: Copy Jre for macOS arm64
