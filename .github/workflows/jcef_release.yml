@@ -115,15 +115,6 @@ jobs:
           echo "JAVA_HOME=$JBR_HOME_PATH" >> $GITHUB_ENV
           echo "$JBR_HOME_PATH/bin" >> $GITHUB_PATH
         
-      - name: Setup Temurin JDK (for jpackage)
-        if: runner.os == 'macOS'
-        id: setup_temurin_mac
-        uses: actions/setup-java@main
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-          java-package: 'jdk'
-          architecture: ${{ matrix.arch }}
           
       # # Install jre Windows
       # - name: Install Jre for Windows
@@ -491,6 +482,16 @@ jobs:
           security set-key-partition-list -S apple-tool:,apple: -s -k "${{ secrets.MAC_CERTS_PASSWORD }}" "$KEYCHAIN_PATH"
           echo "Certificate and key successfully installed."
 
+      - name: Setup Temurin JDK (for jpackage)
+        if: runner.os == 'macOS'
+        id: setup_temurin_mac
+        uses: actions/setup-java@main
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          java-package: 'jdk'
+          architecture: ${{ matrix.arch }}
+          
       # =================================================================
       # 【第三阶段】在打包前，将环境切换到 Temurin
       # =================================================================
