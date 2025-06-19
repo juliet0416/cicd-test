@@ -361,9 +361,11 @@ jobs:
         shell: bash
         run: |
           pushd ${{ secrets.REPO_FRONT_PATH }}
+          tar -a -c -f dist.zip dist
           yarn
           yarn run build:web:desktop --app_version=${{ github.event.inputs.version }}
-          zip -r dist.zip dist
+          # zip -r dist.zip dist
+          tar -a -c -f dist.zip dist
           ossutil cp -rf dist.zip "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/"
           
           cp -r dist ./static/
