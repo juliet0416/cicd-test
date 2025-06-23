@@ -226,8 +226,8 @@ jobs:
         run: |
           cd ${{ secrets.REPO_FRONT_PATH }}
           yarn
-          yarn run modify:package:name enterprise
-          yarn run build:web:enterprise:client --app_version=${{ github.event.inputs.version }}
+          yarn run modify:package:name qdataai
+          yarn run build:web:desktop:client --app_version=${{ github.event.inputs.version }}
           cp -r dist ./static/
 
 
