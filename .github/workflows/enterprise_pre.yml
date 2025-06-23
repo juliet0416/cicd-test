@@ -211,6 +211,15 @@ jobs:
           mvn clean install -U -B '-Dmaven.test.skip=true' -f ${{ secrets.REPO_POM_PATH }}
           cp ${{ secrets.REPO_JAR_PATH }} ${{ secrets.REPO_STATIC_JAR_PATH }}
 
+      # 打包前端网页端资源
+      - name: Prepare Build WEB
+        run: |
+          cd ${{ secrets.REPO_FRONT_PATH }}
+          yarn
+          yarn run build:web --app_version=${{ github.event.inputs.version }}
+          cp -r dist ./static/
+
+          
       # 打包Web前端资源
       - name: Build FE Static
         run: |
@@ -225,10 +234,8 @@ jobs:
       - name: Prepare Build Electron
         run: |
           cd ${{ secrets.REPO_FRONT_PATH }}
-          yarn
           yarn run modify:package:name qdataai
           yarn run build:desktop --app_version=${{ github.event.inputs.version }}
-          cp -r dist ./static/
 
 
       # 打包Electron
