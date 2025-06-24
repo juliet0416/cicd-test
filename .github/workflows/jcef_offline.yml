@@ -1,4 +1,4 @@
-name: Build Release Client
+name: Build jcef_Offline Client
 
 on:
   workflow_dispatch:
@@ -441,6 +441,7 @@ jobs:
         run: |
           pushd ${{ secrets.REPO_FRONT_PATH }}
           yarn
+          yarn run modify:package:name chat2db-local Chat2DB-Local
           yarn run build:web:offline --app_version=${{ github.event.inputs.version }}
           # zip -r dist.zip dist
           tar -a -c -f dist.zip dist
