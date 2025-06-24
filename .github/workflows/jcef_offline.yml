@@ -1,0 +1,602 @@
+name: Build Release Client
+
+on:
+  workflow_dispatch:
+    inputs:
+      logLevel:
+        description: 'Log level'
+        required: true
+        default: 'warning'
+      version:
+        description: 'Version number'
+        required: true
+        default: '1.0.0'
+
+jobs:
+  release:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            arch: x86_64
+            file_name: 'latest.dmg'
+            file_extension: '-x64.dmg'
+            build_arg: '--mac --x64'
+          - os: windows-latest
+            file_extension: '.exe'
+            file_name: 'latest.exe'
+            build_arg: '--win --x64'
+          - os: macos-latest
+            arch: arm64
+            file_name: 'arm64-latest.dmg'
+            file_extension: '-arm64.dmg'
+            build_arg: '--mac --arm64'
+          # - os: ubuntu-latest
+          #   arch: x86_64
+          #   file_name: 'latest.AppImage'
+          #   file_extension: '-x86_64.AppImage'
+          #   build_arg: '--linux --x64'
+          # - os: ubuntu-latest
+          #   arch: arm64
+          #   file_name: 'arm64-latest.AppImage'
+          #   file_extension: '-arm64.AppImage'
+          #   build_arg: '--linux --arm64'
+
+    runs-on: ${{ matrix.os }}
+
+    # 将release_test分支的代码检出（即复制）到 GitHub Actions 的运行环境中。
+    steps:
+      - name: Check out second repository
+        uses: actions/checkout@v2
+        with:
+          repository: ${{ secrets.REPO_URL }}
+          path: ${{ secrets.REPO_PATH }}
+          ref: ${{ secrets.JCEF_REPO_BRANCH }}
+          token: ${{ secrets.ACCESS_TOKEN }}
+          
+      # Output basic information
+      - name: Print basic information
+        run: |
+          echo "current version: ${{ github.run_id }}"
+
+
+       # =================================================================
+      # 【第一阶段】准备环境：下载 JBR 并安装 Temurin JDK
+      # =================================================================
+      - name: Setup Custom JBR (for Build and Runtime Image)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Write-Host "Downloading and extracting JBR to be used for compilation and as the runtime image..."
+          curl.exe -L -o jbr.tar.gz "https://cache-redirector.jetbrains.com/intellij-jbr/jbr_jcef-17.0.12-windows-x64-b1207.37.tar.gz"
+          New-Item -Path "jbr-for-build" -ItemType Directory -Force
+          tar.exe -xzf jbr.tar.gz -C jbr-for-build --strip-components=1
+          
+          # 将 JBR 的路径保存到一个环境变量中，供后续步骤使用
+          $jbrPath = Resolve-Path -Path "jbr-for-build"
+          echo "JBR_BUILD_PATH=$jbrPath" >> $env:GITHUB_ENV
+          Write-Host "JBR for compilation is ready at: $jbrPath"
+          
+      - name: Setup Temurin JDK (for Packaging with jpackage)
+        if: runner.os == 'Windows'
+        # 【重要】给这个步骤一个 ID，以便后续引用它的输出
+        id: setup_temurin
+        uses: actions/setup-java@main
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          # 确保安装的是完整的 JDK，以便包含 jpackage
+          java-package: 'jdk'
+          # 设置 Maven 缓存以加速构建
+          cache: 'maven'    
+
+      # =================================================================
+      # 【第一阶段】准备环境：将 JBR 设置为默认，并安装好 Temurin
+      # =================================================================
+      - name: Setup Custom JBR as Default JAVA_HOME
+        if: runner.os == 'macOS'
+        run: |
+          # 根据 matrix.arch 动态选择要下载的 JBR URL
+          if [ "${{ matrix.arch }}" == "arm64" ]; then
+            JBR_URL="https://cache-redirector.jetbrains.com/intellij-jbr/jbr_jcef-17.0.12-osx-aarch64-b1207.37.tar.gz"
+          else
+            JBR_URL="https://cache-redirector.jetbrains.com/intellij-jbr/jbr_jcef-17.0.12-osx-x64-b1207.37.tar.gz"
+          fi
+          
+          echo "Downloading JBR for ${{ matrix.arch }}..."
+          curl -L -o jbr.tar.gz "$JBR_URL"
+          mkdir -p jbr-default
+          tar -xzf jbr.tar.gz -C jbr-default --strip-components=1
+          
+          # 获取 JBR 的绝对路径并设置为默认的 JAVA_HOME
+          JBR_HOME_PATH=$(cd jbr-default/Contents/Home && pwd)
+          echo "Setting default JAVA_HOME to JBR: $JBR_HOME_PATH"
+          echo "JAVA_HOME=$JBR_HOME_PATH" >> $GITHUB_ENV
+          echo "$JBR_HOME_PATH/bin" >> $GITHUB_PATH
+        
+          
+      # # Install jre Windows
+      # - name: Install Jre for Windows
+      #   if: ${{ runner.os == 'Windows' }}
+      #   uses: actions/setup-java@main
+      #   with:
+      #     java-version: '17'
+      #     distribution: 'temurin'
+      #     java-package: 'jre'
+          
+      # - name: Setup Custom JBR for Windows
+      #   if: runner.os == 'Windows'
+      #   # 显式指定使用 PowerShell
+      #   shell: pwsh
+      #   run: |
+      #     # --------------------- 准备工作 ---------------------
+      #     Write-Host "Downloading and extracting JBR for Windows..."
+      #     # 下载用户指定的 Windows JBR 版本
+      #     curl.exe -L -o jbr.tar.gz "https://cache-redirector.jetbrains.com/intellij-jbr/jbr_jcef-17.0.12-windows-x64-b1207.37.tar.gz"
+          
+      #     # 使用 PowerShell 原生命令创建目录
+      #     New-Item -Path "jbr-17" -ItemType Directory -Force
+          
+      #     # GitHub Actions 的 Windows 运行器支持 tar 命令
+      #     tar.exe -xzf jbr.tar.gz -C jbr-17 --strip-components=1
+          
+      #     # --------------------- 核心配置步骤 ---------------------
+      #     Write-Host "Configuring environment variables for Windows..."
+          
+      #     # 步骤 1: 获取 JBR Home 目录的绝对路径
+      #     # Windows JBR 的结构更简单，解压后就是 Home 目录
+      #     $jbrPath = Resolve-Path -Path "jbr-17"
+      #     Write-Host "Correct JAVA_HOME path will be: $jbrPath"
+
+      #     # 步骤 2: 设置 JAVA_HOME 环境变量，供后续步骤使用
+      #     echo "JAVA_HOME=$jbrPath" >> $env:GITHUB_ENV
+
+      #     # 步骤 3: 使用 GITHUB_PATH 将 JBR 的 bin 目录添加到 PATH 最前端
+      #     $jbrBinPath = Join-Path $jbrPath "bin"
+      #     echo "$jbrBinPath" >> $env:GITHUB_PATH
+          
+      #     Write-Host "Configuration complete."
+
+      # - name: Verify Final Java Configuration for Windows
+      #   if: runner.os == 'Windows'
+      #   shell: pwsh
+      #   run: |
+      #     Write-Host "--- Verifying final configuration for Windows ---"
+          
+      #     # 1. 检查 JAVA_HOME 环境变量
+      #     Write-Host "JAVA_HOME is: $env:JAVA_HOME"
+
+      #     # 2. 检查 'java' 命令的指向
+      #     $javaPath = (Get-Command java).Source
+      #     Write-Host "'Get-Command java' points to: $javaPath"
+          
+      #     # 3. 检查 Java 版本
+      #     Write-Host "Final 'java -version' output:"
+      #     java -version
+
+      #     # 4. 最终断言，确保路径正确 (已更新为 Windows 路径格式)
+      #     $expectedPathPart = "jbr-17\bin\java.exe"
+      #     if (-not ($javaPath -like "*$expectedPathPart*")) {
+      #       Write-Error "Failed to set custom JBR path correctly! Expected path to contain '$expectedPathPart' but got '$javaPath'."
+      #       exit 1
+      #     }
+          
+      #     Write-Host "JBR path verification successful."    
+
+      # # Install jre MacOS X64
+      # - name: Install Jre MacOS X64
+      #   if: ${{ runner.os == 'macOS' && matrix.arch == 'x86_64' }}
+      #   uses: actions/setup-java@v2
+      #   with:
+      #     java-version: '17'
+      #     distribution: 'temurin'
+      #     java-package: 'jre'
+      #     architecture: 'x64'
+
+      # - name: Setup Custom JBR For Mac arm (Final Correct Path)
+      #   if: ${{ runner.os == 'macOS' && matrix.arch == 'arm64' }}
+      #   run: |
+      #     # --------------------- 准备工作 ---------------------
+      #     echo "Downloading and extracting JBR..."
+      #     curl -L -o jbr.tar.gz "https://cache-redirector.jetbrains.com/intellij-jbr/jbr_jcef-17.0.12-osx-aarch64-b1207.37.tar.gz"
+      #     mkdir -p jbr-17
+      #     tar -xzf jbr.tar.gz -C jbr-17 --strip-components=1
+          
+      #     # --------------------- 核心配置步骤 (已根据最终路径 jbr-17/Contents/Home 修正) ---------------------
+      #     echo "Configuring environment variables..."
+          
+      #     # 步骤 1: 获取 JBR 的 Home 目录的绝对路径 (关键修正)
+      #     # 我们进入 jbr-17/Contents/Home 目录后再获取路径
+      #     JBR_HOME=$(cd jbr-17/Contents/Home && pwd)
+      #     echo "Correct JAVA_HOME path will be: $JBR_HOME"
+
+      #     # 步骤 2: 设置 JAVA_HOME 环境变量
+      #     echo "JAVA_HOME=$JBR_HOME" >> $GITHUB_ENV
+
+      #     # 步骤 3: 使用 GITHUB_PATH 将 JBR 的 bin 目录添加到 PATH 最前端
+      #     echo "$JBR_HOME/bin" >> $GITHUB_PATH
+          
+      #     echo "Configuration complete."
+
+      # - name: Setup Custom JBR For Mac x64 (Final Correct Path)
+      #   if: ${{ runner.os == 'macOS' && matrix.arch == 'x86_64' }}
+      #   run: |
+      #     # --------------------- 准备工作 ---------------------
+      #     echo "Downloading and extracting JBR..."
+      #     curl -L -o jbr.tar.gz "https://cache-redirector.jetbrains.com/intellij-jbr/jbr_jcef-17.0.12-osx-x64-b1207.37.tar.gz"
+      #     mkdir -p jbr-17
+      #     tar -xzf jbr.tar.gz -C jbr-17 --strip-components=1
+          
+      #     # --------------------- 核心配置步骤 (已根据最终路径 jbr-17/Contents/Home 修正) ---------------------
+      #     echo "Configuring environment variables..."
+          
+      #     # 步骤 1: 获取 JBR 的 Home 目录的绝对路径 (关键修正)
+      #     # 我们进入 jbr-17/Contents/Home 目录后再获取路径
+      #     JBR_HOME=$(cd jbr-17/Contents/Home && pwd)
+      #     echo "Correct JAVA_HOME path will be: $JBR_HOME"
+
+      #     # 步骤 2: 设置 JAVA_HOME 环境变量
+      #     echo "JAVA_HOME=$JBR_HOME" >> $GITHUB_ENV
+
+      #     # 步骤 3: 使用 GITHUB_PATH 将 JBR 的 bin 目录添加到 PATH 最前端
+      #     echo "$JBR_HOME/bin" >> $GITHUB_PATH
+          
+      #     echo "Configuration complete."    
+
+      # - name: Verify Final Java Configuration
+      #   if: ${{ runner.os == 'macOS'}}
+      #   run: |
+      #     echo "--- Verifying final configuration ---"
+          
+      #     # 1. 检查 JAVA_HOME
+      #     echo "JAVA_HOME is: $JAVA_HOME"
+
+      #     # 2. 检查 'java' 命令的指向
+      #     WHICH_JAVA=$(which java)
+      #     echo "'which java' points to: $WHICH_JAVA"
+
+      #     # 3. 检查 Java 版本
+      #     echo "Final 'java -version' output:"
+      #     java -version
+
+      #     # 4. 最终断言，确保路径正确 (已更新断言路径)
+      #     if [[ ! "$WHICH_JAVA" == *"/jbr-17/Contents/Home/bin/java"* ]]; then
+      #       echo "::error::Failed to set custom JBR path correctly!"
+      #       exit 1
+      #     fi
+          
+      # Install jre MacOS arm64
+      # - name: Install Jre MacOS arm64
+      #   if: ${{ runner.os == 'macOS' && matrix.arch == 'arm64' }}
+      #   uses: actions/setup-java@main
+      #   with:
+      #     java-version: '17'
+      #     distribution: 'temurin'
+      #     java-package: 'jre'
+      #     architecture: 'aarch64'
+
+      
+
+      # Install jre Linux x64
+      - name: Install Jre for Linux
+        if: ${{ runner.os == 'Linux' && matrix.arch == 'x86_64' }}
+        uses: actions/setup-java@main
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          java-package: 'jre'
+
+      # Install jre Linux arm64
+      - name: Install Jre for Linux
+        if: ${{ runner.os == 'Linux' && matrix.arch == 'arm64' }}
+        uses: actions/setup-java@main
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          java-package: 'jre'
+          architecture: 'aarch64'
+
+      # java.security open tls1 Windows
+      - name: Enable tls1
+        if: ${{ runner.os == 'Windows' }}
+        # 在这个步骤中，临时覆盖 JAVA_HOME，让 Maven 使用 JBR
+        env:
+          JAVA_HOME: ${{ env.JBR_BUILD_PATH }}
+        run: |
+          # sed -i '' "s/\(^jdk.tls.disabledAlgorithms=\)\(.*\)\( TLSv1, TLSv1.1,\)\(.*\)/\1\2\4/" "${{ env.JAVA_HOME }}/conf/security/java.security"
+          $filePath = "${{ env.JAVA_HOME }}\conf\security\java.security"
+          $content = Get-Content $filePath -Raw
+          $updatedContent = $content -replace '(?s)(jdk.tls.disabledAlgorithms\s*=\s*)(.*?)(\s*TLSv1,\s*TLSv1\.1,)(.*?)(?=[,\r\n])', '$1$2$4'
+
+          $updatedContent | Set-Content $filePath
+          Write-Output "Original content:"
+          Write-Output $content
+
+          # 打印修改后的内容确认替换是否生效
+          Write-Output "Updated content:"
+          Write-Output $updatedContent
+
+        shell: pwsh
+
+      # java.security open tls1 macOS
+      - name: Enable tls1
+        if: ${{ runner.os == 'macOS' }}
+        run: |
+          sed -i '' "s/\(^jdk.tls.disabledAlgorithms=\)\(.*\)\( TLSv1, TLSv1.1,\)\(.*\)/\1\2\4/" $JAVA_HOME/conf/security/java.security
+
+      # Copy jre Windows
+      - name: Copy Jre for Windows
+        if: ${{ runner.os == 'Windows' }}
+        # 在这个步骤中，临时覆盖 JAVA_HOME，让 Maven 使用 JBR
+        env:
+          JAVA_HOME: ${{ env.JBR_BUILD_PATH }}
+        run: |
+          # mkdir -p ${{ secrets.REPO_STATIC_PATH }} 
+          # cp -r "${{ env.JAVA_HOME }}" ${{ secrets.REPO_JRE_PATH }}
+          mkdir -p ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/runtime/win/Home
+          cp -r ${{ env.JAVA_HOME }}/* ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/runtime/win/Home
+          ls ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/runtime/win/Home
+
+      # Copy jre macOS
+      - name: Copy Jre for macOS arm64
+        if: ${{ runner.os == 'macOS' }}
+        run: |
+          echo $JAVA_HOME
+          mkdir -p ${{ secrets.REPO_STATIC_PATH }} 
+          cp -r $JAVA_HOME ${{ secrets.REPO_JRE_PATH }} 
+          chmod -R 777 ${{ secrets.REPO_JRE_PATH }}
+          mkdir -p ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/runtime/mac
+          cp -r $JAVA_HOME ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/runtime/mac
+          chmod -R 777 ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/runtime/mac
+          cp -r $JAVA_HOME/../Frameworks ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/mac
+          rm -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/mac/Frameworks/cef_server.app
+          
+
+      # Copy jre Linux
+      - name: Copy Jre for Linux
+        if: ${{ runner.os == 'Linux' }}
+        run: |
+          mkdir -p ${{ secrets.REPO_STATIC_PATH }} 
+          cp -r $JAVA_HOME ${{ secrets.REPO_JRE_PATH }} 
+          chmod -R 777 ${{ secrets.REPO_JRE_PATH }}
+
+      # Linux
+      - name: Delete File
+        if: ${{ runner.os == 'Linux' }}
+        run: |
+          cd ${{ secrets.REPO_JRE_PATH }} 
+          ls -la
+          rm -rf legal
+          ls -la
+
+      # 安装Node.js
+      - name: Install Node.js
+        uses: actions/setup-node@main
+        with:
+          node-version: '18.17.0'
+          cache: 'yarn'
+          cache-dependency-path: ${{ secrets.REPO_YARN_PATH }}
+            
+      # 安装Maven
+      # - name: Install Java and Maven
+      #   uses: actions/setup-java@main
+      #   with:
+      #     java-version: '17'
+      #     distribution: 'temurin'
+      #     cache: 'maven'
+
+        # 打包依赖包
+      # - name: Check out first repository
+      #   uses: actions/checkout@v2
+      #   with:
+      #     repository: ${{ secrets.REPO_BASE_URL }}
+      #     ref: ${{ secrets.TEST_REPO_BASE_BRANCH }}
+      #     path: ${{ secrets.REPO_BASE_PATH }}
+
+      - name: Check out sqlParser repository
+        uses: actions/checkout@v2
+        with:
+          repository: ${{ secrets.SQL_PARSER_BASE_URL }}
+          ref: ${{ secrets.SQL_PARSER_REPO_BASE_BRANCH }}
+          path: ${{ secrets.SQL_PARSER_REPO_BASE_PATH }}
+          token: ${{ secrets.ACCESS_TOKEN }}
+
+      # 设置OSS
+      - name: Set up oss utils
+        uses: yizhoumo/setup-ossutil@v1
+        with:
+          endpoint: ${{ secrets.OSS_ENDPOINT }}
+          access-key-id: ${{ secrets.OSS_ACCESS_KEY_ID }}
+          access-key-secret: ${{ secrets.OSS_ACCESS_KEY_SECRET }}
+          ossutil-version: '1.7.16'
+
+      # 打包后端工程
+      - name: Build BE Static win
+        if: ${{ runner.os == 'Windows' }}
+          # 在这个步骤中，临时覆盖 JAVA_HOME，让 Maven 使用 JBR
+        env:
+          JAVA_HOME: ${{ env.JBR_BUILD_PATH }}
+        run: |
+          pwd
+          mvn -v 
+          mvn clean install -U -B '-Dmaven.test.skip=true' -f ${{ secrets.REPO_POM_PATH }}
+          # ossutil cp -rf ${{ secrets.REPO_JAR_PATH }} "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/"
+          # cp ${{ secrets.REPO_JAR_PATH }} ${{ secrets.REPO_STATIC_JAR_PATH }} 
+          
+      # 打包后端工程
+      - name: Build BE Static mac
+        if: ${{ runner.os == 'macOS' }}
+        run: |
+          pwd
+          mvn -v 
+          mvn clean install -U -B '-Dmaven.test.skip=true' -f ${{ secrets.REPO_POM_PATH }}
+          # ossutil cp -rf ${{ secrets.REPO_JAR_PATH }} "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/"
+          # cp ${{ secrets.REPO_JAR_PATH }} ${{ secrets.REPO_STATIC_JAR_PATH }}
+          
+
+      # 打包前端资源
+      - name: Build FE Static
+        shell: bash
+        run: |
+          pushd ${{ secrets.REPO_FRONT_PATH }}
+          yarn
+          yarn run build:web:offline --app_version=${{ github.event.inputs.version }}
+          # zip -r dist.zip dist
+          tar -a -c -f dist.zip dist
+          ossutil cp -rf dist.zip "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/"
+          
+          cp -r dist ./static/
+          
+          popd
+          echo "Returned to the original directory. Current path is:"
+          pwd
+          
+          mkdir -p ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile
+          cp ${{ secrets.REPO_FRONT_PATH }}/dist.zip ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile
+          
+          mkdir -p ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/mac
+          mkdir -p ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/win
+          mkdir -p ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/linux
+          cp -r ${{ secrets.REPO_FRONT_PATH }}/dist ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/mac
+          cp -r ${{ secrets.REPO_FRONT_PATH }}/dist ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/win
+          cp -r ${{ secrets.REPO_FRONT_PATH }}/dist ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/linux
+
+          echo "start build version file"
+          sh ${{secrets.JCEF_PROJECT_ROOT}}/generate_metadata.sh  ${{ github.event.inputs.version }}  ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile  https://cdn.chat2db-ai.com/offline/updates
+          cp ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/version.json   ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/local_version.json
+          cp ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/local_version.json ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/mac
+          cp ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/local_version.json ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/win
+          cp ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/local_version.json ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/linux
+          
+          
+      - name: Import Code-Signing Certificate
+        if: ${{ runner.os == 'macOS' }}
+        run: |
+          echo "${{ secrets.MAC_CERTS }}" | base64 --decode > certificate.p12
+          KEYCHAIN_PATH=$RUNNER_TEMP/build.keychain
+          security create-keychain -p "${{ secrets.MAC_CERTS_PASSWORD }}" "$KEYCHAIN_PATH"
+          security default-keychain -s "$KEYCHAIN_PATH"
+          security unlock-keychain -p "${{ secrets.MAC_CERTS_PASSWORD }}" "$KEYCHAIN_PATH"
+          security import certificate.p12 -k "$KEYCHAIN_PATH" -P "${{ secrets.MAC_CERTS_PASSWORD }}" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "${{ secrets.MAC_CERTS_PASSWORD }}" "$KEYCHAIN_PATH"
+          echo "Certificate and key successfully installed."
+
+      - name: Setup Temurin JDK (for jpackage)
+        if: runner.os == 'macOS'
+        id: setup_temurin_mac
+        uses: actions/setup-java@main
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          java-package: 'jdk'
+          architecture: ${{ matrix.arch }}
+          
+      # =================================================================
+      # 【第三阶段】在打包前，将环境切换到 Temurin
+      # =================================================================
+      - name: Switch to Temurin JDK for Packaging
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          echo "Switching active Java environment to Temurin for jpackage..."
+          
+          # 从 setup_temurin 步骤的输出中，获取 Temurin JDK 的安装路径
+          TEMURIN_PATH="${{ steps.setup_temurin.outputs.jdk-path }}"
+          echo "Found Temurin JDK path: $TEMURIN_PATH"
+          
+          # 覆盖 GITHUB_ENV 和 GITHUB_PATH，让后续步骤使用 Temurin
+          echo "JAVA_HOME=$TEMURIN_PATH" >> $GITHUB_ENV
+          echo "$TEMURIN_PATH/bin" >> $GITHUB_PATH
+          echo "Environment switched. Subsequent steps will use Temurin JDK."    
+
+
+      - name: package mac arm64
+        if: ${{ runner.os == 'macOS' && matrix.arch == 'arm64' }}
+        run: |
+          sh ${{secrets.JCEF_PROJECT_ROOT}}/package_macos.sh  ${{ github.event.inputs.version }} "${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg"
+          
+      - name: package mac x86_64   
+        if: ${{ runner.os == 'macOS' && matrix.arch == 'x86_64' }}
+        run: |
+          sh ${{secrets.JCEF_PROJECT_ROOT}}/package_macos.sh  ${{ github.event.inputs.version }} ${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.dmg
+          
+        # 公证&签名 Mac App
+      - name: Notarize MacOS x86_64 App
+        if: matrix.os == 'macos-latest' && matrix.arch == 'x86_64'
+        run: |
+          xcrun notarytool store-credentials ${{ secrets.PRODUCT_BASE_NAME }} --apple-id "${{ secrets.MAC_APPLE_ID }}" --password "${{ secrets.MAC_APPLE_PASSWORD }}" --team-id "${{ secrets.MAC_TEAM_ID }}"
+          xcrun notarytool submit ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.dmg --keychain-profile ${{ secrets.PRODUCT_BASE_NAME }} --wait --verbose
+          ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/*-x64.dmg "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/"
+          # ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/version.json "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/"
+          # ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/*.jar "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/"
+          # ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/*.zip "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/"
+          echo "oss successful"
+      # 公证&签名 Mac App
+      - name: Notarize MacOS ARM App
+        if: matrix.os == 'macos-latest' && matrix.arch == 'arm64'
+        run: |
+          xcrun notarytool store-credentials ${{ secrets.PRODUCT_BASE_NAME }} --apple-id "${{ secrets.MAC_APPLE_ID }}" --password "${{ secrets.MAC_APPLE_PASSWORD }}" --team-id "${{ secrets.MAC_TEAM_ID }}"
+          xcrun notarytool submit ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg --keychain-profile ${{ secrets.PRODUCT_BASE_NAME }} --wait --verbose
+          ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/*-arm64.dmg "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/"
+          ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/version.json "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/"
+          ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/*.jar "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/"
+          ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/*.zip "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/"
+          echo "oss successful"
+          
+
+      - name: package win x64
+        if: ${{ runner.os == 'Windows' }}
+        shell: bash 
+        run: |
+          # sh ${{secrets.JCEF_PROJECT_ROOT}}/package_win.sh  ${{ github.event.inputs.version }} "${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg"
+          sh ${{secrets.JCEF_PROJECT_ROOT}}/package_win.sh  ${{ github.event.inputs.version }}
+          # ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/*.exe "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/"
+          # echo "oss successful"
+    
+      # 准备发往OSS的文件
+      - name: Prepare upload for OSS
+        if: ${{ runner.os == 'Windows' }}
+        run: |
+          pwd
+          mkdir -p  ${{ secrets.REPO_FRONT_PATH }}/release
+          cp -r ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe ${{ secrets.REPO_FRONT_PATH }}/release
+          ls ${{ secrets.REPO_FRONT_PATH }}/release 
+          cp -r ${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe ${{ github.workspace }}
+      - name: Install WinSCP
+        if: ${{ runner.os == 'Windows' }}
+        run: |
+          choco install winscp
+
+      # 上传文件到OSS准备
+      - name: Upload to OSS for windows
+        if: matrix.os == 'windows-latest'
+        run: |
+          # ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe" "oss://${{ secrets.BUCKET_NAME }}/offline/${{ github.event.inputs.version }}/temp/"
+          ossutil cp -rf "${{ github.workspace }}/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe" "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/temp/"
+
+      # 上传文件到远程服务器
+      - name: Copy files to remote server
+        if: ${{ runner.os == 'Windows' }}
+        timeout-minutes: 15
+        env:
+          SCP_PASSWORD: ${{ secrets.WIN_SSH_PRIVATE_KEY }}
+          REMOTE_HOST: ${{ secrets.WIN_SERVER_IP }}
+          REMOTE_USER: ${{ secrets.WIN_SERVER_USER }}
+          REMOTE_PATH: '${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe'
+          REMOTE_OSS: ${{ secrets.REMOTE_SIGN_SCRIPT_OSS }}
+          HOST_KEY: ${{ secrets.HOST_KEY }}
+          FILE_TO_UPLOAD: '${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe'
+          REMOTE_SCRIPT_PATH_1: '${{ secrets.REMOTE_SIGN_SCRIPT }} --alg SHA-1 ${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe'
+          REMOTE_SCRIPT_PATH_2: '${{ secrets.REMOTE_SIGN_SCRIPT }} --alg SHA-256 ${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe'
+          LOCAL_DOWNLOAD_PATH: '${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe'
+        run: |
+          winscp.com /log=winscp.log /command `
+            "option batch abort" `
+            "option confirm off" `
+            "open scp://${{ env.REMOTE_USER }}:${{ env.SCP_PASSWORD }}@${{ env.REMOTE_HOST }} -hostkey=*" `
+            "call ${{ env.REMOTE_OSS }} oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/temp/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe ${env:REMOTE_PATH}" `
+            "call ${env:REMOTE_SCRIPT_PATH_1}" `
+            "call ${env:REMOTE_SCRIPT_PATH_2}" `
+            "call ${{ env.REMOTE_OSS }} ${env:REMOTE_PATH} oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe " `
+            "exit"
