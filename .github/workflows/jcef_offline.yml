@@ -544,7 +544,25 @@ jobs:
           # ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/*.jar "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/"
           # ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/*.zip "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/"
           echo "oss successful"
+
+      - name: upload jar and web zip to oss (using PowerShell and ossutil filter)
+        if: ${{ runner.os == 'Windows' }}
+        shell: pwsh
+        run: |
+          # 1. 定义变量
+          $SourceDir = "${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile" # PowerShell也能很好地处理正斜杠
+          $DestURL = "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/"
           
+          # 2. 上传 version.json
+          Write-Host "Uploading version.json..."
+          ossutil cp -f "${SourceDir}/version.json" "${DestURL}"
+          
+          # 3. 【推荐】一次性递归上传整个目录，但只包含 .jar 和 .zip 文件
+          #    -r 表示递归, -f 表示强制, --include 是过滤器
+          Write-Host "Uploading *.jar and *.zip files..."
+          ossutil cp -r -f "${SourceDir}" "${DestURL}" --include "*.jar" --include "*.zip"
+          
+          Write-Host "oss upload successful"    
 
       - name: package win x64
         if: ${{ runner.os == 'Windows' }}
