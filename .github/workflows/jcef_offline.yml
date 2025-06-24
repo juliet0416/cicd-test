@@ -515,12 +515,12 @@ jobs:
       - name: package mac arm64
         if: ${{ runner.os == 'macOS' && matrix.arch == 'arm64' }}
         run: |
-          sh ${{secrets.JCEF_PROJECT_ROOT}}/package_macos.sh  ${{ github.event.inputs.version }} "${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg"
+          sh ${{secrets.JCEF_PROJECT_ROOT}}/package_macos_offline.sh  ${{ github.event.inputs.version }} "${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg"
           
       - name: package mac x86_64   
         if: ${{ runner.os == 'macOS' && matrix.arch == 'x86_64' }}
         run: |
-          sh ${{secrets.JCEF_PROJECT_ROOT}}/package_macos.sh  ${{ github.event.inputs.version }} ${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.dmg
+          sh ${{secrets.JCEF_PROJECT_ROOT}}/package_macos_offline.sh  ${{ github.event.inputs.version }} ${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.dmg
           
         # 公证&签名 Mac App
       - name: Notarize MacOS x86_64 App
@@ -540,9 +540,9 @@ jobs:
           xcrun notarytool store-credentials ${{ secrets.PRODUCT_BASE_NAME }} --apple-id "${{ secrets.MAC_APPLE_ID }}" --password "${{ secrets.MAC_APPLE_PASSWORD }}" --team-id "${{ secrets.MAC_TEAM_ID }}"
           xcrun notarytool submit ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg --keychain-profile ${{ secrets.PRODUCT_BASE_NAME }} --wait --verbose
           ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/*-arm64.dmg "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/"
-          ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/version.json "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/"
-          ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/*.jar "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/"
-          ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/*.zip "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/"
+          # ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/version.json "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/"
+          # ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/*.jar "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/"
+          # ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/*.zip "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/"
           echo "oss successful"
           
 
@@ -551,7 +551,7 @@ jobs:
         shell: bash 
         run: |
           # sh ${{secrets.JCEF_PROJECT_ROOT}}/package_win.sh  ${{ github.event.inputs.version }} "${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg"
-          sh ${{secrets.JCEF_PROJECT_ROOT}}/package_win.sh  ${{ github.event.inputs.version }}
+          sh ${{secrets.JCEF_PROJECT_ROOT}}/package_win_offline.sh  ${{ github.event.inputs.version }}
           # ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/*.exe "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/"
           # echo "oss successful"
     
