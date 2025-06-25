@@ -92,6 +92,7 @@ jobs:
           cache: 'maven'    
           
       - name: Install WiX Toolset v3.14 via Chocolatey
+        if: runner.os == 'Windows'
         run: |
           # 安装指定版本的 WiX Toolset。jpackage 通常会自动在 PATH 中找到它。
           choco install wixtoolset --version=3.14 -y --force
