@@ -85,7 +85,7 @@ jobs:
           Write-Host "Downloading and extracting custom OpenJDK..."
           
           # 1. 定义下载地址和目标文件名
-          $url = "https://mirrors.huaweicloud.com/openjdk/17.0.2/openjdk-17.0.2_windows-x64_bin.zip"
+          $url = "https://download.java.net/java/GA/jdk17.0.2/dfd4a8d0985749f896bed50d7138ee7f/8/GPL/openjdk-17.0.2_windows-x64_bin.zip"
           $outputFile = "openjdk.zip"
           $extractDir = "openjdk-custom"
 
