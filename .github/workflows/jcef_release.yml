@@ -91,38 +91,35 @@ jobs:
           # 设置 Maven 缓存以加速构建
           cache: 'maven'    
           
-      - name: Install WiX Toolset v3.14 via Chocolatey
-        if: runner.os == 'Windows'
-        run: |
-          echo "Installing WiX Toolset v3.14..."
-          choco install wixtoolset --version=3.14 -y --force
-          echo "Installation command finished."
-
-      # 新增的验证和设置路径步骤 (非常关键！)
-      - name: Verify WiX installation and Add to PATH
-        id: verify_wix # 给这个步骤一个 id，方便调试
-        if: runner.os == 'Windows'
+      # 步骤一：自定义下载您需要的版本 (例如 WiX v3.14.1)
+      - name: 1. Custom Download WiX Toolset
         shell: pwsh
         run: |
-          echo "Verifying WiX installation path..."
-          # 使用 where.exe 命令找出 candle.exe 的完整路径
-          try {
-            $WIX_PATH_FULL = (where.exe candle).Path
-            echo "Found candle.exe at: $WIX_PATH_FULL"
-            
-            # 从完整路径中提取出目录路径
-            $WIX_BIN_DIR = Split-Path -Path $WIX_PATH_FULL -Parent
-            echo "WiX bin directory is: $WIX_BIN_DIR"
-            
-            # 将这个目录显式地添加到 GITHUB_PATH，确保后续步骤能找到它
-            echo "Adding $WIX_BIN_DIR to GITHUB_PATH"
-            echo "$WIX_BIN_DIR" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-            echo "::set-output name=wix_found::true"
-          } catch {
-            echo "::error::Could not find candle.exe after installation. WiX Toolset might not be installed correctly."
-            exit 1
-          }
+          $WIX_VERSION_URL = "https://github.com/wixtoolset/wix3/releases/download/wix314rtm/wix314-binaries.zip"
+          $WIX_INSTALL_DIR = "D:\wix_custom"
+          
+          echo "Downloading custom WiX version from $WIX_VERSION_URL"
+          Invoke-WebRequest -Uri $WIX_VERSION_URL -OutFile "wix.zip"
+          
+          echo "Extracting to $WIX_INSTALL_DIR"
+          7z x wix.zip -o"$WIX_INSTALL_DIR" -y
 
+      # 步骤二：执行“临时切换”（将自定义版本路径置于 PATH 最前面）
+      - name: 2. Temporarily Switch to Custom WiX Version
+        shell: pwsh
+        run: |
+          $WIX_BIN_DIR = "D:\wix_custom\bin"
+          echo "Switching PATH to prioritize '$WIX_BIN_DIR'"
+          # echo ... >> $env:GITHUB_PATH 是 GitHub Actions 中实现“临时切换”的标准命令
+          echo "$WIX_BIN_DIR" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+      
+      # 步骤三：（可选但强烈推荐）验证切换是否成功
+      - name: 3. Verify the Switch
+        run: |
+          echo "Verifying which 'candle.exe' will be used:"
+          # 这个命令的输出应该指向我们自定义下载的路径，证明“切换”成功
+          where.exe candle
+          
       # =================================================================
       # 【第一阶段】准备环境：将 JBR 设置为默认，并安装好 Temurin
       # =================================================================
