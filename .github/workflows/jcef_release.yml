@@ -84,8 +84,8 @@ jobs:
         id: setup_temurin
         uses: actions/setup-java@main
         with:
-          java-version: '17'
-          distribution: 'openjdk'
+          java-version: '17.0.11'
+          distribution: 'temurin'
           # 确保安装的是完整的 JDK，以便包含 jpackage
           java-package: 'jdk'
           # 设置 Maven 缓存以加速构建
