@@ -78,18 +78,29 @@ jobs:
           echo "JBR_BUILD_PATH=$jbrPath" >> $env:GITHUB_ENV
           Write-Host "JBR for compilation is ready at: $jbrPath"
           
-      - name: Setup Temurin JDK (for Packaging with jpackage)
+      - name: Setup Custom OpenJDK and Set Unique Environment Variable
         if: runner.os == 'Windows'
-        # 【重要】给这个步骤一个 ID，以便后续引用它的输出
-        id: setup_temurin
-        uses: actions/setup-java@main
-        with:
-          java-version: '17'
-          distribution: 'adopt'
-          # 确保安装的是完整的 JDK，以便包含 jpackage
-          java-package: 'jdk'
-          # 设置 Maven 缓存以加速构建
-          cache: 'maven'    
+        shell: pwsh
+        run: |
+          Write-Host "Downloading and extracting custom OpenJDK..."
+          
+          # 1. 定义下载地址和目标文件名
+          $url = "https://mirrors.huaweicloud.com/openjdk/17.0.2/openjdk-17.0.2_windows-x64_bin.zip"
+          $outputFile = "openjdk.zip"
+          $extractDir = "openjdk-custom"
+
+          # 2. 下载并解压
+          curl.exe -L -o $outputFile "$url"
+          New-Item -Path $extractDir -ItemType Directory -Force
+          7z.exe x $outputFile -o"$extractDir" -y
+
+          # 3. 动态获取解压后的 JDK 主目录路径
+          $jdkHome = Get-ChildItem -Path $extractDir | Select-Object -First 1 | ForEach-Object { $_.FullName }
+          Write-Host "Resolved OpenJDK home path: $jdkHome"
+
+          # 4. 【已修改】将路径保存到一个唯一的环境变量中，而不是直接设置 JAVA_HOME
+          echo "OPENJDK_PATH=$jdkHome" >> $env:GITHUB_ENV
+          Write-Host "Custom OpenJDK path saved to OPENJDK_PATH for subsequent steps."
           
 
       # =================================================================
@@ -588,6 +599,9 @@ jobs:
       - name: package win x64
         if: ${{ runner.os == 'Windows' }}
         shell: bash 
+        env:
+          # 在这个步骤中，临时将 JAVA_HOME 设置为 OpenJDK 的路径
+          JAVA_HOME: ${{ env.OPENJDK_PATH }}
         run: |
           # sh ${{secrets.JCEF_PROJECT_ROOT}}/package_win.sh  ${{ github.event.inputs.version }} "${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg"
           sh ${{secrets.JCEF_PROJECT_ROOT}}/package_win.sh  ${{ github.event.inputs.version }}
