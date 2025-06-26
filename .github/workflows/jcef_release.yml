@@ -91,11 +91,37 @@ jobs:
           # 设置 Maven 缓存以加速构建
           cache: 'maven'    
           
-      - name: 3. Setup WiX Toolset v3.14
-        uses: wixtoolset/wix-actions/setup-wix@v1
-        with:
-          # 在这里指定你需要的 WiX Toolset 版本
-          wix-version: 'v3.14'
+      - name: Install WiX Toolset v3.14 via Chocolatey
+        if: runner.os == 'Windows'
+        run: |
+          echo "Installing WiX Toolset v3.14..."
+          choco install wixtoolset --version=3.14 -y --force
+          echo "Installation command finished."
+
+      # 新增的验证和设置路径步骤 (非常关键！)
+      - name: Verify WiX installation and Add to PATH
+        id: verify_wix # 给这个步骤一个 id，方便调试
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          echo "Verifying WiX installation path..."
+          # 使用 where.exe 命令找出 candle.exe 的完整路径
+          try {
+            $WIX_PATH_FULL = (where.exe candle).Path
+            echo "Found candle.exe at: $WIX_PATH_FULL"
+            
+            # 从完整路径中提取出目录路径
+            $WIX_BIN_DIR = Split-Path -Path $WIX_PATH_FULL -Parent
+            echo "WiX bin directory is: $WIX_BIN_DIR"
+            
+            # 将这个目录显式地添加到 GITHUB_PATH，确保后续步骤能找到它
+            echo "Adding $WIX_BIN_DIR to GITHUB_PATH"
+            echo "$WIX_BIN_DIR" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+            echo "::set-output name=wix_found::true"
+          } catch {
+            echo "::error::Could not find candle.exe after installation. WiX Toolset might not be installed correctly."
+            exit 1
+          }
 
       # =================================================================
       # 【第一阶段】准备环境：将 JBR 设置为默认，并安装好 Temurin
