@@ -91,11 +91,11 @@ jobs:
           # 设置 Maven 缓存以加速构建
           cache: 'maven'    
           
-      - name: Install WiX Toolset v3.14 via Chocolatey
-        if: runner.os == 'Windows'
-        run: |
-          # 安装指定版本的 WiX Toolset。jpackage 通常会自动在 PATH 中找到它。
-          choco install wixtoolset --version=3.14 -y --force
+      - name: 3. Setup WiX Toolset v3.14
+        uses: wixtoolset/wix-actions/setup-wix@v1
+        with:
+          # 在这里指定你需要的 WiX Toolset 版本
+          wix-version: 'v3.14'
 
       # =================================================================
       # 【第一阶段】准备环境：将 JBR 设置为默认，并安装好 Temurin
