@@ -103,20 +103,20 @@ jobs:
           Write-Host "Custom OpenJDK path saved to OPENJDK_PATH for subsequent steps."
 
           
-      - name: test jpackage win x64
-        if: ${{ runner.os == 'Windows' }}
-        shell: bash 
-        env:
-          # 在这个步骤中，临时将 JAVA_HOME 设置为 OpenJDK 的路径
-          JAVA_HOME: ${{ env.OPENJDK_PATH }}
-          PATH: ${{ env.OPENJDK_PATH }}/bin:$PATH
-        run: |
-          java -version 
-          jpackage --help 
-          # sh ${{secrets.JCEF_PROJECT_ROOT}}/package_win.sh  ${{ github.event.inputs.version }} "${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg"
-          sh ${{secrets.JCEF_PROJECT_ROOT}}/package_win.sh  ${{ github.event.inputs.version }}
-          # ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/*.exe "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/"
-          # echo "oss successful"    
+      # - name: test jpackage win x64
+      #   if: ${{ runner.os == 'Windows' }}
+      #   shell: bash 
+      #   env:
+      #     # 在这个步骤中，临时将 JAVA_HOME 设置为 OpenJDK 的路径
+      #     JAVA_HOME: ${{ env.OPENJDK_PATH }}
+      #     PATH: ${{ env.OPENJDK_PATH }}/bin:$PATH
+      #   run: |
+      #     java -version 
+      #     jpackage --help 
+      #     # sh ${{secrets.JCEF_PROJECT_ROOT}}/package_win.sh  ${{ github.event.inputs.version }} "${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg"
+      #     sh ${{secrets.JCEF_PROJECT_ROOT}}/package_win.sh  ${{ github.event.inputs.version }}
+      #     # ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/*.exe "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/"
+      #     # echo "oss successful"    
           
 
       # =================================================================
@@ -618,6 +618,7 @@ jobs:
         env:
           # 在这个步骤中，临时将 JAVA_HOME 设置为 OpenJDK 的路径
           JAVA_HOME: ${{ env.OPENJDK_PATH }}
+          PATH: ${{ env.OPENJDK_PATH }}/bin:$PATH
         run: |
           # sh ${{secrets.JCEF_PROJECT_ROOT}}/package_win.sh  ${{ github.event.inputs.version }} "${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg"
           sh ${{secrets.JCEF_PROJECT_ROOT}}/package_win.sh  ${{ github.event.inputs.version }}
