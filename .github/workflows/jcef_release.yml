@@ -110,7 +110,7 @@ jobs:
           # 在这个步骤中，临时将 JAVA_HOME 设置为 OpenJDK 的路径
           JAVA_HOME: ${{ env.OPENJDK_PATH }}
         run: |
-          java --version 
+          java -version 
           jpackage --help 
           # sh ${{secrets.JCEF_PROJECT_ROOT}}/package_win.sh  ${{ github.event.inputs.version }} "${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg"
           sh ${{secrets.JCEF_PROJECT_ROOT}}/package_win.sh  ${{ github.event.inputs.version }}
