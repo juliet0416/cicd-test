@@ -109,6 +109,7 @@ jobs:
         env:
           # 在这个步骤中，临时将 JAVA_HOME 设置为 OpenJDK 的路径
           JAVA_HOME: ${{ env.OPENJDK_PATH }}
+          PATH: ${{ env.OPENJDK_PATH }}/bin:$PATH
         run: |
           java -version 
           jpackage --help 
