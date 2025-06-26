@@ -85,42 +85,12 @@ jobs:
         uses: actions/setup-java@main
         with:
           java-version: '17'
-          distribution: 'temurin'
+          distribution: 'openjdk'
           # 确保安装的是完整的 JDK，以便包含 jpackage
           java-package: 'jdk'
           # 设置 Maven 缓存以加速构建
           cache: 'maven'    
           
-      # 步骤一：自定义下载您需要的版本 (例如 WiX v3.14.1)
-      - name: 1. Custom Download WiX Toolset
-        shell: pwsh
-        run: |
-          $WIX_VERSION_URL = "https://github.com/wixtoolset/wix3/releases/download/wix314rtm/wix314-binaries.zip"
-          $WIX_INSTALL_DIR = "D:\wix_custom"
-          
-          echo "Downloading custom WiX version from $WIX_VERSION_URL"
-          Invoke-WebRequest -Uri $WIX_VERSION_URL -OutFile "wix.zip"
-          
-          echo "Extracting to $WIX_INSTALL_DIR"
-          7z x wix.zip -o"$WIX_INSTALL_DIR" -y
-
-          # --- 2. 在当前会话中强制切换 PATH ---
-          # 这是最关键的一行！它直接修改当前 PowerShell 会话的 PATH 变量。
-          $WIX_BIN_DIR = "$WIX_INSTALL_DIR\bin"
-          $env:PATH = "$WIX_BIN_DIR;" + $env:PATH
-          echo "PATH has been temporarily prepended with: $WIX_BIN_DIR"
-
-          # --- 3. 在同一会话中立即验证 ---
-          # 这一次的输出一定会是我们自定义的路径
-          echo "Verifying the switch within the same step..."
-          $WIX_LOCATION = where.exe candle
-          echo "Verification successful. 'candle.exe' is now at: $WIX_LOCATION"
-          
-          # 确认找到的是自定义版本，如果不是则报错退出
-          if (-not $WIX_LOCATION.Path.StartsWith($WIX_INSTALL_DIR)) {
-            echo "::error::Failed to switch to custom WiX version. Exiting."
-            exit 1
-          }
 
       # =================================================================
       # 【第一阶段】准备环境：将 JBR 设置为默认，并安装好 Temurin
