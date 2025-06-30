@@ -77,6 +77,30 @@ jobs:
           $jbrPath = Resolve-Path -Path "jbr-for-build"
           echo "JBR_BUILD_PATH=$jbrPath" >> $env:GITHUB_ENV
           Write-Host "JBR for compilation is ready at: $jbrPath"
+
+      - name: Setup Custom OpenJDK and Set Unique Environment Variable
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Write-Host "Downloading and extracting custom OpenJDK..."
+          
+          # 1. 定义下载地址和目标文件名
+          $url = "https://download.java.net/java/GA/jdk17.0.2/dfd4a8d0985749f896bed50d7138ee7f/8/GPL/openjdk-17.0.2_windows-x64_bin.zip"
+          $outputFile = "openjdk.zip"
+          $extractDir = "openjdk-custom"
+
+          # 2. 下载并解压
+          curl.exe -L -o $outputFile "$url"
+          New-Item -Path $extractDir -ItemType Directory -Force
+          7z.exe x $outputFile -o"$extractDir" -y
+
+          # 3. 动态获取解压后的 JDK 主目录路径
+          $jdkHome = Get-ChildItem -Path $extractDir | Select-Object -First 1 | ForEach-Object { $_.FullName }
+          Write-Host "Resolved OpenJDK home path: $jdkHome"
+
+          # 4. 【已修改】将路径保存到一个唯一的环境变量中，而不是直接设置 JAVA_HOME
+          echo "OPENJDK_PATH=$jdkHome" >> $env:GITHUB_ENV
+          Write-Host "Custom OpenJDK path saved to OPENJDK_PATH for subsequent steps."    
           
       - name: Setup Temurin JDK (for Packaging with jpackage)
         if: runner.os == 'Windows'
