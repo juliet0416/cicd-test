@@ -465,6 +465,7 @@ jobs:
 
       # 打包前端资源
       - name: Build FE Static
+        if: runner.os != 'Windows'
         shell: bash
         run: |
           pushd ${{ secrets.REPO_FRONT_PATH }}
@@ -496,7 +497,46 @@ jobs:
           cp ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/local_version.json ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/mac
           cp ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/local_version.json ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/win
           cp ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/local_version.json ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/linux
+
+
+       # Step specifically for Windows
+      - name: Build FE Static (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          pushd ${{ secrets.REPO_FRONT_PATH }}
+          yarn
+          yarn run build:web:desktop --app_version=${{ github.event.inputs.version }}
           
+          # 【已修改】在 Windows 上，使用 7-Zip 创建标准的 zip 文件，避免编码问题
+          # 7-Zip is pre-installed on GitHub's Windows runners
+          7z a -tzip dist.zip ./dist
+          
+          ossutil cp -rf dist.zip "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/"
+          cp -r dist ./static/
+          popd
+          
+          echo "Returned to the original directory. Current path is:"
+          pwd
+          
+          # The rest of the script is the same, as the commands are compatible
+          mkdir -p ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile
+          cp ${{ secrets.REPO_FRONT_PATH }}/dist.zip ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile
+          
+          mkdir -p ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/mac
+          mkdir -p ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/win
+          mkdir -p ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/linux
+          cp -r ${{ secrets.REPO_FRONT_PATH }}/dist ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/mac
+          cp -r ${{ secrets.REPO_FRONT_PATH }}/dist ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/win
+          cp -r ${{ secrets.REPO_FRONT_PATH }}/dist ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/linux
+
+          echo "start build version file"
+          sh ${{secrets.JCEF_PROJECT_ROOT}}/generate_metadata.sh ${{ github.event.inputs.version }} ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile https://cdn.chat2db-ai.com/download/updates
+          cp ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/version.json ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/local_version.json
+          cp ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/local_version.json ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/mac
+          cp ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/local_version.json ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/win
+          cp ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/local_version.json ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/linux
+    
           
       - name: Import Code-Signing Certificate
         if: ${{ runner.os == 'macOS' }}
