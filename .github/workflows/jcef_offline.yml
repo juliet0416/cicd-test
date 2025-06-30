@@ -596,6 +596,10 @@ jobs:
       - name: package win x64
         if: ${{ runner.os == 'Windows' }}
         shell: bash 
+        env:
+          # 在这个步骤中，临时将 JAVA_HOME 设置为 OpenJDK 的路径
+          JAVA_HOME: ${{ env.OPENJDK_PATH }}
+          PATH: ${{ env.OPENJDK_PATH }}/bin:$PATH
         run: |
           # sh ${{secrets.JCEF_PROJECT_ROOT}}/package_win.sh  ${{ github.event.inputs.version }} "${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg"
           sh ${{secrets.JCEF_PROJECT_ROOT}}/package_win_offline.sh  ${{ github.event.inputs.version }}
