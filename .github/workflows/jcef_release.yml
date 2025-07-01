@@ -473,7 +473,7 @@ jobs:
           yarn run build:web:desktop --app_version=${{ github.event.inputs.version }}
           # zip -r dist.zip dist
           tar -a -c -f dist.zip dist
-          ossutil cp -rf dist.zip "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/"
+          # ossutil cp -rf dist.zip "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/"
           
           cp -r dist ./static/
           
@@ -512,7 +512,7 @@ jobs:
           # 7-Zip is pre-installed on GitHub's Windows runners
           7z a -tzip dist.zip ./dist
           
-          ossutil cp -rf dist.zip "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/"
+          # ossutil cp -rf dist.zip "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/"
           cp -r dist ./static/
           popd
           
