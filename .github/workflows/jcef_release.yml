@@ -735,7 +735,7 @@ jobs:
 
       - name: Upload x64 exe to OSS if requested
         # 只有当触发工作流时，传入的 upload_latest 参数值为 'true'，此步骤才会执行
-        if: ${{ runner.os == 'Windows' }} && github.event.inputs.upload_latest == 'true'
+        if: matrix.os == 'windows-latest' && github.event.inputs.upload_latest == 'true'
         run: |
           echo "检测到需要上传 x64 exe，正在执行上传..."
           ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe "oss://${{ secrets.BUCKET_NAME }}/download/latest_test/${{ secrets.PRODUCT_APP_NAME }}-latest.exe"
