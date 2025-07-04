@@ -100,20 +100,7 @@ jobs:
 
           # 4. 【已修改】将路径保存到一个唯一的环境变量中，而不是直接设置 JAVA_HOME
           echo "OPENJDK_PATH=$jdkHome" >> $env:GITHUB_ENV
-          Write-Host "Custom OpenJDK path saved to OPENJDK_PATH for subsequent steps."    
-          
-      - name: Setup Temurin JDK (for Packaging with jpackage)
-        if: runner.os == 'Windows'
-        # 【重要】给这个步骤一个 ID，以便后续引用它的输出
-        id: setup_temurin
-        uses: actions/setup-java@main
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-          # 确保安装的是完整的 JDK，以便包含 jpackage
-          java-package: 'jdk'
-          # 设置 Maven 缓存以加速构建
-          cache: 'maven'    
+          Write-Host "Custom OpenJDK path saved to OPENJDK_PATH for subsequent steps."      
           
       # =================================================================
       # 【第一阶段】准备环境：将 JBR 设置为默认，并安装好 Temurin
