@@ -11,6 +11,11 @@ on:
         description: 'Version number'
         required: true
         default: '1.0.0'
+      upload_latest:
+        description: '是否上传到 latest 目录 (true/false)'
+        required: false   # 设为非必须
+        default: 'false'  # 提供一个默认值
+        type: string
 
 jobs:
   release:
