@@ -595,7 +595,7 @@ jobs:
         run: |
           xcrun notarytool store-credentials ${{ secrets.PRODUCT_BASE_NAME }} --apple-id "${{ secrets.MAC_APPLE_ID }}" --password "${{ secrets.MAC_APPLE_PASSWORD }}" --team-id "${{ secrets.MAC_TEAM_ID }}"
           xcrun notarytool submit ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.dmg --keychain-profile ${{ secrets.PRODUCT_BASE_NAME }} --wait --verbose
-          ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/*-x64.dmg "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/"
+          ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/*-x64.dmg "oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/"
           # ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/version.json "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/"
           # ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/*.jar "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/"
           # ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/*.zip "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/"
@@ -606,7 +606,7 @@ jobs:
         run: |
           xcrun notarytool store-credentials ${{ secrets.PRODUCT_BASE_NAME }} --apple-id "${{ secrets.MAC_APPLE_ID }}" --password "${{ secrets.MAC_APPLE_PASSWORD }}" --team-id "${{ secrets.MAC_TEAM_ID }}"
           xcrun notarytool submit ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg --keychain-profile ${{ secrets.PRODUCT_BASE_NAME }} --wait --verbose
-          ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/*-arm64.dmg "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/"
+          ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/*-arm64.dmg "oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/"
           # ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/version.json "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/"
           # ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/*.jar "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/"
           # ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/*.zip "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/"
@@ -709,7 +709,7 @@ jobs:
             "call ${{ env.REMOTE_OSS }} oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/temp/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe ${env:REMOTE_PATH}" `
             "call ${env:REMOTE_SCRIPT_PATH_1}" `
             "call ${env:REMOTE_SCRIPT_PATH_2}" `
-            "call ${{ env.REMOTE_OSS }} ${env:REMOTE_PATH} oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe " `
+            "call ${{ env.REMOTE_OSS }} ${env:REMOTE_PATH} oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe " `
             "exit"
 
       # # 拉取OSS文件
