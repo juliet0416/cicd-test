@@ -733,20 +733,19 @@ jobs:
             "call ${{ env.REMOTE_OSS }} ${env:REMOTE_PATH} oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe " `
             "exit"
 
+      # 拉取OSS文件
+      - name: Prepare upload for OSS on windows
+        if: ${{ runner.os == 'Windows' }}
+        run: |
+          ossutil cp -rf oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/
+
       - name: Upload x64 exe to OSS if requested
         # 只有当触发工作流时，传入的 upload_latest 参数值为 'true'，此步骤才会执行
         if: matrix.os == 'windows-latest' && github.event.inputs.upload_latest == 'true'
         run: |
           echo "检测到需要上传 x64 exe，正在执行上传..."
           ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe "oss://${{ secrets.BUCKET_NAME }}/download/latest/${{ secrets.PRODUCT_APP_NAME }}-latest.exe"
-           
-
-      # # 拉取OSS文件
-      # - name: Prepare upload for OSS on windows
-      #   if: ${{ runner.os == 'Windows' }}
-      #   run: |
-      #     ossutil cp -rf oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe ${{ secrets.REPO_FRONT_PATH }}/release/
-
+              
       # # 修改windows加签后的yml文件
       # - name: Calculate file hash
       #   if: ${{ runner.os == 'Windows' }}
