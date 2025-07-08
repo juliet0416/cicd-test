@@ -730,6 +730,12 @@ jobs:
             "call ${{ env.REMOTE_OSS }} ${env:REMOTE_PATH} oss://${{ secrets.BUCKET_NAME }}/offline/${{ github.event.inputs.version }}/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe " `
             "exit"
 
+      # 拉取OSS文件
+      - name: Prepare upload for OSS on windows
+        if: ${{ runner.os == 'Windows' }}
+        run: |
+          ossutil cp -rf oss://${{ secrets.BUCKET_NAME }}/offline/${{ github.event.inputs.version }}/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/
+
       - name: Upload x64 exe to OSS if requested
         # 只有当触发工作流时，传入的 upload_latest 参数值为 'true'，此步骤才会执行
         if: matrix.os == 'windows-latest' && github.event.inputs.upload_latest == 'true'
