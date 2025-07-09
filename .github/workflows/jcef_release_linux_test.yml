@@ -42,7 +42,7 @@ jobs:
             file_name: 'latest.deb'
             file_extension: '-x86_64.deb'
             build_arg: '--linux --x64'
-          - os: ubuntu-22.04
+          - os: ubuntu-latest-arm64
             arch: arm64
             file_name: 'arm64-latest.deb'
             file_extension: '-arm64.deb'
