@@ -136,7 +136,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           # 根据 matrix.arch 动态选择要下载的 JBR URL
-          if [ "${{ matrix.arch }}" == "arm64" ]; then
+          if [ ${{ runner.os == 'Linux' && matrix.arch == 'arm64' }} ]; then
             JBR_URL="https://cache-redirector.jetbrains.com/intellij-jbr/jbr_jcef-17.0.12-linux-aarch64-b1207.37.tar.gz"
           else
             JBR_URL="https://cache-redirector.jetbrains.com/intellij-jbr/jbr_jcef-17.0.12-linux-x64-b1207.37.tar.gz"
@@ -580,7 +580,7 @@ jobs:
           ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe "oss://${{ secrets.BUCKET_NAME }}/download/latest/${{ secrets.PRODUCT_APP_NAME }}-latest.exe"
 
        # Install jre Linux x64
-      - name: Install Jre for Linux
+      - name: Install Jre for Linux x64
         if: ${{ runner.os == 'Linux' && matrix.arch == 'x86_64' }}
         uses: actions/setup-java@main
         with:
@@ -589,7 +589,7 @@ jobs:
           java-package: 'jre'
 
       # Install jre Linux arm64
-      - name: Install Jre for Linux
+      - name: Install Jre for Linux arm
         if: ${{ runner.os == 'Linux' && matrix.arch == 'arm64' }}
         uses: actions/setup-java@main
         with:
@@ -602,12 +602,14 @@ jobs:
         if: ${{ runner.os == 'Linux' && matrix.arch == 'arm64' }}
         run: |
           /bin/bash ${{secrets.JCEF_PROJECT_ROOT}}/package_linux.sh  ${{ github.event.inputs.version }} "${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.deb"
-          
+          ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/*.deb "oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/"
+         
       - name: package linux x86_64   
         if: ${{ runner.os == 'Linux' && matrix.arch == 'x86_64' }}
         run: |
           /bin/bash ${{secrets.JCEF_PROJECT_ROOT}}/package_linux.sh  ${{ github.event.inputs.version }} ${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.deb
-          
+          ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/*.deb "oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/"
+      
           
       # # 修改windows加签后的yml文件
       # - name: Calculate file hash
