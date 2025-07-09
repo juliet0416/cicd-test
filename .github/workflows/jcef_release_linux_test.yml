@@ -292,7 +292,7 @@ jobs:
           
       # 打包后端工程
       - name: Build BE Static mac
-        if: ${{ runner.os == 'macOS' }}
+        if: runner.os != 'Windows'
         run: |
           pwd
           mvn -v 
