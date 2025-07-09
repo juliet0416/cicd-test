@@ -601,12 +601,12 @@ jobs:
       - name: package linux arm64
         if: ${{ runner.os == 'Linux' && matrix.arch == 'arm64' }}
         run: |
-          sh ${{secrets.JCEF_PROJECT_ROOT}}/package_linux.sh  ${{ github.event.inputs.version }} "${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.deb"
+          /bin/bash ${{secrets.JCEF_PROJECT_ROOT}}/package_linux.sh  ${{ github.event.inputs.version }} "${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.deb"
           
       - name: package linux x86_64   
         if: ${{ runner.os == 'Linux' && matrix.arch == 'x86_64' }}
         run: |
-          sh ${{secrets.JCEF_PROJECT_ROOT}}/package_linux.sh  ${{ github.event.inputs.version }} ${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.deb
+          /bin/bash ${{secrets.JCEF_PROJECT_ROOT}}/package_linux.sh  ${{ github.event.inputs.version }} ${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.deb
           
           
       # # 修改windows加签后的yml文件
