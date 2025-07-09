@@ -208,13 +208,15 @@ jobs:
           cp -r $JAVA_HOME/../Frameworks ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/mac
           rm -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/mac/Frameworks/cef_server.app
           
-      # Copy jre Windows
+      # Copy jre Linux
       - name: Copy Jre for Linux
         if: ${{ runner.os == 'Linux' }}
         run: |
           echo $JAVA_HOME
           mkdir -p ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/runtime/linux/Home
           cp -r ${{ env.JAVA_HOME }}/* ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/runtime/linux/Home
+          ls ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/runtime/linux/Home
+          rm -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/runtime/linux/Home/legal
           ls ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/runtime/linux/Home
 
       # # Copy jre Linux
