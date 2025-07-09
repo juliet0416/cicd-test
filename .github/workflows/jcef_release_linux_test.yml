@@ -148,7 +148,7 @@ jobs:
           tar -xzf jbr.tar.gz -C jbr-default --strip-components=1
           
           # 获取 JBR 的绝对路径并设置为默认的 JAVA_HOME
-          JBR_HOME_PATH=$(cd jbr-default/Contents/Home && pwd)
+          JBR_HOME_PATH=$(cd jbr-default && pwd)
           echo "Setting default JAVA_HOME to JBR: $JBR_HOME_PATH"
           echo "JAVA_HOME=$JBR_HOME_PATH" >> $GITHUB_ENV
           echo "$JBR_HOME_PATH/bin" >> $GITHUB_PATH     
@@ -208,23 +208,31 @@ jobs:
           cp -r $JAVA_HOME/../Frameworks ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/mac
           rm -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/mac/Frameworks/cef_server.app
           
-
-      # Copy jre Linux
+      # Copy jre Windows
       - name: Copy Jre for Linux
         if: ${{ runner.os == 'Linux' }}
         run: |
-          mkdir -p ${{ secrets.REPO_STATIC_PATH }} 
-          cp -r $JAVA_HOME ${{ secrets.REPO_JRE_PATH }} 
-          chmod -R 777 ${{ secrets.REPO_JRE_PATH }}
+          echo $JAVA_HOME
+          mkdir -p ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/runtime/linux/Home
+          cp -r ${{ env.JAVA_HOME }}/* ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/runtime/linux/Home
+          ls ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/runtime/linux/Home
 
-      # Linux
-      - name: Delete File
-        if: ${{ runner.os == 'Linux' }}
-        run: |
-          cd ${{ secrets.REPO_JRE_PATH }} 
-          ls -la
-          rm -rf legal
-          ls -la
+      # # Copy jre Linux
+      # - name: Copy Jre for Linux
+      #   if: ${{ runner.os == 'Linux' }}
+      #   run: |
+      #     mkdir -p ${{ secrets.REPO_STATIC_PATH }} 
+      #     cp -r $JAVA_HOME ${{ secrets.REPO_JRE_PATH }} 
+      #     chmod -R 777 ${{ secrets.REPO_JRE_PATH }}
+
+      # # Linux
+      # - name: Delete File
+      #   if: ${{ runner.os == 'Linux' }}
+      #   run: |
+      #     cd ${{ secrets.REPO_JRE_PATH }} 
+      #     ls -la
+      #     rm -rf legal
+      #     ls -la
 
       # 安装Node.js
       - name: Install Node.js
