@@ -136,7 +136,8 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           # 根据 matrix.arch 动态选择要下载的 JBR URL
-          if [ ${{ runner.os == 'Linux' && matrix.arch == 'arm64' }} ]; then
+          if [ "${{ matrix.arch }}" == "arm64" ]; then
+            echo "arm64"
             JBR_URL="https://cache-redirector.jetbrains.com/intellij-jbr/jbr_jcef-17.0.12-linux-aarch64-b1207.37.tar.gz"
           else
             JBR_URL="https://cache-redirector.jetbrains.com/intellij-jbr/jbr_jcef-17.0.12-linux-x64-b1207.37.tar.gz"
