@@ -295,6 +295,14 @@ jobs:
       - name: Build BE Static mac
         if: runner.os != 'Windows'
         run: |
+          echo "--- Runner Architecture ---"
+          uname -m
+
+          echo "--- Maven (mvn) Script Type ---"
+          file $(which mvn)
+
+          echo "--- Java Executable Architecture ---"
+          file /home/runner/work/cicd-test/cicd-test/jbr-default/bin/java
           pwd
           mvn -v 
           mvn clean install -U -B '-Dmaven.test.skip=true' -f ${{ secrets.REPO_POM_PATH }}
