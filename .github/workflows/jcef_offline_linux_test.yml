@@ -429,19 +429,19 @@ jobs:
       - name: package mac arm64
         if: ${{ runner.os == 'macOS' && matrix.arch == 'arm64' }}
         run: |
-          sh ${{secrets.JCEF_PROJECT_ROOT}}/package_macos.sh  ${{ github.event.inputs.version }} "${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg"
+          sh ${{secrets.JCEF_PROJECT_ROOT}}/package_macos.sh  ${{ github.event.inputs.version }} "${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg"
           
       - name: package mac x86_64   
         if: ${{ runner.os == 'macOS' && matrix.arch == 'x86_64' }}
         run: |
-          sh ${{secrets.JCEF_PROJECT_ROOT}}/package_macos.sh  ${{ github.event.inputs.version }} ${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.dmg
+          sh ${{secrets.JCEF_PROJECT_ROOT}}/package_macos.sh  ${{ github.event.inputs.version }} ${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.dmg
           
         # 公证&签名 Mac App
       - name: Notarize MacOS x86_64 App
         if: matrix.os == 'macos-latest' && matrix.arch == 'x86_64'
         run: |
           xcrun notarytool store-credentials ${{ secrets.PRODUCT_BASE_NAME }} --apple-id "${{ secrets.MAC_APPLE_ID }}" --password "${{ secrets.MAC_APPLE_PASSWORD }}" --team-id "${{ secrets.MAC_TEAM_ID }}"
-          xcrun notarytool submit ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.dmg --keychain-profile ${{ secrets.PRODUCT_BASE_NAME }} --wait --verbose
+          xcrun notarytool submit ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.dmg --keychain-profile ${{ secrets.PRODUCT_BASE_NAME }} --wait --verbose
           ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/*-x64.dmg "oss://${{ secrets.BUCKET_NAME }}/offline/${{ github.event.inputs.version }}/"
           # ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/version.json "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/"
           # ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/*.jar "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/"
@@ -452,7 +452,7 @@ jobs:
         if: matrix.os == 'macos-latest' && matrix.arch == 'arm64'
         run: |
           xcrun notarytool store-credentials ${{ secrets.PRODUCT_BASE_NAME }} --apple-id "${{ secrets.MAC_APPLE_ID }}" --password "${{ secrets.MAC_APPLE_PASSWORD }}" --team-id "${{ secrets.MAC_TEAM_ID }}"
-          xcrun notarytool submit ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg --keychain-profile ${{ secrets.PRODUCT_BASE_NAME }} --wait --verbose
+          xcrun notarytool submit ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg --keychain-profile ${{ secrets.PRODUCT_BASE_NAME }} --wait --verbose
           ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/*-arm64.dmg "oss://${{ secrets.BUCKET_NAME }}/offline/${{ github.event.inputs.version }}/"
           # ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/version.json "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/"
           # ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/*.jar "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/"
@@ -464,7 +464,7 @@ jobs:
         if: matrix.os == 'macos-latest' && matrix.arch == 'arm64' && github.event.inputs.upload_latest == 'true'
         run: |
           echo "检测到需要上传 arm64 DMG，正在执行上传..."
-          ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg "oss://${{ secrets.BUCKET_NAME }}/offline/latest/${{ secrets.PRODUCT_APP_NAME }}-arm64-latest.dmg"
+          ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg "oss://${{ secrets.BUCKET_NAME }}/offline/latest/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-arm64-latest.dmg"
 
 
       - name: Upload x64 DMG to OSS if requested
@@ -472,7 +472,7 @@ jobs:
         if: matrix.os == 'macos-latest' && matrix.arch == 'x86_64' && github.event.inputs.upload_latest == 'true'
         run: |
           echo "检测到需要上传 arm64 DMG，正在执行上传..."
-          ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.dmg "oss://${{ secrets.BUCKET_NAME }}/offline/latest/${{ secrets.PRODUCT_APP_NAME }}-latest.dmg"
+          ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.dmg "oss://${{ secrets.BUCKET_NAME }}/offline/latest/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-latest.dmg"
      
           
       # - name: upload jar and web zip to oss 
@@ -523,7 +523,7 @@ jobs:
           JAVA_HOME: ${{ env.OPENJDK_PATH }}
           PATH: ${{ env.OPENJDK_PATH }}/bin:$PATH
         run: |
-          # sh ${{secrets.JCEF_PROJECT_ROOT}}/package_win.sh  ${{ github.event.inputs.version }} "${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg"
+          # sh ${{secrets.JCEF_PROJECT_ROOT}}/package_win.sh  ${{ github.event.inputs.version }} "${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg"
           sh ${{secrets.JCEF_PROJECT_ROOT}}/package_win.sh  ${{ github.event.inputs.version }}
           # ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/*.exe "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/"
           # echo "oss successful"
@@ -534,9 +534,9 @@ jobs:
         run: |
           pwd
           mkdir -p  ${{ secrets.REPO_FRONT_PATH }}/release
-          cp -r ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe ${{ secrets.REPO_FRONT_PATH }}/release
+          cp -r ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe ${{ secrets.REPO_FRONT_PATH }}/release
           ls ${{ secrets.REPO_FRONT_PATH }}/release 
-          cp -r ${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe ${{ github.workspace }}
+          cp -r ${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe ${{ github.workspace }}
       - name: Install WinSCP
         if: ${{ runner.os == 'Windows' }}
         run: |
@@ -546,8 +546,8 @@ jobs:
       - name: Upload to OSS for windows
         if: matrix.os == 'windows-latest'
         run: |
-          # ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe" "oss://${{ secrets.BUCKET_NAME }}/offline/${{ github.event.inputs.version }}/temp/"
-          ossutil cp -rf "${{ github.workspace }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe" "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/temp/"
+          # ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe" "oss://${{ secrets.BUCKET_NAME }}/offline/${{ github.event.inputs.version }}/temp/"
+          ossutil cp -rf "${{ github.workspace }}/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe" "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/temp/"
 
       # 上传文件到远程服务器
       - name: Copy files to remote server
@@ -557,36 +557,36 @@ jobs:
           SCP_PASSWORD: ${{ secrets.WIN_SSH_PRIVATE_KEY }}
           REMOTE_HOST: ${{ secrets.WIN_SERVER_IP }}
           REMOTE_USER: ${{ secrets.WIN_SERVER_USER }}
-          REMOTE_PATH: '${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe'
+          REMOTE_PATH: '${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe'
           REMOTE_OSS: ${{ secrets.REMOTE_SIGN_SCRIPT_OSS }}
           HOST_KEY: ${{ secrets.HOST_KEY }}
-          FILE_TO_UPLOAD: '${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe'
-          REMOTE_SCRIPT_PATH_1: '${{ secrets.REMOTE_SIGN_SCRIPT }} --alg SHA-1 ${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe'
-          REMOTE_SCRIPT_PATH_2: '${{ secrets.REMOTE_SIGN_SCRIPT }} --alg SHA-256 ${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe'
-          LOCAL_DOWNLOAD_PATH: '${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe'
+          FILE_TO_UPLOAD: '${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe'
+          REMOTE_SCRIPT_PATH_1: '${{ secrets.REMOTE_SIGN_SCRIPT }} --alg SHA-1 ${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe'
+          REMOTE_SCRIPT_PATH_2: '${{ secrets.REMOTE_SIGN_SCRIPT }} --alg SHA-256 ${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe'
+          LOCAL_DOWNLOAD_PATH: '${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe'
         run: |
           winscp.com /log=winscp.log /command `
             "option batch abort" `
             "option confirm off" `
             "open scp://${{ env.REMOTE_USER }}:${{ env.SCP_PASSWORD }}@${{ env.REMOTE_HOST }} -hostkey=*" `
-            "call ${{ env.REMOTE_OSS }} oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/temp/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe ${env:REMOTE_PATH}" `
+            "call ${{ env.REMOTE_OSS }} oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/temp/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe ${env:REMOTE_PATH}" `
             "call ${env:REMOTE_SCRIPT_PATH_1}" `
             "call ${env:REMOTE_SCRIPT_PATH_2}" `
-            "call ${{ env.REMOTE_OSS }} ${env:REMOTE_PATH} oss://${{ secrets.BUCKET_NAME }}/offline/${{ github.event.inputs.version }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe " `
+            "call ${{ env.REMOTE_OSS }} ${env:REMOTE_PATH} oss://${{ secrets.BUCKET_NAME }}/offline/${{ github.event.inputs.version }}/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe " `
             "exit"
 
       # 拉取OSS文件
       - name: Prepare upload for OSS on windows
         if: ${{ runner.os == 'Windows' }}
         run: |
-          ossutil cp -rf oss://${{ secrets.BUCKET_NAME }}/offline/${{ github.event.inputs.version }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/
+          ossutil cp -rf oss://${{ secrets.BUCKET_NAME }}/offline/${{ github.event.inputs.version }}/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/
 
       - name: Upload x64 exe to OSS if requested
         # 只有当触发工作流时，传入的 upload_latest 参数值为 'true'，此步骤才会执行
         if: matrix.os == 'windows-latest' && github.event.inputs.upload_latest == 'true'
         run: |
           echo "检测到需要上传 x64 exe，正在执行上传..."
-          ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe "oss://${{ secrets.BUCKET_NAME }}/offline/latest/${{ secrets.PRODUCT_APP_NAME }}-latest.exe"
+          ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe "oss://${{ secrets.BUCKET_NAME }}/offline/latest/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-latest.exe"
 
        # Install jre Linux x64
       - name: Install Jre for Linux x64
@@ -610,13 +610,13 @@ jobs:
       - name: package linux arm64
         if: ${{ runner.os == 'Linux' && matrix.arch == 'arm64' }}
         run: |
-          /bin/bash ${{secrets.JCEF_PROJECT_ROOT}}/package_linux.sh  ${{ github.event.inputs.version }} "${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.deb"
+          /bin/bash ${{secrets.JCEF_PROJECT_ROOT}}/package_linux.sh  ${{ github.event.inputs.version }} "${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.deb"
           ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/*.deb "oss://${{ secrets.BUCKET_NAME }}/offline/${{ github.event.inputs.version }}/"
          
       - name: package linux x86_64   
         if: ${{ runner.os == 'Linux' && matrix.arch == 'x86_64' }}
         run: |
-          /bin/bash ${{secrets.JCEF_PROJECT_ROOT}}/package_linux.sh  ${{ github.event.inputs.version }} ${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.deb
+          /bin/bash ${{secrets.JCEF_PROJECT_ROOT}}/package_linux.sh  ${{ github.event.inputs.version }} ${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.deb
           ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/*.deb "oss://${{ secrets.BUCKET_NAME }}/offline/${{ github.event.inputs.version }}/"
       
           
@@ -626,7 +626,7 @@ jobs:
       #   id: hash
       #   run: |
       #     # Step 1: Get the SHA512 hash of the file using CertUtil
-      #     $hashOutput = Certutil -hashfile "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe" SHA512
+      #     $hashOutput = Certutil -hashfile "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe" SHA512
       #     Write-Output "CertUtil Output: $hashOutput"
 
       #     # Extract the hash value (second line of the output)
@@ -698,44 +698,44 @@ jobs:
       # - name: Upload to OSS for Mac
       #   if: matrix.os == 'macos-latest' && matrix.arch == 'x86_64'
       #   run: |
-      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.dmg" "oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/"
-      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.zip" "oss://${{ secrets.BUCKET_NAME }}/download/latest/mac/x64/"
-      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.zip.blockmap" "oss://${{ secrets.BUCKET_NAME }}/download/latest/mac/x64/"
+      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.dmg" "oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/"
+      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.zip" "oss://${{ secrets.BUCKET_NAME }}/download/latest/mac/x64/"
+      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.zip.blockmap" "oss://${{ secrets.BUCKET_NAME }}/download/latest/mac/x64/"
       #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/latest-mac.yml" "oss://${{ secrets.BUCKET_NAME }}/download/latest/mac/x64/"
-      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.dmg" "oss://${{ secrets.BUCKET_NAME }}/download/latest/${{ secrets.PRODUCT_APP_NAME }}-latest.dmg"
+      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.dmg" "oss://${{ secrets.BUCKET_NAME }}/download/latest/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-latest.dmg"
 
       # - name: Upload to OSS for Mac arm64
       #   if: matrix.os == 'macos-latest' && matrix.arch == 'arm64'
       #   run: |
-      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg" "oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/"
-      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.zip" "oss://${{ secrets.BUCKET_NAME }}/download/latest/mac/arm64/"
-      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.zip.blockmap" "oss://${{ secrets.BUCKET_NAME }}/download/latest/mac/arm64/"
+      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg" "oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/"
+      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.zip" "oss://${{ secrets.BUCKET_NAME }}/download/latest/mac/arm64/"
+      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.zip.blockmap" "oss://${{ secrets.BUCKET_NAME }}/download/latest/mac/arm64/"
       #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/latest-mac.yml" "oss://${{ secrets.BUCKET_NAME }}/download/latest/mac/arm64/"
-      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg" "oss://${{ secrets.BUCKET_NAME }}/download/latest/${{ secrets.PRODUCT_APP_NAME }}-arm64-latest.dmg"
+      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg" "oss://${{ secrets.BUCKET_NAME }}/download/latest/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-arm64-latest.dmg"
 
       # - name: Upload to OSS for windows
       #   if: matrix.os == 'windows-latest'
       #   run: |
-      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe" "oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/"
+      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe" "oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/"
       #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/latest.yml" "oss://${{ secrets.BUCKET_NAME }}/download/latest/windows/"
-      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe" "oss://${{ secrets.BUCKET_NAME }}/download/latest/windows/"
-      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe" "oss://${{ secrets.BUCKET_NAME }}/download/latest/${{ secrets.PRODUCT_APP_NAME }}-latest.exe"
+      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe" "oss://${{ secrets.BUCKET_NAME }}/download/latest/windows/"
+      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe" "oss://${{ secrets.BUCKET_NAME }}/download/latest/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-latest.exe"
 
       # - name: Upload to OSS for linux x86_64
       #   if: matrix.os == 'ubuntu-latest' && matrix.arch == 'x86_64'
       #   run: |
       #     ls -la ${{ secrets.REPO_FRONT_PATH }}/release/
-      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x86_64.AppImage" "oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x86_64.AppImage"
-      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x86_64.AppImage" "oss://${{ secrets.BUCKET_NAME }}/download/latest/${{ secrets.PRODUCT_APP_NAME }}-latest.AppImage"
-      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x86_64.AppImage" "oss://${{ secrets.BUCKET_NAME }}/download/latest/linux/x86_64/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x86_64.AppImage"
+      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x86_64.AppImage" "oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x86_64.AppImage"
+      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x86_64.AppImage" "oss://${{ secrets.BUCKET_NAME }}/download/latest/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-latest.AppImage"
+      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x86_64.AppImage" "oss://${{ secrets.BUCKET_NAME }}/download/latest/linux/x86_64/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x86_64.AppImage"
 
-      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-amd64.deb" "oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x86_64.deb"
-      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-amd64.deb" "oss://${{ secrets.BUCKET_NAME }}/download/latest/${{ secrets.PRODUCT_APP_NAME }}-latest.deb"
-      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-amd64.deb" "oss://${{ secrets.BUCKET_NAME }}/download/latest/linux/x86_64/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-amd64.deb"
+      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-amd64.deb" "oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x86_64.deb"
+      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-amd64.deb" "oss://${{ secrets.BUCKET_NAME }}/download/latest/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-latest.deb"
+      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-amd64.deb" "oss://${{ secrets.BUCKET_NAME }}/download/latest/linux/x86_64/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-amd64.deb"
 
-      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x86_64.rpm" "oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x86_64.rpm"
-      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x86_64.rpm" "oss://${{ secrets.BUCKET_NAME }}/download/latest/${{ secrets.PRODUCT_APP_NAME }}-latest.rpm"
-      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x86_64.rpm" "oss://${{ secrets.BUCKET_NAME }}/download/latest/linux/x86_64/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x86_64.rpm"
+      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x86_64.rpm" "oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x86_64.rpm"
+      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x86_64.rpm" "oss://${{ secrets.BUCKET_NAME }}/download/latest/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-latest.rpm"
+      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x86_64.rpm" "oss://${{ secrets.BUCKET_NAME }}/download/latest/linux/x86_64/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x86_64.rpm"
 
       #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/latest-linux.yml" "oss://${{ secrets.BUCKET_NAME }}/download/latest/linux/x86_64/"
 
@@ -743,17 +743,17 @@ jobs:
       #   if: matrix.os == 'ubuntu-latest' && matrix.arch == 'arm64'
       #   run: |
       #     ls -la ${{ secrets.REPO_FRONT_PATH }}/release/
-      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.AppImage" "oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.AppImage"
-      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.AppImage" "oss://${{ secrets.BUCKET_NAME }}/download/latest/${{ secrets.PRODUCT_APP_NAME }}-arm64-latest.AppImage"
-      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.AppImage" "oss://${{ secrets.BUCKET_NAME }}/download/latest/linux/arm64/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.AppImage"
+      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.AppImage" "oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.AppImage"
+      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.AppImage" "oss://${{ secrets.BUCKET_NAME }}/download/latest/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-arm64-latest.AppImage"
+      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.AppImage" "oss://${{ secrets.BUCKET_NAME }}/download/latest/linux/arm64/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.AppImage"
 
-      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.deb" "oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.deb"
-      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.deb" "oss://${{ secrets.BUCKET_NAME }}/download/latest/${{ secrets.PRODUCT_APP_NAME }}-arm64-latest.deb"
-      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.deb" "oss://${{ secrets.BUCKET_NAME }}/download/latest/linux/arm64/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.deb"
+      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.deb" "oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.deb"
+      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.deb" "oss://${{ secrets.BUCKET_NAME }}/download/latest/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-arm64-latest.deb"
+      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.deb" "oss://${{ secrets.BUCKET_NAME }}/download/latest/linux/arm64/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.deb"
 
-      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-aarch64.rpm" "oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.rpm"
-      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-aarch64.rpm" "oss://${{ secrets.BUCKET_NAME }}/download/latest/${{ secrets.PRODUCT_APP_NAME }}-arm64-latest.rpm"
-      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-aarch64.rpm" "oss://${{ secrets.BUCKET_NAME }}/download/latest/linux/arm64/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-aarch64.rpm"
+      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-aarch64.rpm" "oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.rpm"
+      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-aarch64.rpm" "oss://${{ secrets.BUCKET_NAME }}/download/latest/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-arm64-latest.rpm"
+      #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-aarch64.rpm" "oss://${{ secrets.BUCKET_NAME }}/download/latest/linux/arm64/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-aarch64.rpm"
 
       #     ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/latest-linux-arm64.yml" "oss://${{ secrets.BUCKET_NAME }}/download/latest/linux/arm64/"
 
@@ -765,8 +765,8 @@ jobs:
       #     msgtype: markdown
       #     content: |
       #       {
-      #         "title": "${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}${{ matrix.file_extension }}-打包完成通知",
-      #         "text": "# ${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}${{ matrix.file_extension }}-打包完成通知\n ###  任务id：[${{ github.event.inputs.version }}](https://github.com/juliet0416/cicd-test/actions/runs/${{ github.run_id }})\n ### 下载地址：${{secrets.CDN_URL}}/download/${{ github.event.inputs.version }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}${{ matrix.file_extension }}"
+      #         "title": "${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}${{ matrix.file_extension }}-打包完成通知",
+      #         "text": "# ${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}${{ matrix.file_extension }}-打包完成通知\n ###  任务id：[${{ github.event.inputs.version }}](https://github.com/juliet0416/cicd-test/actions/runs/${{ github.run_id }})\n ### 下载地址：${{secrets.CDN_URL}}/download/${{ github.event.inputs.version }}/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}${{ matrix.file_extension }}"
       #       }
 
       # # 发送到飞书
@@ -779,7 +779,7 @@ jobs:
       #     content: |
       #       post:
       #         zh_cn:
-      #           title: "${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}${{ matrix.file_extension }}-打包完成通知"
+      #           title: "${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}${{ matrix.file_extension }}-打包完成通知"
       #           content:
       #           - - tag: text
       #               text: "任务id："
@@ -789,7 +789,7 @@ jobs:
       #           - - tag: text
       #               text: "状态: ${{ job.status == 'success' && '✅ 成功' || '❌ 失败' }}"
       #           - - tag: text
-      #               text: "下载地址：${{secrets.CDN_URL}}/download/${{ github.event.inputs.version }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}${{ matrix.file_extension }}"
+      #               text: "下载地址：${{secrets.CDN_URL}}/download/${{ github.event.inputs.version }}/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}${{ matrix.file_extension }}"
 
       # - name: Send feishu message
       #   uses: foxundermoon/feishu-action@v2
@@ -800,7 +800,7 @@ jobs:
       #     content: |
       #       post:
       #         zh_cn:
-      #           title: "${{ secrets.PRODUCT_APP_NAME }} ${{ github.event.inputs.version }} ${{ runner.os }} ${{ matrix.arch }} 打包完成通知"
+      #           title: "${{ secrets.OFFLINE_PRODUCT_APP_NAME }} ${{ github.event.inputs.version }} ${{ runner.os }} ${{ matrix.arch }} 打包完成通知"
       #           content:
       #           - - tag: text
       #               text: "任务ID: "
@@ -808,8 +808,8 @@ jobs:
       #               text: "${{ github.run_id }}"
       #               href: "https://github.com/juliet0416/cicd-test/actions/runs/${{ github.run_id }}"
       #           - - tag: text
-      #               text: "下载地址: ${{secrets.CDN_URL}}/download/${{ github.event.inputs.version }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-${{ matrix.arch }}.deb"
+      #               text: "下载地址: ${{secrets.CDN_URL}}/download/${{ github.event.inputs.version }}/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-${{ matrix.arch }}.deb"
       #           - - tag: text
-      #               text: "下载地址: ${{secrets.CDN_URL}}/download/${{ github.event.inputs.version }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-${{ matrix.arch }}.rpm"
+      #               text: "下载地址: ${{secrets.CDN_URL}}/download/${{ github.event.inputs.version }}/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-${{ matrix.arch }}.rpm"
       #           - - tag: text
-      #               text: "下载地址: ${{secrets.CDN_URL}}/download/${{ github.event.inputs.version }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-${{ matrix.arch }}.AppImage"
+      #               text: "下载地址: ${{secrets.CDN_URL}}/download/${{ github.event.inputs.version }}/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-${{ matrix.arch }}.AppImage"
