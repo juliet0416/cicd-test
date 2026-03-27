@@ -575,13 +575,20 @@ jobs:
           echo "Switching active Java environment to Temurin for jpackage..."
           
           # 从 setup_temurin 步骤的输出中，获取 Temurin JDK 的安装路径
-          TEMURIN_PATH="${{ steps.setup_temurin.outputs.jdk-path }}"
+          TEMURIN_PATH="${{ steps.setup_temurin_mac.outputs.jdk-path }}"
           echo "Found Temurin JDK path: $TEMURIN_PATH"
+          if [ -z "$TEMURIN_PATH" ]; then
+            echo "::error::Temurin JDK path is empty."
+            exit 1
+          fi
           
           # 覆盖 GITHUB_ENV 和 GITHUB_PATH，让后续步骤使用 Temurin
           echo "JAVA_HOME=$TEMURIN_PATH" >> $GITHUB_ENV
           echo "$TEMURIN_PATH/bin" >> $GITHUB_PATH
-          echo "Environment switched. Subsequent steps will use Temurin JDK."    
+          echo "Environment switched. Subsequent steps will use Temurin JDK."
+          echo "Temurin java path: $TEMURIN_PATH/bin/java"
+          "$TEMURIN_PATH/bin/java" -version
+          "$TEMURIN_PATH/bin/jpackage" --version
 
 
       - name: package mac arm64
