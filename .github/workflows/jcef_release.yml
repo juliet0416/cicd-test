@@ -573,9 +573,14 @@ jobs:
         shell: bash
         run: |
           echo "Switching active Java environment to Temurin for jpackage..."
-          
-          # 从 setup_temurin 步骤的输出中，获取 Temurin JDK 的安装路径
-          TEMURIN_PATH="${{ steps.setup_temurin_mac.outputs.jdk-path }}"
+
+          # actions/setup-java 会在后续 step 中直接设置 JAVA_HOME，这里优先使用它。
+          TEMURIN_PATH="${JAVA_HOME:-}"
+          if [ -z "$TEMURIN_PATH" ] && command -v java >/dev/null 2>&1; then
+            JAVA_BIN="$(command -v java)"
+            TEMURIN_PATH="$(cd "$(dirname "$JAVA_BIN")/.." && pwd)"
+          fi
+
           echo "Found Temurin JDK path: $TEMURIN_PATH"
           if [ -z "$TEMURIN_PATH" ]; then
             echo "::error::Temurin JDK path is empty."
