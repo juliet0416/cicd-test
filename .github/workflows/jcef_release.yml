@@ -408,7 +408,7 @@ jobs:
                 done
 
                 rm -f "$nested_jar"
-                (cd "$NESTED_TMP" && zip -q -r "$nested_jar" .)
+                (cd "$NESTED_TMP" && zip -q -r -0 "$nested_jar" .)
                 rm -rf "$NESTED_TMP"
                 touch "$WORK_DIR/.modified"
               fi
@@ -424,7 +424,7 @@ jobs:
             if [ -f "$WORK_DIR/.modified" ]; then
               rm -f "$WORK_DIR/.modified"
               rm -f "$JAR_ABS"
-              (cd "$WORK_DIR" && zip -q -r "$JAR_ABS" .)
+              (cd "$WORK_DIR" && zip -q -r -0 "$JAR_ABS" .)
               echo "Repackaged: $(basename "$jar_file")"
             fi
 
