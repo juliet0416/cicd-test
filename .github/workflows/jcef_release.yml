@@ -378,51 +378,57 @@ jobs:
           echo "Certificate and key successfully installed."
 
       # Sign native libraries (.dylib/.jnilib) inside JARs for Apple notarization
+      # The fat JAR (chat2db-enterprise.jar) is copied to jpackage/input/mac/ during Build FE Static.
+      # We must sign native libs inside it BEFORE jpackage bundles it into the .app.
       - name: Sign native libraries inside JARs for notarization
         if: ${{ runner.os == 'macOS' }}
         run: |
           echo "=== Signing native libraries inside JAR files for Apple notarization ==="
+          SIGN_ID="Developer ID Application: JinYu Fan (6MXS42K9F4)"
+          INPUT_DIR="${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input"
 
-          # Scan all JARs under target/ for macOS native libraries
-          find ${{ secrets.REPO_PATH }} -name "*.jar" -path "*/target/*" | while read jar_file; do
-            if unzip -l "$jar_file" 2>/dev/null | grep -qE '\.(dylib|jnilib)$'; then
-              echo "Found native libs in: $jar_file"
-              WORK_DIR=$(mktemp -d)
-              JAR_ABS=$(cd "$(dirname "$jar_file")" && echo "$(pwd)/$(basename "$jar_file")")
-              unzip -q -o "$JAR_ABS" -d "$WORK_DIR"
+          echo "Scanning for JARs in: $INPUT_DIR"
+          find "$INPUT_DIR" -name "*.jar" | while read jar_file; do
+            JAR_ABS="$(cd "$(dirname "$jar_file")" && pwd)/$(basename "$jar_file")"
+            WORK_DIR=$(mktemp -d)
+            unzip -q -o "$JAR_ABS" -d "$WORK_DIR" 2>/dev/null || { rm -rf "$WORK_DIR"; continue; }
 
-              # Check nested JARs for native libs (e.g. BOOT-INF/lib/ in Spring Boot fat jars)
-              find "$WORK_DIR" -name "*.jar" | while read nested_jar; do
-                if unzip -l "$nested_jar" 2>/dev/null | grep -qE '\.(dylib|jnilib)$'; then
-                  echo "  Nested JAR with native libs: $(basename $nested_jar)"
-                  NESTED_TMP=$(mktemp -d)
-                  NESTED_ABS="$nested_jar"
-                  unzip -q -o "$NESTED_ABS" -d "$NESTED_TMP"
+            MODIFIED=false
 
-                  find "$NESTED_TMP" -type f \( -name "*.dylib" -o -name "*.jnilib" \) | while read lib; do
-                    echo "    Signing: $(basename $lib)"
-                    codesign --force --sign "Developer ID Application: JinYu Fan (6MXS42K9F4)" --timestamp "$lib"
-                  done
+            # Sign native libs inside nested JARs (e.g. BOOT-INF/lib/grpc-netty-shaded-*.jar)
+            find "$WORK_DIR" -name "*.jar" 2>/dev/null | while read nested_jar; do
+              if unzip -l "$nested_jar" 2>/dev/null | grep -qE '\.(dylib|jnilib)$'; then
+                echo "Found native libs in: $(basename "$nested_jar") (inside $(basename "$jar_file"))"
+                NESTED_TMP=$(mktemp -d)
+                unzip -q -o "$nested_jar" -d "$NESTED_TMP"
 
-                  # Repackage the nested JAR (remove old, create new to avoid I/O errors)
-                  rm -f "$NESTED_ABS"
-                  (cd "$NESTED_TMP" && zip -q -r "$NESTED_ABS" .)
-                  rm -rf "$NESTED_TMP"
-                fi
-              done
+                find "$NESTED_TMP" -type f \( -name "*.dylib" -o -name "*.jnilib" \) | while read lib; do
+                  echo "  Signing: $(basename "$lib")"
+                  codesign --force --sign "$SIGN_ID" --timestamp "$lib"
+                done
 
-              # Sign any native libs directly in the top-level JAR
-              find "$WORK_DIR" -maxdepth 5 -type f \( -name "*.dylib" -o -name "*.jnilib" \) ! -path "*.jar/*" | while read lib; do
-                echo "    Signing top-level: $(basename $lib)"
-                codesign --force --sign "Developer ID Application: JinYu Fan (6MXS42K9F4)" --timestamp "$lib"
-              done
+                rm -f "$nested_jar"
+                (cd "$NESTED_TMP" && zip -q -r "$nested_jar" .)
+                rm -rf "$NESTED_TMP"
+                touch "$WORK_DIR/.modified"
+              fi
+            done
 
-              # Repackage the main JAR
+            # Sign any native libs at the top level of the JAR
+            find "$WORK_DIR" -type f \( -name "*.dylib" -o -name "*.jnilib" \) 2>/dev/null | while read lib; do
+              echo "  Signing top-level: $(basename "$lib") (in $(basename "$jar_file"))"
+              codesign --force --sign "$SIGN_ID" --timestamp "$lib"
+              touch "$WORK_DIR/.modified"
+            done
+
+            if [ -f "$WORK_DIR/.modified" ]; then
+              rm -f "$WORK_DIR/.modified"
               rm -f "$JAR_ABS"
               (cd "$WORK_DIR" && zip -q -r "$JAR_ABS" .)
-              rm -rf "$WORK_DIR"
-              echo "  Done: $jar_file"
+              echo "Repackaged: $(basename "$jar_file")"
             fi
+
+            rm -rf "$WORK_DIR"
           done
 
           echo "=== Native library signing complete ==="
