@@ -377,53 +377,53 @@ jobs:
           security set-key-partition-list -S apple-tool:,apple: -s -k "${{ secrets.MAC_CERTS_PASSWORD }}" "$KEYCHAIN_PATH"
           echo "Certificate and key successfully installed."
 
-      # 签名JAR包内的macOS原生库（Apple公证要求所有二进制文件都必须签名）
+      # Sign native libraries (.dylib/.jnilib) inside JARs for Apple notarization
       - name: Sign native libraries inside JARs for notarization
         if: ${{ runner.os == 'macOS' }}
         run: |
           echo "=== Signing native libraries inside JAR files for Apple notarization ==="
 
-          # 查找 maven 构建产出的主 JAR（BOOT-INF 结构的 Spring Boot fat jar）
-          MAIN_JAR=$(find ${{ secrets.REPO_PATH }} -name "chat2db-*.jar" -path "*/target/*" ! -name "*-sources.jar" ! -name "*-javadoc.jar" | head -1)
+          # Scan all JARs under target/ for macOS native libraries
+          find ${{ secrets.REPO_PATH }} -name "*.jar" -path "*/target/*" | while read jar_file; do
+            if unzip -l "$jar_file" 2>/dev/null | grep -qE '\.(dylib|jnilib)$'; then
+              echo "Found native libs in: $jar_file"
+              WORK_DIR=$(mktemp -d)
+              JAR_ABS=$(cd "$(dirname "$jar_file")" && echo "$(pwd)/$(basename "$jar_file")")
+              unzip -q -o "$JAR_ABS" -d "$WORK_DIR"
 
-          if [ -z "$MAIN_JAR" ]; then
-            echo "Warning: No main JAR found via find, trying REPO_JAR_PATH..."
-            MAIN_JAR="${{ secrets.REPO_JAR_PATH }}"
-          fi
+              # Check nested JARs for native libs (e.g. BOOT-INF/lib/ in Spring Boot fat jars)
+              find "$WORK_DIR" -name "*.jar" | while read nested_jar; do
+                if unzip -l "$nested_jar" 2>/dev/null | grep -qE '\.(dylib|jnilib)$'; then
+                  echo "  Nested JAR with native libs: $(basename $nested_jar)"
+                  NESTED_TMP=$(mktemp -d)
+                  NESTED_ABS="$nested_jar"
+                  unzip -q -o "$NESTED_ABS" -d "$NESTED_TMP"
 
-          if [ ! -f "$MAIN_JAR" ]; then
-            echo "Error: JAR file not found at $MAIN_JAR"
-            exit 1
-          fi
+                  find "$NESTED_TMP" -type f \( -name "*.dylib" -o -name "*.jnilib" \) | while read lib; do
+                    echo "    Signing: $(basename $lib)"
+                    codesign --force --sign "Developer ID Application: JinYu Fan (6MXS42K9F4)" --timestamp "$lib"
+                  done
 
-          echo "Processing main JAR: $MAIN_JAR"
-          WORK_DIR=$(mktemp -d)
-          unzip -q -o "$MAIN_JAR" -d "$WORK_DIR"
+                  # Repackage the nested JAR (remove old, create new to avoid I/O errors)
+                  rm -f "$NESTED_ABS"
+                  (cd "$NESTED_TMP" && zip -q -r "$NESTED_ABS" .)
+                  rm -rf "$NESTED_TMP"
+                fi
+              done
 
-          SIGNED=0
-
-          # 遍历 BOOT-INF/lib 下的嵌套 JAR，查找并签名原生库
-          for nested_jar in $(find "$WORK_DIR/BOOT-INF/lib" -name "*.jar" 2>/dev/null); do
-            if unzip -l "$nested_jar" 2>/dev/null | grep -qE '\.(dylib|jnilib)$'; then
-              echo "  Found native libs in: $(basename $nested_jar)"
-              NESTED_TMP=$(mktemp -d)
-              unzip -q -o "$nested_jar" -d "$NESTED_TMP"
-
-              find "$NESTED_TMP" -type f \( -name "*.dylib" -o -name "*.jnilib" \) | while read lib; do
-                echo "    Signing: $(basename $lib)"
+              # Sign any native libs directly in the top-level JAR
+              find "$WORK_DIR" -maxdepth 5 -type f \( -name "*.dylib" -o -name "*.jnilib" \) ! -path "*.jar/*" | while read lib; do
+                echo "    Signing top-level: $(basename $lib)"
                 codesign --force --sign "Developer ID Application: JinYu Fan (6MXS42K9F4)" --timestamp "$lib"
               done
 
-              # 重新打包嵌套的 JAR
-              (cd "$NESTED_TMP" && zip -q -r "$nested_jar" .)
-              rm -rf "$NESTED_TMP"
-              SIGNED=1
+              # Repackage the main JAR
+              rm -f "$JAR_ABS"
+              (cd "$WORK_DIR" && zip -q -r "$JAR_ABS" .)
+              rm -rf "$WORK_DIR"
+              echo "  Done: $jar_file"
             fi
           done
-
-          # 重新打包主 JAR
-          (cd "$WORK_DIR" && zip -q -r "$MAIN_JAR" .)
-          rm -rf "$WORK_DIR"
 
           echo "=== Native library signing complete ==="
 
