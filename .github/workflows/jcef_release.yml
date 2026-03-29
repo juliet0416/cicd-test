@@ -37,7 +37,7 @@ jobs:
             file_name: 'arm64-latest.dmg'
             file_extension: '-arm64.dmg'
             build_arg: '--mac --arm64'
-          - os: ubuntu-latest
+          - os: ubuntu-22.04
             arch: x86_64
             file_name: 'latest.deb'
             file_extension: '-amd64.deb'
@@ -562,13 +562,13 @@ jobs:
           ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.dmg "oss://${{ secrets.BUCKET_NAME }}/download/latest/${{ secrets.PRODUCT_APP_NAME }}-latest.dmg"
 
       - name: Upload Linux DEB to OSS
-        if: matrix.os == 'ubuntu-latest' && matrix.arch == 'x86_64'
+        if: matrix.os == 'ubuntu-22.04' && matrix.arch == 'x86_64'
         run: |
           echo "上传 Ubuntu DEB 包到版本目录..."
           ossutil cp -rf "${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-amd64.deb" "oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/"
 
       - name: Upload Linux DEB to latest if requested
-        if: matrix.os == 'ubuntu-latest' && matrix.arch == 'x86_64' && github.event.inputs.upload_latest == 'true'
+        if: matrix.os == 'ubuntu-22.04' && matrix.arch == 'x86_64' && github.event.inputs.upload_latest == 'true'
         run: |
           echo "检测到需要上传 Ubuntu latest DEB，正在执行上传..."
           ossutil cp -rf "${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-amd64.deb" "oss://${{ secrets.BUCKET_NAME }}/download/latest/${{ secrets.PRODUCT_APP_NAME }}-latest.deb"
