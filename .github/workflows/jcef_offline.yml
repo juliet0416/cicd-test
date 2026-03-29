@@ -37,15 +37,15 @@ jobs:
             file_name: 'arm64-latest.dmg'
             file_extension: '-arm64.dmg'
             build_arg: '--mac --arm64'
-          # - os: ubuntu-latest
-          #   arch: x86_64
-          #   file_name: 'latest.AppImage'
-          #   file_extension: '-x86_64.AppImage'
-          #   build_arg: '--linux --x64'
+          - os: ubuntu-22.04
+            arch: x86_64
+            file_name: 'latest.deb'
+            file_extension: '-amd64.deb'
+            build_arg: '--linux --x64'
           # - os: ubuntu-latest
           #   arch: arm64
-          #   file_name: 'arm64-latest.AppImage'
-          #   file_extension: '-arm64.AppImage'
+          #   file_name: 'arm64-latest.deb'
+          #   file_extension: '-arm64.deb'
           #   build_arg: '--linux --arm64'
 
     runs-on: ${{ matrix.os }}
@@ -294,24 +294,30 @@ jobs:
 
       
 
-      # Install jre Linux x64
-      - name: Install Jre for Linux
-        if: ${{ runner.os == 'Linux' && matrix.arch == 'x86_64' }}
-        uses: actions/setup-java@main
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-          java-package: 'jre'
+      - name: Setup Custom JBR for Linux Runtime Image
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          if [ "${{ matrix.arch }}" == "arm64" ]; then
+            JBR_URL="https://cache-redirector.jetbrains.com/intellij-jbr/jbr_jcef-17.0.12-linux-aarch64-b1207.37.tar.gz"
+          else
+            JBR_URL="https://cache-redirector.jetbrains.com/intellij-jbr/jbr_jcef-17.0.12-linux-x64-b1207.37.tar.gz"
+          fi
 
-      # Install jre Linux arm64
-      - name: Install Jre for Linux
-        if: ${{ runner.os == 'Linux' && matrix.arch == 'arm64' }}
-        uses: actions/setup-java@main
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-          java-package: 'jre'
-          architecture: 'aarch64'
+          echo "Downloading Linux JBR JCEF for ${{ matrix.arch }}..."
+          curl -L -o jbr-linux.tar.gz "$JBR_URL"
+          mkdir -p jbr-linux
+          tar -xzf jbr-linux.tar.gz -C jbr-linux --strip-components=1
+
+          JBR_HOME_PATH=$(cd jbr-linux && pwd)
+          echo "JBR_LINUX_PATH=$JBR_HOME_PATH" >> $GITHUB_ENV
+          echo "Linux JBR JCEF is ready at: $JBR_HOME_PATH"
+
+      - name: Install Ubuntu packaging dependencies
+        if: ${{ runner.os == 'Linux' }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y fakeroot zip
 
       # java.security open tls1 Windows
       - name: Enable tls1
@@ -372,10 +378,15 @@ jobs:
       # Copy jre Linux
       - name: Copy Jre for Linux
         if: ${{ runner.os == 'Linux' }}
+        env:
+          JAVA_HOME: ${{ env.JBR_LINUX_PATH }}
         run: |
           mkdir -p ${{ secrets.REPO_STATIC_PATH }} 
           cp -r $JAVA_HOME ${{ secrets.REPO_JRE_PATH }} 
           chmod -R 777 ${{ secrets.REPO_JRE_PATH }}
+          mkdir -p ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/runtime/linux/Home
+          cp -r $JAVA_HOME/* ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/runtime/linux/Home
+          chmod -R 777 ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/runtime/linux
 
       # Linux
       - name: Delete File
@@ -385,6 +396,20 @@ jobs:
           ls -la
           rm -rf legal
           ls -la
+          rm -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/runtime/linux/Home/legal
+
+      - name: Setup Temurin JDK for Linux Build and Packaging
+        if: ${{ runner.os == 'Linux' }}
+        uses: actions/setup-java@main
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          java-package: 'jdk'
+
+      - name: Enable tls1
+        if: ${{ runner.os == 'Linux' }}
+        run: |
+          sed -i "s/\(^jdk.tls.disabledAlgorithms=\)\(.*\)\( TLSv1, TLSv1.1,\)\(.*\)/\1\2\4/" $JAVA_HOME/conf/security/java.security
 
       # 安装Node.js
       - name: Install Node.js
@@ -449,6 +474,15 @@ jobs:
           mvn clean install -U -B '-Dmaven.test.skip=true' -f ${{ secrets.REPO_POM_PATH }}
           # ossutil cp -rf ${{ secrets.REPO_JAR_PATH }} "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/"
           # cp ${{ secrets.REPO_JAR_PATH }} ${{ secrets.REPO_STATIC_JAR_PATH }}
+
+      - name: Build BE Static linux
+        if: ${{ runner.os == 'Linux' }}
+        run: |
+          pwd
+          mvn -v
+          mvn clean install -U -B '-Dmaven.test.skip=true' -f ${{ secrets.REPO_POM_PATH }}
+          # ossutil cp -rf ${{ secrets.REPO_JAR_PATH }} "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/"
+          # cp ${{ secrets.REPO_JAR_PATH }} ${{ secrets.REPO_STATIC_JAR_PATH }}
           
 
        # 打包前端资源
@@ -460,8 +494,8 @@ jobs:
           yarn
           yarn run modify:package:name chat2db-local Chat2DB-Local
           yarn run build:web:offline --app_version=${{ github.event.inputs.version }}
-          # zip -r dist.zip dist
-          tar -a -c -f dist.zip dist
+          rm -f dist.zip
+          zip -qr dist.zip dist
           
           cp -r dist ./static/
           
@@ -573,6 +607,58 @@ jobs:
           security set-key-partition-list -S apple-tool:,apple: -s -k "${{ secrets.MAC_CERTS_PASSWORD }}" "$KEYCHAIN_PATH"
           echo "Certificate and key successfully installed."
 
+      # Sign native libraries (.dylib/.jnilib) inside JARs for Apple notarization
+      # The fat JAR (chat2db-enterprise.jar) is copied to jpackage/input/mac/ during Build FE Static.
+      # We must sign native libs inside it BEFORE jpackage bundles it into the .app.
+      - name: Sign native libraries inside JARs for notarization
+        if: ${{ runner.os == 'macOS' }}
+        run: |
+          echo "=== Signing native libraries inside JAR files for Apple notarization ==="
+          SIGN_ID="Developer ID Application: JinYu Fan (6MXS42K9F4)"
+          INPUT_DIR="${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input"
+
+          echo "Scanning for JARs in: $INPUT_DIR"
+          find "$INPUT_DIR" -name "*.jar" | while read jar_file; do
+            JAR_ABS="$(cd "$(dirname "$jar_file")" && pwd)/$(basename "$jar_file")"
+            WORK_DIR=$(mktemp -d)
+            unzip -q -o "$JAR_ABS" -d "$WORK_DIR" 2>/dev/null || { rm -rf "$WORK_DIR"; continue; }
+
+            find "$WORK_DIR" -name "*.jar" 2>/dev/null | while read nested_jar; do
+              if unzip -l "$nested_jar" 2>/dev/null | grep -qE '\.(dylib|jnilib)$'; then
+                echo "Found native libs in: $(basename "$nested_jar") (inside $(basename "$jar_file"))"
+                NESTED_TMP=$(mktemp -d)
+                unzip -q -o "$nested_jar" -d "$NESTED_TMP"
+
+                find "$NESTED_TMP" -type f \( -name "*.dylib" -o -name "*.jnilib" \) | while read lib; do
+                  echo "  Signing: $(basename "$lib")"
+                  codesign --force --sign "$SIGN_ID" --timestamp "$lib"
+                done
+
+                rm -f "$nested_jar"
+                (cd "$NESTED_TMP" && zip -q -r -0 "$nested_jar" .)
+                rm -rf "$NESTED_TMP"
+                touch "$WORK_DIR/.modified"
+              fi
+            done
+
+            find "$WORK_DIR" -type f \( -name "*.dylib" -o -name "*.jnilib" \) 2>/dev/null | while read lib; do
+              echo "  Signing top-level: $(basename "$lib") (in $(basename "$jar_file"))"
+              codesign --force --sign "$SIGN_ID" --timestamp "$lib"
+              touch "$WORK_DIR/.modified"
+            done
+
+            if [ -f "$WORK_DIR/.modified" ]; then
+              rm -f "$WORK_DIR/.modified"
+              rm -f "$JAR_ABS"
+              (cd "$WORK_DIR" && zip -q -r -0 "$JAR_ABS" .)
+              echo "Repackaged: $(basename "$jar_file")"
+            fi
+
+            rm -rf "$WORK_DIR"
+          done
+
+          echo "=== Native library signing complete ==="
+
       - name: Setup Temurin JDK (for jpackage)
         if: runner.os == 'macOS'
         id: setup_temurin_mac
@@ -591,15 +677,27 @@ jobs:
         shell: bash
         run: |
           echo "Switching active Java environment to Temurin for jpackage..."
-          
-          # 从 setup_temurin 步骤的输出中，获取 Temurin JDK 的安装路径
-          TEMURIN_PATH="${{ steps.setup_temurin.outputs.jdk-path }}"
+
+          # actions/setup-java 会在后续 step 中直接设置 JAVA_HOME，这里优先使用它。
+          TEMURIN_PATH="${JAVA_HOME:-}"
+          if [ -z "$TEMURIN_PATH" ] && command -v java >/dev/null 2>&1; then
+            JAVA_BIN="$(command -v java)"
+            TEMURIN_PATH="$(cd "$(dirname "$JAVA_BIN")/.." && pwd)"
+          fi
+
           echo "Found Temurin JDK path: $TEMURIN_PATH"
-          
+          if [ -z "$TEMURIN_PATH" ]; then
+            echo "::error::Temurin JDK path is empty."
+            exit 1
+          fi
+
           # 覆盖 GITHUB_ENV 和 GITHUB_PATH，让后续步骤使用 Temurin
           echo "JAVA_HOME=$TEMURIN_PATH" >> $GITHUB_ENV
           echo "$TEMURIN_PATH/bin" >> $GITHUB_PATH
-          echo "Environment switched. Subsequent steps will use Temurin JDK."    
+          echo "Environment switched. Subsequent steps will use Temurin JDK."
+          echo "Temurin java path: $TEMURIN_PATH/bin/java"
+          "$TEMURIN_PATH/bin/java" -version
+          "$TEMURIN_PATH/bin/jpackage" --version
 
 
       - name: package mac arm64
@@ -611,6 +709,11 @@ jobs:
         if: ${{ runner.os == 'macOS' && matrix.arch == 'x86_64' }}
         run: |
           sh ${{secrets.JCEF_PROJECT_ROOT}}/package_macos_offline.sh  ${{ github.event.inputs.version }} ${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.dmg
+
+      - name: package linux x86_64
+        if: ${{ runner.os == 'Linux' && matrix.arch == 'x86_64' }}
+        run: |
+          bash ${{secrets.JCEF_PROJECT_ROOT}}/package_linux_offline.sh ${{ github.event.inputs.version }} "${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-amd64.deb"
           
         # 公证&签名 Mac App
       - name: Notarize MacOS x86_64 App
@@ -618,6 +721,7 @@ jobs:
         run: |
           xcrun notarytool store-credentials ${{ secrets.PRODUCT_BASE_NAME }} --apple-id "${{ secrets.MAC_APPLE_ID }}" --password "${{ secrets.MAC_APPLE_PASSWORD }}" --team-id "${{ secrets.MAC_TEAM_ID }}"
           xcrun notarytool submit ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.dmg --keychain-profile ${{ secrets.PRODUCT_BASE_NAME }} --wait --verbose
+          xcrun stapler staple ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.dmg
           ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/*-x64.dmg "oss://${{ secrets.BUCKET_NAME }}/offline/${{ github.event.inputs.version }}/"
           # ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/version.json "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/"
           # ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/*.jar "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/"
@@ -629,6 +733,7 @@ jobs:
         run: |
           xcrun notarytool store-credentials ${{ secrets.PRODUCT_BASE_NAME }} --apple-id "${{ secrets.MAC_APPLE_ID }}" --password "${{ secrets.MAC_APPLE_PASSWORD }}" --team-id "${{ secrets.MAC_TEAM_ID }}"
           xcrun notarytool submit ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg --keychain-profile ${{ secrets.PRODUCT_BASE_NAME }} --wait --verbose
+          xcrun stapler staple ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg
           ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/*-arm64.dmg "oss://${{ secrets.BUCKET_NAME }}/offline/${{ github.event.inputs.version }}/"
           # ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/version.json "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/"
           # ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/*.jar "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/"
@@ -649,6 +754,18 @@ jobs:
         run: |
           echo "检测到需要上传 x64 DMG，正在执行上传..."
           ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.dmg "oss://${{ secrets.BUCKET_NAME }}/offline/latest/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-latest.dmg"
+
+      - name: Upload Linux DEB to OSS
+        if: matrix.os == 'ubuntu-22.04' && matrix.arch == 'x86_64'
+        run: |
+          echo "上传 Ubuntu 离线 DEB 包到版本目录..."
+          ossutil cp -rf "${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-amd64.deb" "oss://${{ secrets.BUCKET_NAME }}/offline/${{ github.event.inputs.version }}/"
+
+      - name: Upload Linux DEB to latest if requested
+        if: matrix.os == 'ubuntu-22.04' && matrix.arch == 'x86_64' && github.event.inputs.upload_latest == 'true'
+        run: |
+          echo "检测到需要上传 Ubuntu latest DEB，正在执行上传..."
+          ossutil cp -rf "${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-amd64.deb" "oss://${{ secrets.BUCKET_NAME }}/offline/latest/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-latest.deb"
          
 
       - name: upload jar and web zip to oss (using PowerShell and ossutil filter)
