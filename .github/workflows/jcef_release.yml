@@ -133,24 +133,24 @@ jobs:
           echo "$JBR_HOME_PATH/bin" >> $GITHUB_PATH
 
 
-      # Install jre Linux x64
-      - name: Install Jre for Linux
-        if: ${{ runner.os == 'Linux' && matrix.arch == 'x86_64' }}
-        uses: actions/setup-java@main
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-          java-package: 'jre'
+      - name: Setup Custom JBR for Linux Runtime Image
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          if [ "${{ matrix.arch }}" == "arm64" ]; then
+            JBR_URL="https://cache-redirector.jetbrains.com/intellij-jbr/jbr_jcef-17.0.12-linux-aarch64-b1207.37.tar.gz"
+          else
+            JBR_URL="https://cache-redirector.jetbrains.com/intellij-jbr/jbr_jcef-17.0.12-linux-x64-b1207.37.tar.gz"
+          fi
 
-      # Install jre Linux arm64
-      - name: Install Jre for Linux
-        if: ${{ runner.os == 'Linux' && matrix.arch == 'arm64' }}
-        uses: actions/setup-java@main
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-          java-package: 'jre'
-          architecture: 'aarch64'
+          echo "Downloading Linux JBR JCEF for ${{ matrix.arch }}..."
+          curl -L -o jbr-linux.tar.gz "$JBR_URL"
+          mkdir -p jbr-linux
+          tar -xzf jbr-linux.tar.gz -C jbr-linux --strip-components=1
+
+          JBR_HOME_PATH=$(cd jbr-linux && pwd)
+          echo "JBR_LINUX_PATH=$JBR_HOME_PATH" >> $GITHUB_ENV
+          echo "Linux JBR JCEF is ready at: $JBR_HOME_PATH"
 
       - name: Install Ubuntu packaging dependencies
         if: ${{ runner.os == 'Linux' }}
@@ -217,6 +217,8 @@ jobs:
       # Copy jre Linux
       - name: Copy Jre for Linux
         if: ${{ runner.os == 'Linux' }}
+        env:
+          JAVA_HOME: ${{ env.JBR_LINUX_PATH }}
         run: |
           mkdir -p ${{ secrets.REPO_STATIC_PATH }}
           cp -r $JAVA_HOME ${{ secrets.REPO_JRE_PATH }}
