@@ -37,15 +37,15 @@ jobs:
             file_name: 'arm64-latest.dmg'
             file_extension: '-arm64.dmg'
             build_arg: '--mac --arm64'
-          # - os: ubuntu-latest
-          #   arch: x86_64
-          #   file_name: 'latest.AppImage'
-          #   file_extension: '-x86_64.AppImage'
-          #   build_arg: '--linux --x64'
+          - os: ubuntu-latest
+            arch: x86_64
+            file_name: 'latest.deb'
+            file_extension: '-amd64.deb'
+            build_arg: '--linux --x64'
           # - os: ubuntu-latest
           #   arch: arm64
-          #   file_name: 'arm64-latest.AppImage'
-          #   file_extension: '-arm64.AppImage'
+          #   file_name: 'arm64-latest.deb'
+          #   file_extension: '-arm64.deb'
           #   build_arg: '--linux --arm64'
 
     runs-on: ${{ matrix.os }}
@@ -152,6 +152,12 @@ jobs:
           java-package: 'jre'
           architecture: 'aarch64'
 
+      - name: Install Ubuntu packaging dependencies
+        if: ${{ runner.os == 'Linux' }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y fakeroot
+
       # java.security open tls1 Windows
       - name: Enable tls1
         if: ${{ runner.os == 'Windows' }}
@@ -215,6 +221,9 @@ jobs:
           mkdir -p ${{ secrets.REPO_STATIC_PATH }}
           cp -r $JAVA_HOME ${{ secrets.REPO_JRE_PATH }}
           chmod -R 777 ${{ secrets.REPO_JRE_PATH }}
+          mkdir -p ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/runtime/linux/Home
+          cp -r $JAVA_HOME/* ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/runtime/linux/Home
+          chmod -R 777 ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/runtime/linux
 
       # Linux
       - name: Delete File
@@ -224,6 +233,20 @@ jobs:
           ls -la
           rm -rf legal
           ls -la
+          rm -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/runtime/linux/Home/legal
+
+      - name: Setup Temurin JDK for Linux Build and Packaging
+        if: ${{ runner.os == 'Linux' }}
+        uses: actions/setup-java@main
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          java-package: 'jdk'
+
+      - name: Enable tls1
+        if: ${{ runner.os == 'Linux' }}
+        run: |
+          sed -i "s/\(^jdk.tls.disabledAlgorithms=\)\(.*\)\( TLSv1, TLSv1.1,\)\(.*\)/\1\2\4/" $JAVA_HOME/conf/security/java.security
 
       # 安装Node.js
       - name: Install Node.js
@@ -289,6 +312,15 @@ jobs:
           # ossutil cp -rf ${{ secrets.REPO_JAR_PATH }} "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/"
           # cp ${{ secrets.REPO_JAR_PATH }} ${{ secrets.REPO_STATIC_JAR_PATH }}
 
+      - name: Build BE Static linux
+        if: ${{ runner.os == 'Linux' }}
+        run: |
+          pwd
+          mvn -v
+          mvn clean install -U -B '-Dmaven.test.skip=true' -f ${{ secrets.REPO_POM_PATH }}
+          # ossutil cp -rf ${{ secrets.REPO_JAR_PATH }} "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/"
+          # cp ${{ secrets.REPO_JAR_PATH }} ${{ secrets.REPO_STATIC_JAR_PATH }}
+
 
       # 打包前端资源
       - name: Build FE Static
@@ -298,8 +330,8 @@ jobs:
           pushd ${{ secrets.REPO_FRONT_PATH }}
           yarn
           yarn run build:web:desktop --app_version=${{ github.event.inputs.version }}
-          # zip -r dist.zip dist
-          tar -a -c -f dist.zip dist
+          rm -f dist.zip
+          zip -qr dist.zip dist
           # ossutil cp -rf dist.zip "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/"
 
           cp -r dist ./static/
@@ -484,6 +516,11 @@ jobs:
         run: |
           sh ${{secrets.JCEF_PROJECT_ROOT}}/package_macos.sh  ${{ github.event.inputs.version }} ${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.dmg
 
+      - name: package linux x86_64
+        if: ${{ runner.os == 'Linux' && matrix.arch == 'x86_64' }}
+        run: |
+          sh ${{secrets.JCEF_PROJECT_ROOT}}/package_linux.sh ${{ github.event.inputs.version }} "${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-amd64.deb"
+
         # 公证&签名 Mac App（添加 stapler staple 钉入公证票据）
       - name: Notarize MacOS x86_64 App
         if: matrix.os == 'macos-latest' && matrix.arch == 'x86_64'
@@ -523,6 +560,18 @@ jobs:
         run: |
           echo "检测到需要上传 arm64 DMG，正在执行上传..."
           ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.dmg "oss://${{ secrets.BUCKET_NAME }}/download/latest/${{ secrets.PRODUCT_APP_NAME }}-latest.dmg"
+
+      - name: Upload Linux DEB to OSS
+        if: matrix.os == 'ubuntu-latest' && matrix.arch == 'x86_64'
+        run: |
+          echo "上传 Ubuntu DEB 包到版本目录..."
+          ossutil cp -rf "${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-amd64.deb" "oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/"
+
+      - name: Upload Linux DEB to latest if requested
+        if: matrix.os == 'ubuntu-latest' && matrix.arch == 'x86_64' && github.event.inputs.upload_latest == 'true'
+        run: |
+          echo "检测到需要上传 Ubuntu latest DEB，正在执行上传..."
+          ossutil cp -rf "${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-amd64.deb" "oss://${{ secrets.BUCKET_NAME }}/download/latest/${{ secrets.PRODUCT_APP_NAME }}-latest.deb"
 
 
       # - name: upload jar and web zip to oss
