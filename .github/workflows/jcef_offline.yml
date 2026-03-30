@@ -811,8 +811,26 @@ jobs:
           cp -r ${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe ${{ github.workspace }}
       - name: Install WinSCP
         if: ${{ runner.os == 'Windows' }}
+        shell: pwsh
         run: |
-          choco install winscp
+          choco install winscp -y --no-progress
+
+          $candidates = @(
+            "C:\Program Files (x86)\WinSCP\WinSCP.com",
+            "C:\Program Files\WinSCP\WinSCP.com",
+            "C:\ProgramData\chocolatey\bin\winscp.com"
+          )
+
+          $winScpPath = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $winScpPath) {
+            Write-Error "WinSCP.com was not found after installation."
+            exit 1
+          }
+
+          $winScpDir = Split-Path -Path $winScpPath -Parent
+          "WINSCP_PATH=$winScpPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          $winScpDir | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          Write-Host "Resolved WinSCP executable: $winScpPath"
 
       # 上传文件到OSS准备
       - name: Upload to OSS for windows
@@ -825,6 +843,7 @@ jobs:
       - name: Copy files to remote server
         if: ${{ runner.os == 'Windows' }}
         timeout-minutes: 15
+        shell: pwsh
         env:
           SCP_PASSWORD: ${{ secrets.WIN_SSH_PRIVATE_KEY }}
           REMOTE_HOST: ${{ secrets.WIN_SERVER_IP }}
@@ -837,7 +856,7 @@ jobs:
           REMOTE_SCRIPT_PATH_2: '${{ secrets.REMOTE_SIGN_SCRIPT }} --alg SHA-256 ${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe'
           LOCAL_DOWNLOAD_PATH: '${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe'
         run: |
-          winscp.com /log=winscp.log /command `
+          & "${env:WINSCP_PATH}" /log=winscp.log /command `
             "option batch abort" `
             "option confirm off" `
             "open scp://${{ env.REMOTE_USER }}:${{ env.SCP_PASSWORD }}@${{ env.REMOTE_HOST }} -hostkey=*" `
