@@ -39,14 +39,14 @@ jobs:
             build_arg: '--mac --arm64'
           - os: ubuntu-22.04
             arch: x86_64
-            file_name: 'latest.deb'
-            file_extension: '-amd64.deb'
+            file_name: 'latest.AppImage'
+            file_extension: '-x86_64.AppImage'
             build_arg: '--linux --x64'
-          # - os: ubuntu-latest
-          #   arch: arm64
-          #   file_name: 'arm64-latest.deb'
-          #   file_extension: '-arm64.deb'
-          #   build_arg: '--linux --arm64'
+          - os: ubuntu-22.04-arm
+            arch: arm64
+            file_name: 'arm64-latest.AppImage'
+            file_extension: '-arm64.AppImage'
+            build_arg: '--linux --arm64'
 
     runs-on: ${{ matrix.os }}
 
@@ -59,14 +59,14 @@ jobs:
           path: ${{ secrets.REPO_PATH }}
           ref: ${{ secrets.REPO_BRANCH }}
           token: ${{ secrets.ACCESS_TOKEN }}
-          
+
       # Output basic information
       - name: Print basic information
         run: |
           echo "current version: ${{ github.run_id }}"
+      
 
-
-       # =================================================================
+      # =================================================================
       # 【第一阶段】准备环境：下载 JBR 并安装 Temurin JDK
       # =================================================================
       - name: Setup Custom JBR (for Build and Runtime Image)
@@ -106,7 +106,7 @@ jobs:
           # 4. 【已修改】将路径保存到一个唯一的环境变量中，而不是直接设置 JAVA_HOME
           echo "OPENJDK_PATH=$jdkHome" >> $env:GITHUB_ENV
           Write-Host "Custom OpenJDK path saved to OPENJDK_PATH for subsequent steps."      
-          
+
       # =================================================================
       # 【第一阶段】准备环境：将 JBR 设置为默认，并安装好 Temurin
       # =================================================================
@@ -130,158 +130,158 @@ jobs:
           echo "Setting default JAVA_HOME to JBR: $JBR_HOME_PATH"
           echo "JAVA_HOME=$JBR_HOME_PATH" >> $GITHUB_ENV
           echo "$JBR_HOME_PATH/bin" >> $GITHUB_PATH
-        
           
-      # # Install jre Windows
-      # - name: Install Jre for Windows
-      #   if: ${{ runner.os == 'Windows' }}
-      #   uses: actions/setup-java@main
-      #   with:
-      #     java-version: '17'
-      #     distribution: 'temurin'
-      #     java-package: 'jre'
           
-      # - name: Setup Custom JBR for Windows
-      #   if: runner.os == 'Windows'
-      #   # 显式指定使用 PowerShell
-      #   shell: pwsh
-      #   run: |
-      #     # --------------------- 准备工作 ---------------------
-      #     Write-Host "Downloading and extracting JBR for Windows..."
-      #     # 下载用户指定的 Windows JBR 版本
-      #     curl.exe -L -o jbr.tar.gz "https://cache-redirector.jetbrains.com/intellij-jbr/jbr_jcef-17.0.12-windows-x64-b1207.37.tar.gz"
+          # # Install jre Windows
+          # - name: Install Jre for Windows
+          #   if: ${{ runner.os == 'Windows' }}
+          #   uses: actions/setup-java@main
+          #   with:
+          #     java-version: '17'
+          #     distribution: 'temurin'
+          #     java-package: 'jre'
           
-      #     # 使用 PowerShell 原生命令创建目录
-      #     New-Item -Path "jbr-17" -ItemType Directory -Force
+          # - name: Setup Custom JBR for Windows
+          #   if: runner.os == 'Windows'
+          #   # 显式指定使用 PowerShell
+          #   shell: pwsh
+          #   run: |
+          #     # --------------------- 准备工作 ---------------------
+          #     Write-Host "Downloading and extracting JBR for Windows..."
+          #     # 下载用户指定的 Windows JBR 版本
+          #     curl.exe -L -o jbr.tar.gz "https://cache-redirector.jetbrains.com/intellij-jbr/jbr_jcef-17.0.12-windows-x64-b1207.37.tar.gz"
           
-      #     # GitHub Actions 的 Windows 运行器支持 tar 命令
-      #     tar.exe -xzf jbr.tar.gz -C jbr-17 --strip-components=1
+          #     # 使用 PowerShell 原生命令创建目录
+          #     New-Item -Path "jbr-17" -ItemType Directory -Force
           
-      #     # --------------------- 核心配置步骤 ---------------------
-      #     Write-Host "Configuring environment variables for Windows..."
+          #     # GitHub Actions 的 Windows 运行器支持 tar 命令
+          #     tar.exe -xzf jbr.tar.gz -C jbr-17 --strip-components=1
           
-      #     # 步骤 1: 获取 JBR Home 目录的绝对路径
-      #     # Windows JBR 的结构更简单，解压后就是 Home 目录
-      #     $jbrPath = Resolve-Path -Path "jbr-17"
-      #     Write-Host "Correct JAVA_HOME path will be: $jbrPath"
+          #     # --------------------- 核心配置步骤 ---------------------
+          #     Write-Host "Configuring environment variables for Windows..."
+          
+          #     # 步骤 1: 获取 JBR Home 目录的绝对路径
+          #     # Windows JBR 的结构更简单，解压后就是 Home 目录
+          #     $jbrPath = Resolve-Path -Path "jbr-17"
+          #     Write-Host "Correct JAVA_HOME path will be: $jbrPath"
+          
+          #     # 步骤 2: 设置 JAVA_HOME 环境变量，供后续步骤使用
+          #     echo "JAVA_HOME=$jbrPath" >> $env:GITHUB_ENV
+          
+          #     # 步骤 3: 使用 GITHUB_PATH 将 JBR 的 bin 目录添加到 PATH 最前端
+          #     $jbrBinPath = Join-Path $jbrPath "bin"
+          #     echo "$jbrBinPath" >> $env:GITHUB_PATH
+          
+          #     Write-Host "Configuration complete."
+          
+          # - name: Verify Final Java Configuration for Windows
+          #   if: runner.os == 'Windows'
+          #   shell: pwsh
+          #   run: |
+          #     Write-Host "--- Verifying final configuration for Windows ---"
+          
+          #     # 1. 检查 JAVA_HOME 环境变量
+          #     Write-Host "JAVA_HOME is: $env:JAVA_HOME"
+          
+          #     # 2. 检查 'java' 命令的指向
+          #     $javaPath = (Get-Command java).Source
+          #     Write-Host "'Get-Command java' points to: $javaPath"
+          
+          #     # 3. 检查 Java 版本
+          #     Write-Host "Final 'java -version' output:"
+          #     java -version
+          
+          #     # 4. 最终断言，确保路径正确 (已更新为 Windows 路径格式)
+          #     $expectedPathPart = "jbr-17\bin\java.exe"
+          #     if (-not ($javaPath -like "*$expectedPathPart*")) {
+          #       Write-Error "Failed to set custom JBR path correctly! Expected path to contain '$expectedPathPart' but got '$javaPath'."
+          #       exit 1
+          #     }
+          
+          #     Write-Host "JBR path verification successful."    
+          
+          # # Install jre MacOS X64
+          # - name: Install Jre MacOS X64
+          #   if: ${{ runner.os == 'macOS' && matrix.arch == 'x86_64' }}
+          #   uses: actions/setup-java@v2
+          #   with:
+          #     java-version: '17'
+          #     distribution: 'temurin'
+          #     java-package: 'jre'
+          #     architecture: 'x64'
+          
+          # - name: Setup Custom JBR For Mac arm (Final Correct Path)
+          #   if: ${{ runner.os == 'macOS' && matrix.arch == 'arm64' }}
+          #   run: |
+          #     # --------------------- 准备工作 ---------------------
+          #     echo "Downloading and extracting JBR..."
+          #     curl -L -o jbr.tar.gz "https://cache-redirector.jetbrains.com/intellij-jbr/jbr_jcef-17.0.12-osx-aarch64-b1207.37.tar.gz"
+          #     mkdir -p jbr-17
+          #     tar -xzf jbr.tar.gz -C jbr-17 --strip-components=1
+          
+          #     # --------------------- 核心配置步骤 (已根据最终路径 jbr-17/Contents/Home 修正) ---------------------
+          #     echo "Configuring environment variables..."
+          
+          #     # 步骤 1: 获取 JBR 的 Home 目录的绝对路径 (关键修正)
+          #     # 我们进入 jbr-17/Contents/Home 目录后再获取路径
+          #     JBR_HOME=$(cd jbr-17/Contents/Home && pwd)
+          #     echo "Correct JAVA_HOME path will be: $JBR_HOME"
+          
+          #     # 步骤 2: 设置 JAVA_HOME 环境变量
+          #     echo "JAVA_HOME=$JBR_HOME" >> $GITHUB_ENV
+          
+          #     # 步骤 3: 使用 GITHUB_PATH 将 JBR 的 bin 目录添加到 PATH 最前端
+          #     echo "$JBR_HOME/bin" >> $GITHUB_PATH
+          
+          #     echo "Configuration complete."
+          
+          # - name: Setup Custom JBR For Mac x64 (Final Correct Path)
+          #   if: ${{ runner.os == 'macOS' && matrix.arch == 'x86_64' }}
+          #   run: |
+          #     # --------------------- 准备工作 ---------------------
+          #     echo "Downloading and extracting JBR..."
+          #     curl -L -o jbr.tar.gz "https://cache-redirector.jetbrains.com/intellij-jbr/jbr_jcef-17.0.12-osx-x64-b1207.37.tar.gz"
+          #     mkdir -p jbr-17
+          #     tar -xzf jbr.tar.gz -C jbr-17 --strip-components=1
+          
+          #     # --------------------- 核心配置步骤 (已根据最终路径 jbr-17/Contents/Home 修正) ---------------------
+          #     echo "Configuring environment variables..."
+          
+          #     # 步骤 1: 获取 JBR 的 Home 目录的绝对路径 (关键修正)
+          #     # 我们进入 jbr-17/Contents/Home 目录后再获取路径
+          #     JBR_HOME=$(cd jbr-17/Contents/Home && pwd)
+          #     echo "Correct JAVA_HOME path will be: $JBR_HOME"
+          
+          #     # 步骤 2: 设置 JAVA_HOME 环境变量
+          #     echo "JAVA_HOME=$JBR_HOME" >> $GITHUB_ENV
+          
+          #     # 步骤 3: 使用 GITHUB_PATH 将 JBR 的 bin 目录添加到 PATH 最前端
+          #     echo "$JBR_HOME/bin" >> $GITHUB_PATH
+          
+          #     echo "Configuration complete."    
+          
+          # - name: Verify Final Java Configuration
+          #   if: ${{ runner.os == 'macOS'}}
+          #   run: |
+          #     echo "--- Verifying final configuration ---"
+          
+          #     # 1. 检查 JAVA_HOME
+          #     echo "JAVA_HOME is: $JAVA_HOME"
+          
+          #     # 2. 检查 'java' 命令的指向
+          #     WHICH_JAVA=$(which java)
+          #     echo "'which java' points to: $WHICH_JAVA"
+          
+          #     # 3. 检查 Java 版本
+          #     echo "Final 'java -version' output:"
+          #     java -version
+          
+          #     # 4. 最终断言，确保路径正确 (已更新断言路径)
+          #     if [[ ! "$WHICH_JAVA" == *"/jbr-17/Contents/Home/bin/java"* ]]; then
+          #       echo "::error::Failed to set custom JBR path correctly!"
+          #       exit 1
+          #     fi
 
-      #     # 步骤 2: 设置 JAVA_HOME 环境变量，供后续步骤使用
-      #     echo "JAVA_HOME=$jbrPath" >> $env:GITHUB_ENV
-
-      #     # 步骤 3: 使用 GITHUB_PATH 将 JBR 的 bin 目录添加到 PATH 最前端
-      #     $jbrBinPath = Join-Path $jbrPath "bin"
-      #     echo "$jbrBinPath" >> $env:GITHUB_PATH
-          
-      #     Write-Host "Configuration complete."
-
-      # - name: Verify Final Java Configuration for Windows
-      #   if: runner.os == 'Windows'
-      #   shell: pwsh
-      #   run: |
-      #     Write-Host "--- Verifying final configuration for Windows ---"
-          
-      #     # 1. 检查 JAVA_HOME 环境变量
-      #     Write-Host "JAVA_HOME is: $env:JAVA_HOME"
-
-      #     # 2. 检查 'java' 命令的指向
-      #     $javaPath = (Get-Command java).Source
-      #     Write-Host "'Get-Command java' points to: $javaPath"
-          
-      #     # 3. 检查 Java 版本
-      #     Write-Host "Final 'java -version' output:"
-      #     java -version
-
-      #     # 4. 最终断言，确保路径正确 (已更新为 Windows 路径格式)
-      #     $expectedPathPart = "jbr-17\bin\java.exe"
-      #     if (-not ($javaPath -like "*$expectedPathPart*")) {
-      #       Write-Error "Failed to set custom JBR path correctly! Expected path to contain '$expectedPathPart' but got '$javaPath'."
-      #       exit 1
-      #     }
-          
-      #     Write-Host "JBR path verification successful."    
-
-      # # Install jre MacOS X64
-      # - name: Install Jre MacOS X64
-      #   if: ${{ runner.os == 'macOS' && matrix.arch == 'x86_64' }}
-      #   uses: actions/setup-java@v2
-      #   with:
-      #     java-version: '17'
-      #     distribution: 'temurin'
-      #     java-package: 'jre'
-      #     architecture: 'x64'
-
-      # - name: Setup Custom JBR For Mac arm (Final Correct Path)
-      #   if: ${{ runner.os == 'macOS' && matrix.arch == 'arm64' }}
-      #   run: |
-      #     # --------------------- 准备工作 ---------------------
-      #     echo "Downloading and extracting JBR..."
-      #     curl -L -o jbr.tar.gz "https://cache-redirector.jetbrains.com/intellij-jbr/jbr_jcef-17.0.12-osx-aarch64-b1207.37.tar.gz"
-      #     mkdir -p jbr-17
-      #     tar -xzf jbr.tar.gz -C jbr-17 --strip-components=1
-          
-      #     # --------------------- 核心配置步骤 (已根据最终路径 jbr-17/Contents/Home 修正) ---------------------
-      #     echo "Configuring environment variables..."
-          
-      #     # 步骤 1: 获取 JBR 的 Home 目录的绝对路径 (关键修正)
-      #     # 我们进入 jbr-17/Contents/Home 目录后再获取路径
-      #     JBR_HOME=$(cd jbr-17/Contents/Home && pwd)
-      #     echo "Correct JAVA_HOME path will be: $JBR_HOME"
-
-      #     # 步骤 2: 设置 JAVA_HOME 环境变量
-      #     echo "JAVA_HOME=$JBR_HOME" >> $GITHUB_ENV
-
-      #     # 步骤 3: 使用 GITHUB_PATH 将 JBR 的 bin 目录添加到 PATH 最前端
-      #     echo "$JBR_HOME/bin" >> $GITHUB_PATH
-          
-      #     echo "Configuration complete."
-
-      # - name: Setup Custom JBR For Mac x64 (Final Correct Path)
-      #   if: ${{ runner.os == 'macOS' && matrix.arch == 'x86_64' }}
-      #   run: |
-      #     # --------------------- 准备工作 ---------------------
-      #     echo "Downloading and extracting JBR..."
-      #     curl -L -o jbr.tar.gz "https://cache-redirector.jetbrains.com/intellij-jbr/jbr_jcef-17.0.12-osx-x64-b1207.37.tar.gz"
-      #     mkdir -p jbr-17
-      #     tar -xzf jbr.tar.gz -C jbr-17 --strip-components=1
-          
-      #     # --------------------- 核心配置步骤 (已根据最终路径 jbr-17/Contents/Home 修正) ---------------------
-      #     echo "Configuring environment variables..."
-          
-      #     # 步骤 1: 获取 JBR 的 Home 目录的绝对路径 (关键修正)
-      #     # 我们进入 jbr-17/Contents/Home 目录后再获取路径
-      #     JBR_HOME=$(cd jbr-17/Contents/Home && pwd)
-      #     echo "Correct JAVA_HOME path will be: $JBR_HOME"
-
-      #     # 步骤 2: 设置 JAVA_HOME 环境变量
-      #     echo "JAVA_HOME=$JBR_HOME" >> $GITHUB_ENV
-
-      #     # 步骤 3: 使用 GITHUB_PATH 将 JBR 的 bin 目录添加到 PATH 最前端
-      #     echo "$JBR_HOME/bin" >> $GITHUB_PATH
-          
-      #     echo "Configuration complete."    
-
-      # - name: Verify Final Java Configuration
-      #   if: ${{ runner.os == 'macOS'}}
-      #   run: |
-      #     echo "--- Verifying final configuration ---"
-          
-      #     # 1. 检查 JAVA_HOME
-      #     echo "JAVA_HOME is: $JAVA_HOME"
-
-      #     # 2. 检查 'java' 命令的指向
-      #     WHICH_JAVA=$(which java)
-      #     echo "'which java' points to: $WHICH_JAVA"
-
-      #     # 3. 检查 Java 版本
-      #     echo "Final 'java -version' output:"
-      #     java -version
-
-      #     # 4. 最终断言，确保路径正确 (已更新断言路径)
-      #     if [[ ! "$WHICH_JAVA" == *"/jbr-17/Contents/Home/bin/java"* ]]; then
-      #       echo "::error::Failed to set custom JBR path correctly!"
-      #       exit 1
-      #     fi
-          
       # Install jre MacOS arm64
       # - name: Install Jre MacOS arm64
       #   if: ${{ runner.os == 'macOS' && matrix.arch == 'arm64' }}
@@ -292,7 +292,7 @@ jobs:
       #     java-package: 'jre'
       #     architecture: 'aarch64'
 
-      
+
 
       - name: Setup Custom JBR for Linux Runtime Image
         if: runner.os == 'Linux'
@@ -317,7 +317,7 @@ jobs:
         if: ${{ runner.os == 'Linux' }}
         run: |
           sudo apt-get update
-          sudo apt-get install -y fakeroot zip
+          sudo apt-get install -y fakeroot zip rpm desktop-file-utils file
 
       # java.security open tls1 Windows
       - name: Enable tls1
@@ -373,7 +373,7 @@ jobs:
           chmod -R 777 ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/runtime/mac
           cp -r $JAVA_HOME/../Frameworks ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/mac
           rm -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/mac/Frameworks/cef_server.app
-          
+      
 
       # Copy jre Linux
       - name: Copy Jre for Linux
@@ -418,14 +418,14 @@ jobs:
           node-version: '18.17.0'
           cache: 'yarn'
           cache-dependency-path: ${{ secrets.REPO_YARN_PATH }}
-            
-      # 安装Maven
-      # - name: Install Java and Maven
-      #   uses: actions/setup-java@main
-      #   with:
-      #     java-version: '17'
-      #     distribution: 'temurin'
-      #     cache: 'maven'
+
+        # 安装Maven
+        # - name: Install Java and Maven
+        #   uses: actions/setup-java@main
+        #   with:
+        #     java-version: '17'
+        #     distribution: 'temurin'
+        #     cache: 'maven'
 
         # 打包依赖包
       # - name: Check out first repository
@@ -455,7 +455,7 @@ jobs:
       # 打包后端工程
       - name: Build BE Static win
         if: ${{ runner.os == 'Windows' }}
-          # 在这个步骤中，临时覆盖 JAVA_HOME，让 Maven 使用 JBR
+        # 在这个步骤中，临时覆盖 JAVA_HOME，让 Maven 使用 JBR
         env:
           JAVA_HOME: ${{ env.JBR_BUILD_PATH }}
         run: |
@@ -464,7 +464,7 @@ jobs:
           mvn clean install -U -B '-Dmaven.test.skip=true' -f ${{ secrets.REPO_POM_PATH }}
           # ossutil cp -rf ${{ secrets.REPO_JAR_PATH }} "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/"
           # cp ${{ secrets.REPO_JAR_PATH }} ${{ secrets.REPO_STATIC_JAR_PATH }} 
-          
+
       # 打包后端工程
       - name: Build BE Static mac
         if: ${{ runner.os == 'macOS' }}
@@ -483,9 +483,9 @@ jobs:
           mvn clean install -U -B '-Dmaven.test.skip=true' -f ${{ secrets.REPO_POM_PATH }}
           # ossutil cp -rf ${{ secrets.REPO_JAR_PATH }} "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/"
           # cp ${{ secrets.REPO_JAR_PATH }} ${{ secrets.REPO_STATIC_JAR_PATH }}
-          
+      
 
-       # 打包前端资源
+      # 打包前端资源
       - name: Build FE Static
         if: runner.os != 'Windows'
         shell: bash
@@ -519,9 +519,9 @@ jobs:
           cp ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/local_version.json ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/mac
           cp ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/local_version.json ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/win
           cp ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/local_version.json ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/linux
+      
 
-
-       # Step specifically for Windows
+      # Step specifically for Windows
       - name: Build FE Static (Windows)
         if: runner.os == 'Windows'
         shell: bash
@@ -534,7 +534,7 @@ jobs:
           # 【已修改】在 Windows 上，使用 7-Zip 创建标准的 zip 文件，避免编码问题
           # 7-Zip is pre-installed on GitHub's Windows runners
           7z a -tzip dist.zip ./dist
-        
+          
           cp -r dist ./static/
           popd
           
@@ -558,43 +558,43 @@ jobs:
           cp ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/local_version.json ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/mac
           cp ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/local_version.json ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/win
           cp ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/local_version.json ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/linux
-    
-      # 打包前端资源
-      # - name: Build FE Static
-      #   shell: bash
-      #   run: |
-      #     pushd ${{ secrets.REPO_FRONT_PATH }}
-      #     yarn
-      #     yarn run modify:package:name chat2db-local Chat2DB-Local
-      #     yarn run build:web:offline --app_version=${{ github.event.inputs.version }}
-      #     # zip -r dist.zip dist
-      #     tar -a -c -f dist.zip dist
-      #     ossutil cp -rf dist.zip "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/"
           
-      #     cp -r dist ./static/
+          # 打包前端资源
+          # - name: Build FE Static
+          #   shell: bash
+          #   run: |
+          #     pushd ${{ secrets.REPO_FRONT_PATH }}
+          #     yarn
+          #     yarn run modify:package:name chat2db-local Chat2DB-Local
+          #     yarn run build:web:offline --app_version=${{ github.event.inputs.version }}
+          #     # zip -r dist.zip dist
+          #     tar -a -c -f dist.zip dist
+          #     ossutil cp -rf dist.zip "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/"
           
-      #     popd
-      #     echo "Returned to the original directory. Current path is:"
-      #     pwd
+          #     cp -r dist ./static/
           
-      #     mkdir -p ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile
-      #     cp ${{ secrets.REPO_FRONT_PATH }}/dist.zip ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile
+          #     popd
+          #     echo "Returned to the original directory. Current path is:"
+          #     pwd
           
-      #     mkdir -p ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/mac
-      #     mkdir -p ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/win
-      #     mkdir -p ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/linux
-      #     cp -r ${{ secrets.REPO_FRONT_PATH }}/dist ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/mac
-      #     cp -r ${{ secrets.REPO_FRONT_PATH }}/dist ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/win
-      #     cp -r ${{ secrets.REPO_FRONT_PATH }}/dist ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/linux
+          #     mkdir -p ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile
+          #     cp ${{ secrets.REPO_FRONT_PATH }}/dist.zip ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile
+          
+          #     mkdir -p ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/mac
+          #     mkdir -p ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/win
+          #     mkdir -p ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/linux
+          #     cp -r ${{ secrets.REPO_FRONT_PATH }}/dist ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/mac
+          #     cp -r ${{ secrets.REPO_FRONT_PATH }}/dist ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/win
+          #     cp -r ${{ secrets.REPO_FRONT_PATH }}/dist ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/linux
+          
+          #     echo "start build version file"
+          #     sh ${{secrets.JCEF_PROJECT_ROOT}}/generate_metadata.sh  ${{ github.event.inputs.version }}  ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile  https://cdn.chat2db-ai.com/offline/updates
+          #     cp ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/version.json   ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/local_version.json
+          #     cp ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/local_version.json ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/mac
+          #     cp ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/local_version.json ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/win
+          #     cp ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/local_version.json ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/linux
 
-      #     echo "start build version file"
-      #     sh ${{secrets.JCEF_PROJECT_ROOT}}/generate_metadata.sh  ${{ github.event.inputs.version }}  ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile  https://cdn.chat2db-ai.com/offline/updates
-      #     cp ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/version.json   ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/local_version.json
-      #     cp ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/local_version.json ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/mac
-      #     cp ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/local_version.json ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/win
-      #     cp ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/local_version.json ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/linux
-          
-          
+
       - name: Import Code-Signing Certificate
         if: ${{ runner.os == 'macOS' }}
         run: |
@@ -668,7 +668,7 @@ jobs:
           distribution: 'temurin'
           java-package: 'jdk'
           architecture: ${{ matrix.arch }}
-          
+
       # =================================================================
       # 【第三阶段】在打包前，将环境切换到 Temurin
       # =================================================================
@@ -704,17 +704,17 @@ jobs:
         if: ${{ runner.os == 'macOS' && matrix.arch == 'arm64' }}
         run: |
           sh ${{secrets.JCEF_PROJECT_ROOT}}/package_macos_offline.sh  ${{ github.event.inputs.version }} "${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg"
-          
-      - name: package mac x86_64   
+
+      - name: package mac x86_64
         if: ${{ runner.os == 'macOS' && matrix.arch == 'x86_64' }}
         run: |
           sh ${{secrets.JCEF_PROJECT_ROOT}}/package_macos_offline.sh  ${{ github.event.inputs.version }} ${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.dmg
 
-      - name: package linux x86_64
-        if: ${{ runner.os == 'Linux' && matrix.arch == 'x86_64' }}
+      - name: package linux
+        if: ${{ runner.os == 'Linux' }}
         run: |
-          bash ${{secrets.JCEF_PROJECT_ROOT}}/package_linux_offline.sh ${{ github.event.inputs.version }} "${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-amd64.deb"
-          
+          bash ${{secrets.JCEF_PROJECT_ROOT}}/package_linux_offline.sh ${{ github.event.inputs.version }}
+
         # 公证&签名 Mac App
       - name: Notarize MacOS x86_64 App
         if: matrix.os == 'macos-latest' && matrix.arch == 'x86_64'
@@ -755,18 +755,54 @@ jobs:
           echo "检测到需要上传 x64 DMG，正在执行上传..."
           ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.dmg "oss://${{ secrets.BUCKET_NAME }}/offline/latest/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-latest.dmg"
 
-      - name: Upload Linux DEB to OSS
-        if: matrix.os == 'ubuntu-22.04' && matrix.arch == 'x86_64'
+      - name: Upload Linux packages to OSS
+        if: ${{ runner.os == 'Linux' }}
         run: |
-          echo "上传 Ubuntu 离线 DEB 包到版本目录..."
-          ossutil cp -rf "${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-amd64.deb" "oss://${{ secrets.BUCKET_NAME }}/offline/${{ github.event.inputs.version }}/"
+          if [ "${{ matrix.arch }}" = "arm64" ]; then
+            DEB_FILE="${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.deb"
+            RPM_FILE="${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-aarch64.rpm"
+            APPIMAGE_FILE="${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.AppImage"
+          else
+            DEB_FILE="${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-amd64.deb"
+            RPM_FILE="${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x86_64.rpm"
+            APPIMAGE_FILE="${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x86_64.AppImage"
+          fi
 
-      - name: Upload Linux DEB to latest if requested
-        if: matrix.os == 'ubuntu-22.04' && matrix.arch == 'x86_64' && github.event.inputs.upload_latest == 'true'
+          echo "上传 Linux 离线版本产物到 OSS..."
+          ossutil cp -rf "${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${DEB_FILE}" "oss://${{ secrets.BUCKET_NAME }}/offline/${{ github.event.inputs.version }}/"
+          ossutil cp -rf "${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${RPM_FILE}" "oss://${{ secrets.BUCKET_NAME }}/offline/${{ github.event.inputs.version }}/"
+          ossutil cp -rf "${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${APPIMAGE_FILE}" "oss://${{ secrets.BUCKET_NAME }}/offline/${{ github.event.inputs.version }}/"
+
+      - name: Upload Linux packages to latest if requested
+        if: ${{ runner.os == 'Linux' && github.event.inputs.upload_latest == 'true' }}
         run: |
-          echo "检测到需要上传 Ubuntu latest DEB，正在执行上传..."
-          ossutil cp -rf "${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-amd64.deb" "oss://${{ secrets.BUCKET_NAME }}/offline/latest/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-latest.deb"
-         
+          if [ "${{ matrix.arch }}" = "arm64" ]; then
+            ARCH_DIR="arm64"
+            DEB_FILE="${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.deb"
+            RPM_FILE="${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-aarch64.rpm"
+            APPIMAGE_FILE="${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.AppImage"
+            LATEST_DEB="${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-arm64-latest.deb"
+            LATEST_RPM="${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-arm64-latest.rpm"
+            LATEST_APPIMAGE="${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-arm64-latest.AppImage"
+          else
+            ARCH_DIR="x86_64"
+            DEB_FILE="${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-amd64.deb"
+            RPM_FILE="${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x86_64.rpm"
+            APPIMAGE_FILE="${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x86_64.AppImage"
+            LATEST_DEB="${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-latest.deb"
+            LATEST_RPM="${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-latest.rpm"
+            LATEST_APPIMAGE="${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-latest.AppImage"
+          fi
+
+          echo "检测到需要上传 Linux latest 离线产物，正在执行上传..."
+          ossutil cp -rf "${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${DEB_FILE}" "oss://${{ secrets.BUCKET_NAME }}/offline/latest/${LATEST_DEB}"
+          ossutil cp -rf "${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${RPM_FILE}" "oss://${{ secrets.BUCKET_NAME }}/offline/latest/${LATEST_RPM}"
+          ossutil cp -rf "${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${APPIMAGE_FILE}" "oss://${{ secrets.BUCKET_NAME }}/offline/latest/${LATEST_APPIMAGE}"
+
+          ossutil cp -rf "${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${DEB_FILE}" "oss://${{ secrets.BUCKET_NAME }}/offline/latest/linux/${ARCH_DIR}/${DEB_FILE}"
+          ossutil cp -rf "${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${RPM_FILE}" "oss://${{ secrets.BUCKET_NAME }}/offline/latest/linux/${ARCH_DIR}/${RPM_FILE}"
+          ossutil cp -rf "${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${APPIMAGE_FILE}" "oss://${{ secrets.BUCKET_NAME }}/offline/latest/linux/${ARCH_DIR}/${APPIMAGE_FILE}"
+
 
       - name: upload jar and web zip to oss (using PowerShell and ossutil filter)
         if: ${{ runner.os == 'Windows' }}
@@ -789,7 +825,7 @@ jobs:
 
       - name: package win x64
         if: ${{ runner.os == 'Windows' }}
-        shell: bash 
+        shell: bash
         env:
           # 在这个步骤中，临时将 JAVA_HOME 设置为 OpenJDK 的路径
           JAVA_HOME: ${{ env.OPENJDK_PATH }}
@@ -799,7 +835,7 @@ jobs:
           sh ${{secrets.JCEF_PROJECT_ROOT}}/package_win_offline.sh  ${{ github.event.inputs.version }}
           # ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/*.exe "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/"
           # echo "oss successful"
-    
+
       # 准备发往OSS的文件
       - name: Prepare upload for OSS
         if: ${{ runner.os == 'Windows' }}
@@ -878,4 +914,3 @@ jobs:
         run: |
           echo "检测到需要上传 x64 exe，正在执行上传..."
           ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe "oss://${{ secrets.BUCKET_NAME }}/offline/latest/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-latest.exe"
-           
