@@ -39,14 +39,14 @@ jobs:
             build_arg: '--mac --arm64'
           - os: ubuntu-22.04
             arch: x86_64
-            file_name: 'latest.deb'
-            file_extension: '-amd64.deb'
+            file_name: 'latest.AppImage'
+            file_extension: '-x86_64.AppImage'
             build_arg: '--linux --x64'
-          # - os: ubuntu-latest
-          #   arch: arm64
-          #   file_name: 'arm64-latest.deb'
-          #   file_extension: '-arm64.deb'
-          #   build_arg: '--linux --arm64'
+          - os: ubuntu-22.04-arm
+            arch: arm64
+            file_name: 'arm64-latest.AppImage'
+            file_extension: '-arm64.AppImage'
+            build_arg: '--linux --arm64'
 
     runs-on: ${{ matrix.os }}
 
@@ -64,9 +64,9 @@ jobs:
       - name: Print basic information
         run: |
           echo "current version: ${{ github.run_id }}"
+      
 
-
-       # =================================================================
+      # =================================================================
       # 【第一阶段】准备环境：下载 JBR 并安装 Temurin JDK
       # =================================================================
       - name: Setup Custom JBR (for Build and Runtime Image)
@@ -156,7 +156,7 @@ jobs:
         if: ${{ runner.os == 'Linux' }}
         run: |
           sudo apt-get update
-          sudo apt-get install -y fakeroot
+          sudo apt-get install -y fakeroot rpm desktop-file-utils file
 
       # java.security open tls1 Windows
       - name: Enable tls1
@@ -258,13 +258,13 @@ jobs:
           cache: 'yarn'
           cache-dependency-path: ${{ secrets.REPO_YARN_PATH }}
 
-      # 安装Maven
-      # - name: Install Java and Maven
-      #   uses: actions/setup-java@main
-      #   with:
-      #     java-version: '17'
-      #     distribution: 'temurin'
-      #     cache: 'maven'
+        # 安装Maven
+        # - name: Install Java and Maven
+        #   uses: actions/setup-java@main
+        #   with:
+        #     java-version: '17'
+        #     distribution: 'temurin'
+        #     cache: 'maven'
 
         # 打包依赖包
       # - name: Check out first repository
@@ -294,7 +294,7 @@ jobs:
       # 打包后端工程
       - name: Build BE Static win
         if: ${{ runner.os == 'Windows' }}
-          # 在这个步骤中，临时覆盖 JAVA_HOME，让 Maven 使用 JBR
+        # 在这个步骤中，临时覆盖 JAVA_HOME，让 Maven 使用 JBR
         env:
           JAVA_HOME: ${{ env.JBR_BUILD_PATH }}
         run: |
@@ -358,9 +358,9 @@ jobs:
           cp ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/local_version.json ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/mac
           cp ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/local_version.json ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/win
           cp ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/local_version.json ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/linux
+      
 
-
-       # Step specifically for Windows
+      # Step specifically for Windows
       - name: Build FE Static (Windows)
         if: runner.os == 'Windows'
         shell: bash
@@ -518,10 +518,10 @@ jobs:
         run: |
           sh ${{secrets.JCEF_PROJECT_ROOT}}/package_macos.sh  ${{ github.event.inputs.version }} ${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.dmg
 
-      - name: package linux x86_64
-        if: ${{ runner.os == 'Linux' && matrix.arch == 'x86_64' }}
+      - name: package linux
+        if: ${{ runner.os == 'Linux' }}
         run: |
-          bash ${{secrets.JCEF_PROJECT_ROOT}}/package_linux.sh ${{ github.event.inputs.version }} "${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-amd64.deb"
+          bash ${{secrets.JCEF_PROJECT_ROOT}}/package_linux.sh ${{ github.event.inputs.version }}
 
         # 公证&签名 Mac App（添加 stapler staple 钉入公证票据）
       - name: Notarize MacOS x86_64 App
@@ -563,17 +563,53 @@ jobs:
           echo "检测到需要上传 arm64 DMG，正在执行上传..."
           ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.dmg "oss://${{ secrets.BUCKET_NAME }}/download/latest/${{ secrets.PRODUCT_APP_NAME }}-latest.dmg"
 
-      - name: Upload Linux DEB to OSS
-        if: matrix.os == 'ubuntu-22.04' && matrix.arch == 'x86_64'
+      - name: Upload Linux packages to OSS
+        if: ${{ runner.os == 'Linux' }}
         run: |
-          echo "上传 Ubuntu DEB 包到版本目录..."
-          ossutil cp -rf "${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-amd64.deb" "oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/"
+          if [ "${{ matrix.arch }}" = "arm64" ]; then
+            DEB_FILE="${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.deb"
+            RPM_FILE="${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-aarch64.rpm"
+            APPIMAGE_FILE="${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.AppImage"
+          else
+            DEB_FILE="${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-amd64.deb"
+            RPM_FILE="${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x86_64.rpm"
+            APPIMAGE_FILE="${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x86_64.AppImage"
+          fi
 
-      - name: Upload Linux DEB to latest if requested
-        if: matrix.os == 'ubuntu-22.04' && matrix.arch == 'x86_64' && github.event.inputs.upload_latest == 'true'
+          echo "上传 Linux 版本产物到 OSS..."
+          ossutil cp -rf "${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${DEB_FILE}" "oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/"
+          ossutil cp -rf "${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${RPM_FILE}" "oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/"
+          ossutil cp -rf "${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${APPIMAGE_FILE}" "oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/"
+
+      - name: Upload Linux packages to latest if requested
+        if: ${{ runner.os == 'Linux' && github.event.inputs.upload_latest == 'true' }}
         run: |
-          echo "检测到需要上传 Ubuntu latest DEB，正在执行上传..."
-          ossutil cp -rf "${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-amd64.deb" "oss://${{ secrets.BUCKET_NAME }}/download/latest/${{ secrets.PRODUCT_APP_NAME }}-latest.deb"
+          if [ "${{ matrix.arch }}" = "arm64" ]; then
+            ARCH_DIR="arm64"
+            DEB_FILE="${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.deb"
+            RPM_FILE="${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-aarch64.rpm"
+            APPIMAGE_FILE="${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.AppImage"
+            LATEST_DEB="${{ secrets.PRODUCT_APP_NAME }}-arm64-latest.deb"
+            LATEST_RPM="${{ secrets.PRODUCT_APP_NAME }}-arm64-latest.rpm"
+            LATEST_APPIMAGE="${{ secrets.PRODUCT_APP_NAME }}-arm64-latest.AppImage"
+          else
+            ARCH_DIR="x86_64"
+            DEB_FILE="${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-amd64.deb"
+            RPM_FILE="${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x86_64.rpm"
+            APPIMAGE_FILE="${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x86_64.AppImage"
+            LATEST_DEB="${{ secrets.PRODUCT_APP_NAME }}-latest.deb"
+            LATEST_RPM="${{ secrets.PRODUCT_APP_NAME }}-latest.rpm"
+            LATEST_APPIMAGE="${{ secrets.PRODUCT_APP_NAME }}-latest.AppImage"
+          fi
+
+          echo "检测到需要上传 Linux latest 产物，正在执行上传..."
+          ossutil cp -rf "${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${DEB_FILE}" "oss://${{ secrets.BUCKET_NAME }}/download/latest/${LATEST_DEB}"
+          ossutil cp -rf "${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${RPM_FILE}" "oss://${{ secrets.BUCKET_NAME }}/download/latest/${LATEST_RPM}"
+          ossutil cp -rf "${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${APPIMAGE_FILE}" "oss://${{ secrets.BUCKET_NAME }}/download/latest/${LATEST_APPIMAGE}"
+
+          ossutil cp -rf "${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${DEB_FILE}" "oss://${{ secrets.BUCKET_NAME }}/download/latest/linux/${ARCH_DIR}/${DEB_FILE}"
+          ossutil cp -rf "${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${RPM_FILE}" "oss://${{ secrets.BUCKET_NAME }}/download/latest/linux/${ARCH_DIR}/${RPM_FILE}"
+          ossutil cp -rf "${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${APPIMAGE_FILE}" "oss://${{ secrets.BUCKET_NAME }}/download/latest/linux/${ARCH_DIR}/${APPIMAGE_FILE}"
 
 
       # - name: upload jar and web zip to oss
