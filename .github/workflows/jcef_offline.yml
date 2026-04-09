@@ -445,12 +445,24 @@ jobs:
 
       # 设置OSS
       - name: Set up oss utils
+        if: ${{ !(runner.os == 'Linux' && matrix.arch == 'arm64') }}
         uses: yizhoumo/setup-ossutil@v1
         with:
           endpoint: ${{ secrets.OSS_ENDPOINT }}
           access-key-id: ${{ secrets.OSS_ACCESS_KEY_ID }}
           access-key-secret: ${{ secrets.OSS_ACCESS_KEY_SECRET }}
           ossutil-version: '1.7.16'
+
+      - name: Set up oss utils for Linux arm64
+        if: ${{ runner.os == 'Linux' && matrix.arch == 'arm64' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          OSSUTIL_PATH="$RUNNER_TEMP/ossutil"
+          curl -L -o "$OSSUTIL_PATH" "https://gosspublic.alicdn.com/ossutil/1.7.16/ossutilarm64"
+          chmod 755 "$OSSUTIL_PATH"
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+          "$OSSUTIL_PATH" config --endpoint "${{ secrets.OSS_ENDPOINT }}" --access-key-id "${{ secrets.OSS_ACCESS_KEY_ID }}" --access-key-secret "${{ secrets.OSS_ACCESS_KEY_SECRET }}"
 
       # 打包后端工程
       - name: Build BE Static win
