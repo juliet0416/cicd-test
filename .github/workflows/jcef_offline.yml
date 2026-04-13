@@ -464,6 +464,86 @@ jobs:
           echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
           "$OSSUTIL_PATH" config --endpoint "${{ secrets.OSS_ENDPOINT }}" --access-key-id "${{ secrets.OSS_ACCESS_KEY_ID }}" --access-key-secret "${{ secrets.OSS_ACCESS_KEY_SECRET }}"
 
+      - name: Set up rclone and R2 config on Linux and macOS
+        if: ${{ github.event.inputs.upload_latest == 'true' && runner.os != 'Windows' }}
+        shell: bash
+        env:
+          R2_ACCESS_KEY: ${{ secrets.R2_ACCESS_KEY }}
+          R2_SECRET_KEY: ${{ secrets.R2_SECRET_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+        run: |
+          set -euo pipefail
+          if [ -z "$R2_ACCESS_KEY" ] || [ -z "$R2_SECRET_KEY" ] || [ -z "$R2_ENDPOINT" ] || [ -z "$R2_BUCKET_NAME" ]; then
+            echo "R2 secrets are required when upload_latest is true"
+            exit 1
+          fi
+
+          curl https://rclone.org/install.sh | sudo bash
+          RCLONE_CONFIG_PATH="$RUNNER_TEMP/rclone.conf"
+          printf '%s\n' \
+            '[cf-r2]' \
+            'type = s3' \
+            'provider = Cloudflare' \
+            "access_key_id = ${R2_ACCESS_KEY}" \
+            "secret_access_key = ${R2_SECRET_KEY}" \
+            "endpoint = ${R2_ENDPOINT}" \
+            'acl = private' > "$RCLONE_CONFIG_PATH"
+          echo "RCLONE_CONFIG=$RCLONE_CONFIG_PATH" >> "$GITHUB_ENV"
+          echo "R2_REMOTE=cf-r2:${R2_BUCKET_NAME}" >> "$GITHUB_ENV"
+          rclone version
+
+      - name: Set up rclone and R2 config on Windows
+        if: ${{ github.event.inputs.upload_latest == 'true' && runner.os == 'Windows' }}
+        shell: pwsh
+        env:
+          R2_ACCESS_KEY: ${{ secrets.R2_ACCESS_KEY }}
+          R2_SECRET_KEY: ${{ secrets.R2_SECRET_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:R2_ACCESS_KEY) -or [string]::IsNullOrWhiteSpace($env:R2_SECRET_KEY) -or [string]::IsNullOrWhiteSpace($env:R2_ENDPOINT) -or [string]::IsNullOrWhiteSpace($env:R2_BUCKET_NAME)) {
+            Write-Error "R2 secrets are required when upload_latest is true"
+            exit 1
+          }
+
+          choco install rclone -y --no-progress
+
+          $rcloneCommand = Get-Command rclone -ErrorAction SilentlyContinue
+          $resolvedRclonePath = $null
+          if (-not $rcloneCommand) {
+            $candidates = @(
+              "C:\ProgramData\chocolatey\bin\rclone.exe",
+              "C:\Program Files\rclone\rclone.exe"
+            )
+            $resolvedRclonePath = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+            if (-not $resolvedRclonePath) {
+              Write-Error "rclone.exe was not found after installation."
+              exit 1
+            }
+
+            $rcloneDir = Split-Path -Path $resolvedRclonePath -Parent
+            $rcloneDir | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+            $env:PATH = "$rcloneDir;$env:PATH"
+          } else {
+            $resolvedRclonePath = $rcloneCommand.Source
+          }
+
+          $configPath = Join-Path $env:RUNNER_TEMP "rclone.conf"
+          @(
+            "[cf-r2]",
+            "type = s3",
+            "provider = Cloudflare",
+            "access_key_id = $env:R2_ACCESS_KEY",
+            "secret_access_key = $env:R2_SECRET_KEY",
+            "endpoint = $env:R2_ENDPOINT",
+            "acl = private"
+          ) | Set-Content -Path $configPath -Encoding utf8
+
+          "RCLONE_CONFIG=$configPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "R2_REMOTE=cf-r2:$($env:R2_BUCKET_NAME)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          & $resolvedRclonePath version
+
       # 打包后端工程
       - name: Build BE Static win
         if: ${{ runner.os == 'Windows' }}
@@ -758,6 +838,7 @@ jobs:
         run: |
           echo "检测到需要上传 arm64 DMG，正在执行上传..."
           ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg "oss://${{ secrets.BUCKET_NAME }}/offline/latest/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-arm64-latest.dmg"
+          rclone copyto "${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg" "${R2_REMOTE}/offline/latest/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-arm64-latest.dmg"
 
 
       - name: Upload x64 DMG to OSS if requested
@@ -766,6 +847,7 @@ jobs:
         run: |
           echo "检测到需要上传 x64 DMG，正在执行上传..."
           ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.dmg "oss://${{ secrets.BUCKET_NAME }}/offline/latest/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-latest.dmg"
+          rclone copyto "${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.dmg" "${R2_REMOTE}/offline/latest/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-latest.dmg"
 
       - name: Upload Linux packages to OSS
         if: ${{ runner.os == 'Linux' }}
@@ -814,6 +896,14 @@ jobs:
           ossutil cp -rf "${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${DEB_FILE}" "oss://${{ secrets.BUCKET_NAME }}/offline/latest/linux/${ARCH_DIR}/${DEB_FILE}"
           ossutil cp -rf "${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${RPM_FILE}" "oss://${{ secrets.BUCKET_NAME }}/offline/latest/linux/${ARCH_DIR}/${RPM_FILE}"
           ossutil cp -rf "${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${APPIMAGE_FILE}" "oss://${{ secrets.BUCKET_NAME }}/offline/latest/linux/${ARCH_DIR}/${APPIMAGE_FILE}"
+
+          rclone copyto "${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${DEB_FILE}" "${R2_REMOTE}/offline/latest/${LATEST_DEB}"
+          rclone copyto "${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${RPM_FILE}" "${R2_REMOTE}/offline/latest/${LATEST_RPM}"
+          rclone copyto "${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${APPIMAGE_FILE}" "${R2_REMOTE}/offline/latest/${LATEST_APPIMAGE}"
+
+          rclone copyto "${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${DEB_FILE}" "${R2_REMOTE}/offline/latest/linux/${ARCH_DIR}/${DEB_FILE}"
+          rclone copyto "${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${RPM_FILE}" "${R2_REMOTE}/offline/latest/linux/${ARCH_DIR}/${RPM_FILE}"
+          rclone copyto "${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${APPIMAGE_FILE}" "${R2_REMOTE}/offline/latest/linux/${ARCH_DIR}/${APPIMAGE_FILE}"
 
 
       - name: upload jar and web zip to oss (using PowerShell and ossutil filter)
@@ -926,3 +1016,4 @@ jobs:
         run: |
           echo "检测到需要上传 x64 exe，正在执行上传..."
           ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe "oss://${{ secrets.BUCKET_NAME }}/offline/latest/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-latest.exe"
+          rclone copyto "${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe" "${env:R2_REMOTE}/offline/latest/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-latest.exe"
