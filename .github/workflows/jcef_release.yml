@@ -876,7 +876,7 @@ jobs:
         run: |
           echo "current version: ${{ github.run_id }}"
       
-      
+
       # =================================================================
       # 【第一阶段】准备环境：下载 JBR 并安装 Temurin JDK
       # =================================================================
@@ -1262,7 +1262,7 @@ jobs:
           cp ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/local_version.json ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/win
           cp ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/local_version.json ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/linux
       
-      
+
       # Step specifically for Windows
       - name: Build FE Static (Windows)
         if: runner.os == 'Windows'
