@@ -16,6 +16,11 @@ on:
         required: false   # 设为非必须
         default: 'false'  # 提供一个默认值
         type: string
+      update_latest_version_json:
+        description: '是否自动更新 download/updates/latest_version.json (true/false)'
+        required: false
+        default: 'false'
+        type: string
 
 jobs:
   release:
@@ -846,3 +851,27 @@ jobs:
           echo "检测到需要上传 x64 exe，正在执行上传..."
           ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe "oss://${{ secrets.BUCKET_NAME }}/download/latest/${{ secrets.PRODUCT_APP_NAME }}-latest.exe"
           rclone copyto "${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe" "${env:R2_REMOTE}/download/latest/${{ secrets.PRODUCT_APP_NAME }}-latest.exe"
+
+      - name: Generate and upload latest_version.json if requested
+        if: matrix.os == 'windows-latest' && github.event.inputs.update_latest_version_json == 'true'
+        shell: pwsh
+        run: |
+          $metadataUrl = "https://cdn.chat2db-ai.com/download/updates/${{ github.event.inputs.version }}/version.json"
+          $payload = @{
+            latestVersion = "${{ github.event.inputs.version }}"
+            metadataUrl = $metadataUrl
+            forceUpdate = $false
+          } | ConvertTo-Json -Depth 3
+
+          $outputDir = "${{ runner.temp }}"
+          $outputFile = Join-Path $outputDir "latest_version.json"
+          Set-Content -Path $outputFile -Value $payload -Encoding utf8
+
+          Write-Host "Generated latest_version.json:"
+          Get-Content -Path $outputFile
+
+          ossutil cp -f $outputFile "oss://${{ secrets.BUCKET_NAME }}/download/updates/latest_version.json"
+
+          if ($env:R2_REMOTE) {
+            rclone copyto $outputFile "${env:R2_REMOTE}/download/updates/latest_version.json"
+          }
