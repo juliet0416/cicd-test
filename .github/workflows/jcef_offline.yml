@@ -930,29 +930,6 @@ jobs:
           
           Write-Host "oss upload successful"    
 
-      # 安装 Inno Setup：package_win_offline.sh 用 iscc 把 jpackage 产出的 MSI
-      # 包装成带老版本清理逻辑的外壳 .exe，最终签名/分发的都是这个外壳。
-      - name: Install Inno Setup
-        if: ${{ runner.os == 'Windows' }}
-        shell: pwsh
-        run: |
-          choco install innosetup -y --no-progress
-
-          $candidates = @(
-            "C:\Program Files (x86)\Inno Setup 6\ISCC.exe",
-            "C:\Program Files\Inno Setup 6\ISCC.exe",
-            "C:\ProgramData\chocolatey\bin\iscc.exe"
-          )
-          $isccPath = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
-          if (-not $isccPath) {
-            Write-Error "ISCC.exe was not found after installation."
-            exit 1
-          }
-
-          $isccDir = Split-Path -Path $isccPath -Parent
-          $isccDir | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-          Write-Host "Resolved ISCC: $isccPath"
-
       - name: package win x64
         if: ${{ runner.os == 'Windows' }}
         shell: bash
