@@ -1076,43 +1076,60 @@ jobs:
           $winScpVersion = "6.5.6"
           $winScpRoot = Join-Path $env:RUNNER_TEMP "winscp-automation"
           $winScpZip = Join-Path $env:RUNNER_TEMP "WinSCP-Automation.zip"
-          New-Item -Path $winScpRoot -ItemType Directory -Force | Out-Null
           $downloadUrls = @(
-            "https://winscp.net/download/WinSCP-$winScpVersion-Automation.zip/download",
-            "https://www.nuget.org/api/v2/package/WinSCP/$winScpVersion"
+            "https://www.nuget.org/api/v2/package/WinSCP/$winScpVersion",
+            "https://winscp.net/download/WinSCP-$winScpVersion-Automation.zip/download"
           )
-          $downloaded = $false
+          $installed = $false
+          $winScpExe = $null
+          $winScpNet = $null
           foreach ($downloadUrl in $downloadUrls) {
             for ($attempt = 1; $attempt -le 3; $attempt++) {
               try {
-                Invoke-WebRequest -Uri $downloadUrl -OutFile $winScpZip
-                $downloaded = $true
+                Remove-Item -Path $winScpZip -Force -ErrorAction SilentlyContinue
+                Remove-Item -Path $winScpRoot -Recurse -Force -ErrorAction SilentlyContinue
+                New-Item -Path $winScpRoot -ItemType Directory -Force | Out-Null
+
+                Invoke-WebRequest -Uri $downloadUrl -OutFile $winScpZip -MaximumRedirection 10 -UserAgent "Mozilla/5.0"
+                if ((Get-Item $winScpZip).Length -lt 1048576) {
+                  throw "Downloaded WinSCP package is too small to be valid."
+                }
+
+                $stream = [System.IO.File]::OpenRead($winScpZip)
+                try {
+                  $bytes = [byte[]]::new(2)
+                  [void]$stream.Read($bytes, 0, 2)
+                } finally {
+                  $stream.Dispose()
+                }
+                if ($bytes[0] -ne 0x50 -or $bytes[1] -ne 0x4B) {
+                  throw "Downloaded WinSCP package is not a ZIP archive."
+                }
+
+                Expand-Archive -LiteralPath $winScpZip -DestinationPath $winScpRoot -Force
+                $winScpExe = Get-ChildItem -Path $winScpRoot -Recurse -Filter "WinSCP.exe" | Select-Object -First 1
+                $winScpNet = (
+                  Get-ChildItem -Path $winScpRoot -Recurse -Filter "WinSCPnet.dll" |
+                    Where-Object { $_.FullName -like "*netstandard2.0*" } |
+                    Select-Object -First 1
+                )
+                if (-not $winScpExe) {
+                  throw "WinSCP.exe was not found in the automation package."
+                }
+                if (-not $winScpNet) {
+                  throw "WinSCPnet.dll was not found in the automation package."
+                }
+                $installed = $true
                 break
               } catch {
-                Write-Warning "WinSCP download failed from $downloadUrl on attempt ${attempt}: $_"
+                Write-Warning "WinSCP install failed from $downloadUrl on attempt ${attempt}: $_"
                 Start-Sleep -Seconds (5 * $attempt)
               }
             }
-            if ($downloaded) { break }
+            if ($installed) { break }
           }
-          if (-not $downloaded) {
-            Write-Error "Failed to download WinSCP automation package."
-            exit 1
-          }
-          Expand-Archive -Path $winScpZip -DestinationPath $winScpRoot -Force
-
-          $winScpExe = Get-ChildItem -Path $winScpRoot -Recurse -Filter "WinSCP.exe" | Select-Object -First 1
-          $winScpNet = (
-            Get-ChildItem -Path $winScpRoot -Recurse -Filter "WinSCPnet.dll" |
-              Where-Object { $_.FullName -like "*netstandard2.0*" } |
-              Select-Object -First 1
-          )
-          if (-not $winScpExe) {
-            Write-Error "WinSCP.exe was not found in the automation package."
-            exit 1
-          }
-          if (-not $winScpNet) {
-            Write-Error "WinSCPnet.dll was not found in the automation package."
+          if (-not $installed) {
+            Write-Error "Failed to install WinSCP automation package."
             exit 1
           }
           $winScpExePath = $winScpExe.FullName
