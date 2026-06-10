@@ -1126,10 +1126,9 @@ jobs:
           REMOTE_HOST: ${{ secrets.WIN_SERVER_IP }}
           REMOTE_USER: ${{ secrets.WIN_SERVER_USER }}
           MSI_FILE_NAME: '${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.msi'
-          REMOTE_MSI_DIR: '${{ secrets.REMOTE_SIGN_PATH }}/github-${{ github.run_id }}-${{ github.run_attempt }}-msi'
-          REMOTE_MSI_PATH: '${{ secrets.REMOTE_SIGN_PATH }}/github-${{ github.run_id }}-${{ github.run_attempt }}-msi/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.msi'
-          SIGN_MSI_SHA1: '${{ secrets.REMOTE_SIGN_SCRIPT }} --alg SHA-1 ${{ secrets.REMOTE_SIGN_PATH }}/github-${{ github.run_id }}-${{ github.run_attempt }}-msi/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.msi'
-          SIGN_MSI_SHA256: '${{ secrets.REMOTE_SIGN_SCRIPT }} --alg SHA-256 ${{ secrets.REMOTE_SIGN_PATH }}/github-${{ github.run_id }}-${{ github.run_attempt }}-msi/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.msi'
+          REMOTE_MSI_PATH: '${{ secrets.REMOTE_SIGN_PATH }}/github-${{ github.run_id }}-${{ github.run_attempt }}-${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.msi'
+          SIGN_MSI_SHA1: '${{ secrets.REMOTE_SIGN_SCRIPT }} --alg SHA-1 ${{ secrets.REMOTE_SIGN_PATH }}/github-${{ github.run_id }}-${{ github.run_attempt }}-${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.msi'
+          SIGN_MSI_SHA256: '${{ secrets.REMOTE_SIGN_SCRIPT }} --alg SHA-256 ${{ secrets.REMOTE_SIGN_PATH }}/github-${{ github.run_id }}-${{ github.run_attempt }}-${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.msi'
         run: |
           $ErrorActionPreference = "Stop"
           $localMsiPath = (Resolve-Path "${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${env:MSI_FILE_NAME}").Path
@@ -1140,14 +1139,14 @@ jobs:
           & "${env:WINSCP_PATH}" /log=winscp-msi.log /command `
             "option batch abort" `
             "option confirm off" `
+            "option transfer binary" `
             "open scp://${{ env.REMOTE_USER }}:${{ env.SCP_PASSWORD }}@${{ env.REMOTE_HOST }} -hostkey=*" `
-            "call mkdir -p ${env:REMOTE_MSI_DIR}" `
             "put `"$localMsiPath`" `"$env:REMOTE_MSI_PATH`"" `
             "call test -s ${env:REMOTE_MSI_PATH}" `
             "call ${env:SIGN_MSI_SHA1}" `
             "call ${env:SIGN_MSI_SHA256}" `
             "get `"$env:REMOTE_MSI_PATH`" `"$signedMsiPath`"" `
-            "call rm -rf ${env:REMOTE_MSI_DIR}" `
+            "call rm -f ${env:REMOTE_MSI_PATH}" `
             "exit"
 
           if ($LASTEXITCODE -ne 0) {
@@ -1204,10 +1203,9 @@ jobs:
           REMOTE_HOST: ${{ secrets.WIN_SERVER_IP }}
           REMOTE_USER: ${{ secrets.WIN_SERVER_USER }}
           FILE_TO_UPLOAD: '${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe'
-          REMOTE_EXE_DIR: '${{ secrets.REMOTE_SIGN_PATH }}/github-${{ github.run_id }}-${{ github.run_attempt }}-exe'
-          REMOTE_PATH: '${{ secrets.REMOTE_SIGN_PATH }}/github-${{ github.run_id }}-${{ github.run_attempt }}-exe/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe'
-          REMOTE_SCRIPT_PATH_1: '${{ secrets.REMOTE_SIGN_SCRIPT }} --alg SHA-1 ${{ secrets.REMOTE_SIGN_PATH }}/github-${{ github.run_id }}-${{ github.run_attempt }}-exe/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe'
-          REMOTE_SCRIPT_PATH_2: '${{ secrets.REMOTE_SIGN_SCRIPT }} --alg SHA-256 ${{ secrets.REMOTE_SIGN_PATH }}/github-${{ github.run_id }}-${{ github.run_attempt }}-exe/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe'
+          REMOTE_PATH: '${{ secrets.REMOTE_SIGN_PATH }}/github-${{ github.run_id }}-${{ github.run_attempt }}-${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe'
+          REMOTE_SCRIPT_PATH_1: '${{ secrets.REMOTE_SIGN_SCRIPT }} --alg SHA-1 ${{ secrets.REMOTE_SIGN_PATH }}/github-${{ github.run_id }}-${{ github.run_attempt }}-${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe'
+          REMOTE_SCRIPT_PATH_2: '${{ secrets.REMOTE_SIGN_SCRIPT }} --alg SHA-256 ${{ secrets.REMOTE_SIGN_PATH }}/github-${{ github.run_id }}-${{ github.run_attempt }}-${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe'
         run: |
           $ErrorActionPreference = "Stop"
           $localExePath = (Resolve-Path "${{ github.workspace }}/${env:FILE_TO_UPLOAD}").Path
@@ -1219,14 +1217,14 @@ jobs:
           & "${env:WINSCP_PATH}" /log=winscp.log /command `
             "option batch abort" `
             "option confirm off" `
+            "option transfer binary" `
             "open scp://${{ env.REMOTE_USER }}:${{ env.SCP_PASSWORD }}@${{ env.REMOTE_HOST }} -hostkey=*" `
-            "call mkdir -p ${env:REMOTE_EXE_DIR}" `
             "put `"$localExePath`" `"$env:REMOTE_PATH`"" `
             "call test -s ${env:REMOTE_PATH}" `
             "call ${env:REMOTE_SCRIPT_PATH_1}" `
             "call ${env:REMOTE_SCRIPT_PATH_2}" `
             "get `"$env:REMOTE_PATH`" `"$signedExePath`"" `
-            "call rm -rf ${env:REMOTE_EXE_DIR}" `
+            "call rm -f ${env:REMOTE_PATH}" `
             "exit"
 
           if ($LASTEXITCODE -ne 0) {
