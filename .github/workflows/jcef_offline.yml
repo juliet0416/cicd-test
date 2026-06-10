@@ -1141,6 +1141,45 @@ jobs:
           Write-Host "Resolved WinSCP .NET assembly: $winScpNetPath"
           Write-Host "Resolved WinSCP GUI executable: $winScpExePath"
 
+      - name: Normalize signing server host
+        if: ${{ runner.os == 'Windows' }}
+        shell: pwsh
+        env:
+          REMOTE_HOST: ${{ secrets.WIN_SERVER_IP }}
+        run: |
+          $remoteHost = "$env:REMOTE_HOST".Trim().TrimEnd("/")
+          $remotePort = 22
+          if ([string]::IsNullOrWhiteSpace($remoteHost)) {
+            Write-Error "WIN_SERVER_IP is empty."
+            exit 1
+          }
+          if ($remoteHost -match "^[a-zA-Z][a-zA-Z0-9+.-]*://") {
+            $remoteUri = [Uri]$remoteHost
+            $remoteHost = $remoteUri.Host
+            if (-not $remoteUri.IsDefaultPort) {
+              $remotePort = $remoteUri.Port
+            }
+          } elseif ($remoteHost -match "^\[(?<host>[^\]]+)\](:(?<port>\d+))?$") {
+            $remoteHost = $Matches.host
+            if ($Matches.port) {
+              $remotePort = [int]$Matches.port
+            }
+          } elseif ($remoteHost -match "^(?<host>[^:]+):(?<port>\d+)$") {
+            $remoteHost = $Matches.host
+            $remotePort = [int]$Matches.port
+          }
+          $remoteHost = $remoteHost.Trim()
+          if ($remoteHost.StartsWith("[") -and $remoteHost.EndsWith("]")) {
+            $remoteHost = $remoteHost.Substring(1, $remoteHost.Length - 2)
+          }
+          if ([string]::IsNullOrWhiteSpace($remoteHost)) {
+            Write-Error "Normalized signing server host is empty."
+            exit 1
+          }
+          "WINSCP_REMOTE_HOST=$remoteHost" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "WINSCP_REMOTE_PORT=$remotePort" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          Write-Host "Resolved signing server host and port."
+
       - name: Install Inno Setup
         if: ${{ runner.os == 'Windows' }}
         shell: pwsh
@@ -1188,7 +1227,6 @@ jobs:
 
           $sessionOptions = [WinSCP.SessionOptions]::new()
           $sessionOptions.Protocol = [WinSCP.Protocol]::Sftp
-          $sessionOptions.HostName = $env:REMOTE_HOST
           $sessionOptions.UserName = $env:REMOTE_USER
           $sessionOptions.Password = $env:SCP_PASSWORD
           $sessionOptions.GiveUpSecurityAndAcceptAnySshHostKey = $true
@@ -1202,6 +1240,8 @@ jobs:
           $session.SessionLogPath = Join-Path $env:RUNNER_TEMP "winscp-msi.log"
           $opened = $false
           try {
+            $sessionOptions.HostName = $env:WINSCP_REMOTE_HOST
+            $sessionOptions.PortNumber = [int]$env:WINSCP_REMOTE_PORT
             $session.Open($sessionOptions)
             $opened = $true
             $session.PutFiles($localMsiPath, $env:REMOTE_MSI_PATH, $false, $transferOptions).Check()
@@ -1280,7 +1320,6 @@ jobs:
 
           $sessionOptions = [WinSCP.SessionOptions]::new()
           $sessionOptions.Protocol = [WinSCP.Protocol]::Sftp
-          $sessionOptions.HostName = $env:REMOTE_HOST
           $sessionOptions.UserName = $env:REMOTE_USER
           $sessionOptions.Password = $env:SCP_PASSWORD
           $sessionOptions.GiveUpSecurityAndAcceptAnySshHostKey = $true
@@ -1294,6 +1333,8 @@ jobs:
           $session.SessionLogPath = Join-Path $env:RUNNER_TEMP "winscp-exe.log"
           $opened = $false
           try {
+            $sessionOptions.HostName = $env:WINSCP_REMOTE_HOST
+            $sessionOptions.PortNumber = [int]$env:WINSCP_REMOTE_PORT
             $session.Open($sessionOptions)
             $opened = $true
             $session.PutFiles($localExePath, $env:REMOTE_PATH, $false, $transferOptions).Check()
