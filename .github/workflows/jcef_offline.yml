@@ -1073,24 +1073,56 @@ jobs:
         if: ${{ runner.os == 'Windows' }}
         shell: pwsh
         run: |
-          choco install winscp -y --no-progress
-
-          $candidates = @(
-            "C:\Program Files (x86)\WinSCP\WinSCP.com",
-            "C:\Program Files\WinSCP\WinSCP.com",
-            "C:\ProgramData\chocolatey\bin\winscp.com"
+          $winScpVersion = "6.5.6"
+          $winScpRoot = Join-Path $env:RUNNER_TEMP "winscp-automation"
+          $winScpZip = Join-Path $env:RUNNER_TEMP "WinSCP-Automation.zip"
+          New-Item -Path $winScpRoot -ItemType Directory -Force | Out-Null
+          $downloadUrls = @(
+            "https://winscp.net/download/WinSCP-$winScpVersion-Automation.zip/download",
+            "https://www.nuget.org/api/v2/package/WinSCP/$winScpVersion"
           )
-
-          $winScpPath = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
-          if (-not $winScpPath) {
-            Write-Error "WinSCP.com was not found after installation."
+          $downloaded = $false
+          foreach ($downloadUrl in $downloadUrls) {
+            for ($attempt = 1; $attempt -le 3; $attempt++) {
+              try {
+                Invoke-WebRequest -Uri $downloadUrl -OutFile $winScpZip
+                $downloaded = $true
+                break
+              } catch {
+                Write-Warning "WinSCP download failed from $downloadUrl on attempt ${attempt}: $_"
+                Start-Sleep -Seconds (5 * $attempt)
+              }
+            }
+            if ($downloaded) { break }
+          }
+          if (-not $downloaded) {
+            Write-Error "Failed to download WinSCP automation package."
             exit 1
           }
+          Expand-Archive -Path $winScpZip -DestinationPath $winScpRoot -Force
 
-          $winScpDir = Split-Path -Path $winScpPath -Parent
-          "WINSCP_PATH=$winScpPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-          $winScpDir | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-          Write-Host "Resolved WinSCP executable: $winScpPath"
+          $winScpExe = Get-ChildItem -Path $winScpRoot -Recurse -Filter "WinSCP.exe" | Select-Object -First 1
+          $winScpNet = (
+            Get-ChildItem -Path $winScpRoot -Recurse -Filter "WinSCPnet.dll" |
+              Where-Object { $_.FullName -like "*netstandard2.0*" } |
+              Select-Object -First 1
+          )
+          if (-not $winScpExe) {
+            Write-Error "WinSCP.exe was not found in the automation package."
+            exit 1
+          }
+          if (-not $winScpNet) {
+            Write-Error "WinSCPnet.dll was not found in the automation package."
+            exit 1
+          }
+          $winScpExePath = $winScpExe.FullName
+          $winScpNetPath = $winScpNet.FullName
+
+          "WINSCP_NET_PATH=$winScpNetPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "WINSCP_EXE_PATH=$winScpExePath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          $winScpRoot | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          Write-Host "Resolved WinSCP .NET assembly: $winScpNetPath"
+          Write-Host "Resolved WinSCP GUI executable: $winScpExePath"
 
       - name: Install Inno Setup
         if: ${{ runner.os == 'Windows' }}
@@ -1131,47 +1163,40 @@ jobs:
           SIGN_MSI_SHA256: '${{ secrets.REMOTE_SIGN_SCRIPT }} --alg SHA-256 /tmp/github-${{ github.run_id }}-${{ github.run_attempt }}-${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.msi'
         run: |
           $ErrorActionPreference = "Stop"
+          Add-Type -Path $env:WINSCP_NET_PATH
           $localMsiPath = (Resolve-Path "${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${env:MSI_FILE_NAME}").Path
-          $localMsiDir = Split-Path -Parent $localMsiPath
           $signedMsiDir = Join-Path $env:RUNNER_TEMP "signed-msi"
           New-Item -Path $signedMsiDir -ItemType Directory -Force | Out-Null
           $signedMsiPath = Join-Path $signedMsiDir $env:MSI_FILE_NAME
 
-          & "${env:WINSCP_PATH}" /log=winscp-msi-upload.log /command `
-            "option batch abort" `
-            "option confirm off" `
-            "option transfer binary" `
-            "open sftp://${{ env.REMOTE_USER }}:${{ env.SCP_PASSWORD }}@${{ env.REMOTE_HOST }} -hostkey=*" `
-            "lcd `"$localMsiDir`"" `
-            "put `"$env:MSI_FILE_NAME`" `"$env:REMOTE_MSI_PATH`"" `
-            "exit"
-          if ($LASTEXITCODE -ne 0) {
-            exit $LASTEXITCODE
-          }
+          $sessionOptions = [WinSCP.SessionOptions]::new()
+          $sessionOptions.Protocol = [WinSCP.Protocol]::Sftp
+          $sessionOptions.HostName = $env:REMOTE_HOST
+          $sessionOptions.UserName = $env:REMOTE_USER
+          $sessionOptions.Password = $env:SCP_PASSWORD
+          $sessionOptions.GiveUpSecurityAndAcceptAnySshHostKey = $true
 
-          & "${env:WINSCP_PATH}" /log=winscp-msi-sign.log /command `
-            "option batch abort" `
-            "option confirm off" `
-            "open scp://${{ env.REMOTE_USER }}:${{ env.SCP_PASSWORD }}@${{ env.REMOTE_HOST }} -hostkey=*" `
-            "call test -s ${env:REMOTE_MSI_PATH}" `
-            "call ${env:SIGN_MSI_SHA1}" `
-            "call ${env:SIGN_MSI_SHA256}" `
-            "exit"
-          if ($LASTEXITCODE -ne 0) {
-            exit $LASTEXITCODE
-          }
+          $transferOptions = [WinSCP.TransferOptions]::new()
+          $transferOptions.TransferMode = [WinSCP.TransferMode]::Binary
 
-          & "${env:WINSCP_PATH}" /log=winscp-msi-download.log /command `
-            "option batch abort" `
-            "option confirm off" `
-            "option transfer binary" `
-            "open sftp://${{ env.REMOTE_USER }}:${{ env.SCP_PASSWORD }}@${{ env.REMOTE_HOST }} -hostkey=*" `
-            "lcd `"$signedMsiDir`"" `
-            "get `"$env:REMOTE_MSI_PATH`" `"$env:MSI_FILE_NAME`"" `
-            "rm `"$env:REMOTE_MSI_PATH`"" `
-            "exit"
-          if ($LASTEXITCODE -ne 0) {
-            exit $LASTEXITCODE
+          $session = [WinSCP.Session]::new()
+          $session.ExecutablePath = $env:WINSCP_EXE_PATH
+          $session.Timeout = [TimeSpan]::FromMinutes(15)
+          $session.SessionLogPath = Join-Path $env:RUNNER_TEMP "winscp-msi.log"
+          $opened = $false
+          try {
+            $session.Open($sessionOptions)
+            $opened = $true
+            $session.PutFiles($localMsiPath, $env:REMOTE_MSI_PATH, $false, $transferOptions).Check()
+            $session.ExecuteCommand("test -s $($env:REMOTE_MSI_PATH)").Check()
+            $session.ExecuteCommand($env:SIGN_MSI_SHA1).Check()
+            $session.ExecuteCommand($env:SIGN_MSI_SHA256).Check()
+            $session.GetFiles($env:REMOTE_MSI_PATH, $signedMsiPath, $false, $transferOptions).Check()
+          } finally {
+            if ($opened) {
+              try { $session.RemoveFiles($env:REMOTE_MSI_PATH) | Out-Null } catch { Write-Warning "Remote MSI cleanup failed: $_" }
+            }
+            $session.Dispose()
           }
           if (-not (Test-Path $signedMsiPath)) {
             Write-Error "Signed MSI was not downloaded from the signing server."
@@ -1229,48 +1254,41 @@ jobs:
           REMOTE_SCRIPT_PATH_2: '${{ secrets.REMOTE_SIGN_SCRIPT }} --alg SHA-256 /tmp/github-${{ github.run_id }}-${{ github.run_attempt }}-${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe'
         run: |
           $ErrorActionPreference = "Stop"
+          Add-Type -Path $env:WINSCP_NET_PATH
           $localExePath = (Resolve-Path "${{ github.workspace }}/${env:FILE_TO_UPLOAD}").Path
-          $localExeDir = Split-Path -Parent $localExePath
           $jpackageExePath = "${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${env:FILE_TO_UPLOAD}"
           $signedExeDir = Join-Path $env:RUNNER_TEMP "signed-exe"
           New-Item -Path $signedExeDir -ItemType Directory -Force | Out-Null
           $signedExePath = Join-Path $signedExeDir $env:FILE_TO_UPLOAD
 
-          & "${env:WINSCP_PATH}" /log=winscp-exe-upload.log /command `
-            "option batch abort" `
-            "option confirm off" `
-            "option transfer binary" `
-            "open sftp://${{ env.REMOTE_USER }}:${{ env.SCP_PASSWORD }}@${{ env.REMOTE_HOST }} -hostkey=*" `
-            "lcd `"$localExeDir`"" `
-            "put `"$env:FILE_TO_UPLOAD`" `"$env:REMOTE_PATH`"" `
-            "exit"
-          if ($LASTEXITCODE -ne 0) {
-            exit $LASTEXITCODE
-          }
+          $sessionOptions = [WinSCP.SessionOptions]::new()
+          $sessionOptions.Protocol = [WinSCP.Protocol]::Sftp
+          $sessionOptions.HostName = $env:REMOTE_HOST
+          $sessionOptions.UserName = $env:REMOTE_USER
+          $sessionOptions.Password = $env:SCP_PASSWORD
+          $sessionOptions.GiveUpSecurityAndAcceptAnySshHostKey = $true
 
-          & "${env:WINSCP_PATH}" /log=winscp-exe-sign.log /command `
-            "option batch abort" `
-            "option confirm off" `
-            "open scp://${{ env.REMOTE_USER }}:${{ env.SCP_PASSWORD }}@${{ env.REMOTE_HOST }} -hostkey=*" `
-            "call test -s ${env:REMOTE_PATH}" `
-            "call ${env:REMOTE_SCRIPT_PATH_1}" `
-            "call ${env:REMOTE_SCRIPT_PATH_2}" `
-            "exit"
-          if ($LASTEXITCODE -ne 0) {
-            exit $LASTEXITCODE
-          }
+          $transferOptions = [WinSCP.TransferOptions]::new()
+          $transferOptions.TransferMode = [WinSCP.TransferMode]::Binary
 
-          & "${env:WINSCP_PATH}" /log=winscp-exe-download.log /command `
-            "option batch abort" `
-            "option confirm off" `
-            "option transfer binary" `
-            "open sftp://${{ env.REMOTE_USER }}:${{ env.SCP_PASSWORD }}@${{ env.REMOTE_HOST }} -hostkey=*" `
-            "lcd `"$signedExeDir`"" `
-            "get `"$env:REMOTE_PATH`" `"$env:FILE_TO_UPLOAD`"" `
-            "rm `"$env:REMOTE_PATH`"" `
-            "exit"
-          if ($LASTEXITCODE -ne 0) {
-            exit $LASTEXITCODE
+          $session = [WinSCP.Session]::new()
+          $session.ExecutablePath = $env:WINSCP_EXE_PATH
+          $session.Timeout = [TimeSpan]::FromMinutes(15)
+          $session.SessionLogPath = Join-Path $env:RUNNER_TEMP "winscp-exe.log"
+          $opened = $false
+          try {
+            $session.Open($sessionOptions)
+            $opened = $true
+            $session.PutFiles($localExePath, $env:REMOTE_PATH, $false, $transferOptions).Check()
+            $session.ExecuteCommand("test -s $($env:REMOTE_PATH)").Check()
+            $session.ExecuteCommand($env:REMOTE_SCRIPT_PATH_1).Check()
+            $session.ExecuteCommand($env:REMOTE_SCRIPT_PATH_2).Check()
+            $session.GetFiles($env:REMOTE_PATH, $signedExePath, $false, $transferOptions).Check()
+          } finally {
+            if ($opened) {
+              try { $session.RemoveFiles($env:REMOTE_PATH) | Out-Null } catch { Write-Warning "Remote EXE cleanup failed: $_" }
+            }
+            $session.Dispose()
           }
           if (-not (Test-Path $signedExePath)) {
             Write-Error "Signed EXE was not downloaded from the signing server."
