@@ -1132,6 +1132,7 @@ jobs:
         run: |
           $ErrorActionPreference = "Stop"
           $localMsiPath = (Resolve-Path "${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${env:MSI_FILE_NAME}").Path
+          $localMsiDir = Split-Path -Parent $localMsiPath
           $signedMsiDir = Join-Path $env:RUNNER_TEMP "signed-msi"
           New-Item -Path $signedMsiDir -ItemType Directory -Force | Out-Null
           $signedMsiPath = Join-Path $signedMsiDir $env:MSI_FILE_NAME
@@ -1141,7 +1142,8 @@ jobs:
             "option confirm off" `
             "option transfer binary" `
             "open sftp://${{ env.REMOTE_USER }}:${{ env.SCP_PASSWORD }}@${{ env.REMOTE_HOST }} -hostkey=*" `
-            "put `"$localMsiPath`" `"$env:REMOTE_MSI_PATH`"" `
+            "lcd `"$localMsiDir`"" `
+            "put `"$env:MSI_FILE_NAME`" `"$env:REMOTE_MSI_PATH`"" `
             "exit"
           if ($LASTEXITCODE -ne 0) {
             exit $LASTEXITCODE
@@ -1164,7 +1166,8 @@ jobs:
             "option confirm off" `
             "option transfer binary" `
             "open sftp://${{ env.REMOTE_USER }}:${{ env.SCP_PASSWORD }}@${{ env.REMOTE_HOST }} -hostkey=*" `
-            "get `"$env:REMOTE_MSI_PATH`" `"$signedMsiPath`"" `
+            "lcd `"$signedMsiDir`"" `
+            "get `"$env:REMOTE_MSI_PATH`" `"$env:MSI_FILE_NAME`"" `
             "rm `"$env:REMOTE_MSI_PATH`"" `
             "exit"
           if ($LASTEXITCODE -ne 0) {
@@ -1227,6 +1230,7 @@ jobs:
         run: |
           $ErrorActionPreference = "Stop"
           $localExePath = (Resolve-Path "${{ github.workspace }}/${env:FILE_TO_UPLOAD}").Path
+          $localExeDir = Split-Path -Parent $localExePath
           $jpackageExePath = "${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${env:FILE_TO_UPLOAD}"
           $signedExeDir = Join-Path $env:RUNNER_TEMP "signed-exe"
           New-Item -Path $signedExeDir -ItemType Directory -Force | Out-Null
@@ -1237,7 +1241,8 @@ jobs:
             "option confirm off" `
             "option transfer binary" `
             "open sftp://${{ env.REMOTE_USER }}:${{ env.SCP_PASSWORD }}@${{ env.REMOTE_HOST }} -hostkey=*" `
-            "put `"$localExePath`" `"$env:REMOTE_PATH`"" `
+            "lcd `"$localExeDir`"" `
+            "put `"$env:FILE_TO_UPLOAD`" `"$env:REMOTE_PATH`"" `
             "exit"
           if ($LASTEXITCODE -ne 0) {
             exit $LASTEXITCODE
@@ -1260,7 +1265,8 @@ jobs:
             "option confirm off" `
             "option transfer binary" `
             "open sftp://${{ env.REMOTE_USER }}:${{ env.SCP_PASSWORD }}@${{ env.REMOTE_HOST }} -hostkey=*" `
-            "get `"$env:REMOTE_PATH`" `"$signedExePath`"" `
+            "lcd `"$signedExeDir`"" `
+            "get `"$env:REMOTE_PATH`" `"$env:FILE_TO_UPLOAD`"" `
             "rm `"$env:REMOTE_PATH`"" `
             "exit"
           if ($LASTEXITCODE -ne 0) {
