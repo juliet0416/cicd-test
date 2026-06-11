@@ -69,6 +69,57 @@ jobs:
       - name: Print basic information
         run: |
           echo "current version: ${{ github.run_id }}"
+
+      - name: Create Feishu package notification helper
+        shell: python
+        run: |
+          import os
+          from pathlib import Path
+
+          script = r'''
+          import json
+          import os
+          import sys
+          import urllib.request
+          import urllib.error
+
+          webhook = os.environ.get("FEISHU_WEBHOOK_URL", "")
+          if not webhook:
+              print("FEISHU_RELEASE_NOTIFY_WEBHOOK is not configured; skip package notification.")
+              sys.exit(0)
+
+          edition = os.environ.get("PACKAGE_EDITION", "Chat2DB")
+          version = os.environ.get("PACKAGE_VERSION", "")
+          platform = os.environ.get("PACKAGE_PLATFORM", "")
+          package_name = os.environ.get("PACKAGE_NAME", "")
+          package_url = os.environ.get("PACKAGE_URL", "")
+          repository = os.environ.get("GITHUB_REPOSITORY", "")
+          run_id = os.environ.get("GITHUB_RUN_ID", "")
+          run_url = f"https://github.com/{repository}/actions/runs/{run_id}" if repository and run_id else ""
+
+          text = "\n".join([
+              f"{edition} 灰度包上传成功",
+              f"版本：{version}",
+              f"平台：{platform}",
+              f"包名：{package_name}",
+              f"下载链接：{package_url}",
+              f"运行链接：{run_url}",
+          ])
+          payload = json.dumps({"msg_type": "text", "content": {"text": text}}, ensure_ascii=False).encode("utf-8")
+          request = urllib.request.Request(
+              webhook,
+              data=payload,
+              headers={"Content-Type": "application/json"},
+              method="POST",
+          )
+          try:
+              with urllib.request.urlopen(request, timeout=15) as response:
+                  print(response.read().decode("utf-8"))
+          except urllib.error.URLError as exc:
+              print(f"::warning::Feishu package notification failed: {exc}")
+          '''
+
+          Path(os.environ["RUNNER_TEMP"], "notify_package.py").write_text(script, encoding="utf-8")
       
 
       # =================================================================
@@ -906,6 +957,14 @@ jobs:
           xcrun notarytool submit ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.dmg --keychain-profile ${{ secrets.PRODUCT_BASE_NAME }} --wait --verbose
           xcrun stapler staple ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.dmg
           ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/*-x64.dmg "oss://${{ secrets.BUCKET_NAME }}/offline/${{ github.event.inputs.version }}/"
+          PACKAGE_FILE="${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.dmg"
+          FEISHU_WEBHOOK_URL="${{ secrets.FEISHU_RELEASE_NOTIFY_WEBHOOK }}" \
+            PACKAGE_EDITION="Chat2DB Local" \
+            PACKAGE_VERSION="${{ github.event.inputs.version }}" \
+            PACKAGE_PLATFORM="macOS x64" \
+            PACKAGE_NAME="$PACKAGE_FILE" \
+            PACKAGE_URL="https://cdn.chat2db-ai.com/offline/${{ github.event.inputs.version }}/$PACKAGE_FILE" \
+            python3 "$RUNNER_TEMP/notify_package.py"
           # ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/version.json "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/"
           # ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/*.jar "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/"
           # ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/*.zip "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/"
@@ -918,6 +977,14 @@ jobs:
           xcrun notarytool submit ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg --keychain-profile ${{ secrets.PRODUCT_BASE_NAME }} --wait --verbose
           xcrun stapler staple ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg
           ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/*-arm64.dmg "oss://${{ secrets.BUCKET_NAME }}/offline/${{ github.event.inputs.version }}/"
+          PACKAGE_FILE="${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg"
+          FEISHU_WEBHOOK_URL="${{ secrets.FEISHU_RELEASE_NOTIFY_WEBHOOK }}" \
+            PACKAGE_EDITION="Chat2DB Local" \
+            PACKAGE_VERSION="${{ github.event.inputs.version }}" \
+            PACKAGE_PLATFORM="macOS arm64" \
+            PACKAGE_NAME="$PACKAGE_FILE" \
+            PACKAGE_URL="https://cdn.chat2db-ai.com/offline/${{ github.event.inputs.version }}/$PACKAGE_FILE" \
+            python3 "$RUNNER_TEMP/notify_package.py"
           # ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/version.json "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/"
           # ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/*.jar "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/"
           # ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/*.zip "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/"
@@ -967,10 +1034,25 @@ jobs:
             APPIMAGE_FILE="${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x86_64.AppImage"
           fi
 
+          notify_package() {
+            local platform="$1"
+            local package_file="$2"
+            FEISHU_WEBHOOK_URL="${{ secrets.FEISHU_RELEASE_NOTIFY_WEBHOOK }}" \
+              PACKAGE_EDITION="Chat2DB Local" \
+              PACKAGE_VERSION="${{ github.event.inputs.version }}" \
+              PACKAGE_PLATFORM="$platform" \
+              PACKAGE_NAME="$package_file" \
+              PACKAGE_URL="https://cdn.chat2db-ai.com/offline/${{ github.event.inputs.version }}/$package_file" \
+              python3 "$RUNNER_TEMP/notify_package.py"
+          }
+
           echo "上传 Linux 离线版本产物到 OSS..."
           ossutil cp -rf "${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${DEB_FILE}" "oss://${{ secrets.BUCKET_NAME }}/offline/${{ github.event.inputs.version }}/"
+          notify_package "Linux ${{ matrix.arch }} deb" "$DEB_FILE"
           ossutil cp -rf "${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${RPM_FILE}" "oss://${{ secrets.BUCKET_NAME }}/offline/${{ github.event.inputs.version }}/"
+          notify_package "Linux ${{ matrix.arch }} rpm" "$RPM_FILE"
           ossutil cp -rf "${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${APPIMAGE_FILE}" "oss://${{ secrets.BUCKET_NAME }}/offline/${{ github.event.inputs.version }}/"
+          notify_package "Linux ${{ matrix.arch }} AppImage" "$APPIMAGE_FILE"
 
       - name: Upload Linux packages to latest if requested
         if: ${{ runner.os == 'Linux' && github.event.inputs.upload_latest == 'true' }}
@@ -1201,8 +1283,17 @@ jobs:
       # 拉取OSS文件
       - name: Prepare upload for OSS on windows
         if: ${{ runner.os == 'Windows' }}
+        shell: pwsh
         run: |
           ossutil cp -rf oss://${{ secrets.BUCKET_NAME }}/offline/${{ github.event.inputs.version }}/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/
+          $packageFile = "${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe"
+          $env:FEISHU_WEBHOOK_URL = "${{ secrets.FEISHU_RELEASE_NOTIFY_WEBHOOK }}"
+          $env:PACKAGE_EDITION = "Chat2DB Local"
+          $env:PACKAGE_VERSION = "${{ github.event.inputs.version }}"
+          $env:PACKAGE_PLATFORM = "Windows x64"
+          $env:PACKAGE_NAME = $packageFile
+          $env:PACKAGE_URL = "https://cdn.chat2db-ai.com/offline/${{ github.event.inputs.version }}/$packageFile"
+          python "$env:RUNNER_TEMP/notify_package.py"
 
       - name: Upload x64 exe to OSS if requested
         # 只有当触发工作流时，传入的 upload_latest 参数值为 'true'，此步骤才会执行
@@ -1274,58 +1365,3 @@ jobs:
               Write-Warning "::warning::download server upload failed for latest_version.json: $_"
             }
           }
-
-  notify:
-    name: Notify Feishu
-    runs-on: ubuntu-latest
-    needs: release
-    if: ${{ always() }}
-    steps:
-      - name: Send Feishu notification
-        env:
-          FEISHU_WEBHOOK_URL: ${{ secrets.FEISHU_RELEASE_NOTIFY_WEBHOOK }}
-          RELEASE_RESULT: ${{ needs.release.result }}
-          RELEASE_VERSION: ${{ github.event.inputs.version }}
-          UPLOAD_LATEST: ${{ github.event.inputs.upload_latest }}
-          UPDATE_LATEST_VERSION_JSON: ${{ github.event.inputs.update_latest_version_json }}
-          RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: |
-          if [ -z "$FEISHU_WEBHOOK_URL" ]; then
-            echo "FEISHU_RELEASE_NOTIFY_WEBHOOK is not configured; skip notification."
-            exit 0
-          fi
-
-          if [ "$RELEASE_RESULT" = "success" ]; then
-            STATUS="成功"
-          elif [ "$RELEASE_RESULT" = "cancelled" ]; then
-            STATUS="已取消"
-          else
-            STATUS="失败"
-          fi
-          export STATUS
-
-          python3 - <<'PY'
-          import json
-          import os
-          import urllib.request
-
-          webhook = os.environ["FEISHU_WEBHOOK_URL"]
-          text = "\n".join([
-              f"Chat2DB Local 灰度包构建{os.environ['STATUS']}",
-              f"版本：{os.environ['RELEASE_VERSION']}",
-              f"结果：{os.environ['RELEASE_RESULT']}",
-              f"分支：{os.environ['GITHUB_REF_NAME']}",
-              f"上传 latest：{os.environ['UPLOAD_LATEST']}",
-              f"更新 latest_version.json：{os.environ['UPDATE_LATEST_VERSION_JSON']}",
-              f"运行链接：{os.environ['RUN_URL']}",
-          ])
-          payload = json.dumps({"msg_type": "text", "content": {"text": text}}).encode("utf-8")
-          request = urllib.request.Request(
-              webhook,
-              data=payload,
-              headers={"Content-Type": "application/json"},
-              method="POST",
-          )
-          with urllib.request.urlopen(request, timeout=15) as response:
-              print(response.read().decode("utf-8"))
-          PY
