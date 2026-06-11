@@ -1193,3 +1193,63 @@ jobs:
               Write-Warning "::warning::download server upload failed for latest_version.json: $_"
             }
           }
+
+  notify_summary:
+    name: Notify Feishu release summary
+    runs-on: ubuntu-latest
+    needs: release
+    if: ${{ needs.release.result == 'success' }}
+    steps:
+      - name: Send Feishu package summary
+        env:
+          FEISHU_WEBHOOK_URL: ${{ secrets.FEISHU_RELEASE_NOTIFY_WEBHOOK }}
+          RELEASE_VERSION: ${{ github.event.inputs.version }}
+          RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -z "$FEISHU_WEBHOOK_URL" ]; then
+            echo "FEISHU_RELEASE_NOTIFY_WEBHOOK is not configured; skip summary notification."
+            exit 0
+          fi
+
+          python3 - <<'PY'
+          import json
+          import os
+          import urllib.request
+          import urllib.error
+
+          version = os.environ["RELEASE_VERSION"]
+          base = f"https://cdn.chat2db-ai.com/download/{version}"
+          files = [
+              f"Chat2DB-Pro-{version}.exe",
+              f"Chat2DB-Pro-{version}-x64.dmg",
+              f"Chat2DB-Pro-{version}-arm64.dmg",
+              f"Chat2DB-Pro-{version}-x86_64.AppImage",
+              f"Chat2DB-Pro-{version}-arm64.AppImage",
+              f"Chat2DB-Pro-{version}-amd64.deb",
+              f"Chat2DB-Pro-{version}-arm64.deb",
+              f"Chat2DB-Pro-{version}-x86_64.rpm",
+              f"Chat2DB-Pro-{version}-aarch64.rpm",
+          ]
+          lines = [
+              "Chat2DB Pro 灰度包全部上传成功",
+              f"版本：{version}",
+              "下载链接：",
+              *[f"- {base}/{name}" for name in files],
+              f"运行链接：{os.environ['RUN_URL']}",
+          ]
+          payload = json.dumps(
+              {"msg_type": "text", "content": {"text": "\n".join(lines)}},
+              ensure_ascii=False,
+          ).encode("utf-8")
+          request = urllib.request.Request(
+              os.environ["FEISHU_WEBHOOK_URL"],
+              data=payload,
+              headers={"Content-Type": "application/json"},
+              method="POST",
+          )
+          try:
+              with urllib.request.urlopen(request, timeout=15) as response:
+                  print(response.read().decode("utf-8"))
+          except urllib.error.URLError as exc:
+              print(f"::warning::Feishu summary notification failed: {exc}")
+          PY
