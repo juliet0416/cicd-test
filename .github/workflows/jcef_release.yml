@@ -22,7 +22,59 @@ on:
         default: 'false'
         type: string
 
+permissions:
+  contents: read
+  actions: read
+
 jobs:
+  notify_start:
+    name: Notify Feishu release start
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send Feishu start notification
+        env:
+          FEISHU_WEBHOOK_URL: ${{ secrets.FEISHU_RELEASE_NOTIFY_WEBHOOK }}
+          RELEASE_EDITION: Chat2DB Pro
+          RELEASE_VERSION: ${{ github.event.inputs.version }}
+          UPLOAD_LATEST: ${{ github.event.inputs.upload_latest }}
+          UPDATE_LATEST_VERSION_JSON: ${{ github.event.inputs.update_latest_version_json }}
+          RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -z "$FEISHU_WEBHOOK_URL" ]; then
+            echo "FEISHU_RELEASE_NOTIFY_WEBHOOK is not configured; skip start notification."
+            exit 0
+          fi
+
+          python3 - <<'PY'
+          import json
+          import os
+          import urllib.request
+          import urllib.error
+
+          lines = [
+              f"{os.environ['RELEASE_EDITION']} 灰度打包已开始",
+              f"版本：{os.environ['RELEASE_VERSION']}",
+              f"upload_latest：{os.environ['UPLOAD_LATEST']}",
+              f"update_latest_version_json：{os.environ['UPDATE_LATEST_VERSION_JSON']}",
+              f"运行链接：{os.environ['RUN_URL']}",
+          ]
+          payload = json.dumps(
+              {"msg_type": "text", "content": {"text": "\n".join(lines)}},
+              ensure_ascii=False,
+          ).encode("utf-8")
+          request = urllib.request.Request(
+              os.environ["FEISHU_WEBHOOK_URL"],
+              data=payload,
+              headers={"Content-Type": "application/json"},
+              method="POST",
+          )
+          try:
+              with urllib.request.urlopen(request, timeout=15) as response:
+                  print(response.read().decode("utf-8"))
+          except urllib.error.URLError as exc:
+              print(f"::warning::Feishu start notification failed: {exc}")
+          PY
+
   release:
     strategy:
       fail-fast: false
@@ -329,14 +381,6 @@ jobs:
       #     repository: ${{ secrets.REPO_BASE_URL }}
       #     ref: ${{ secrets.TEST_REPO_BASE_BRANCH }}
       #     path: ${{ secrets.REPO_BASE_PATH }}
-
-      - name: Check out sqlParser repository
-        uses: actions/checkout@v2
-        with:
-          repository: ${{ secrets.SQL_PARSER_BASE_URL }}
-          ref: ${{ secrets.SQL_PARSER_REPO_BASE_BRANCH }}
-          path: ${{ secrets.SQL_PARSER_REPO_BASE_PATH }}
-          token: ${{ secrets.ACCESS_TOKEN }}
 
       # 设置OSS
       - name: Set up oss utils
@@ -1198,13 +1242,15 @@ jobs:
     name: Notify Feishu release summary
     runs-on: ubuntu-latest
     needs: release
-    if: ${{ needs.release.result == 'success' }}
+    if: ${{ always() }}
     steps:
       - name: Send Feishu package summary
         env:
           FEISHU_WEBHOOK_URL: ${{ secrets.FEISHU_RELEASE_NOTIFY_WEBHOOK }}
           RELEASE_VERSION: ${{ github.event.inputs.version }}
+          RELEASE_RESULT: ${{ needs.release.result }}
           RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           if [ -z "$FEISHU_WEBHOOK_URL" ]; then
             echo "FEISHU_RELEASE_NOTIFY_WEBHOOK is not configured; skip summary notification."
@@ -1218,6 +1264,8 @@ jobs:
           import urllib.error
 
           version = os.environ["RELEASE_VERSION"]
+          result = os.environ["RELEASE_RESULT"]
+          run_url = os.environ["RUN_URL"]
           base = f"https://cdn.chat2db-ai.com/download/{version}"
           files = [
               f"Chat2DB-Pro-{version}.exe",
@@ -1230,13 +1278,52 @@ jobs:
               f"Chat2DB-Pro-{version}-x86_64.rpm",
               f"Chat2DB-Pro-{version}-aarch64.rpm",
           ]
-          lines = [
-              "Chat2DB Pro 灰度包全部上传成功",
-              f"版本：{version}",
-              "下载链接：",
-              *[f"- {base}/{name}" for name in files],
-              f"运行链接：{os.environ['RUN_URL']}",
-          ]
+
+          def failed_release_jobs():
+              repo = os.environ["GITHUB_REPOSITORY"]
+              run_id = os.environ["GITHUB_RUN_ID"]
+              token = os.environ.get("GITHUB_TOKEN", "")
+              request = urllib.request.Request(
+                  f"https://api.github.com/repos/{repo}/actions/runs/{run_id}/jobs?per_page=100",
+                  headers={
+                      "Accept": "application/vnd.github.v3+json",
+                      "Authorization": f"Bearer {token}",
+                  },
+              )
+              try:
+                  with urllib.request.urlopen(request, timeout=15) as response:
+                      jobs = json.loads(response.read().decode("utf-8")).get("jobs", [])
+              except Exception as exc:
+                  return [f"- 无法读取失败 job 列表：{exc}"]
+
+              failed = []
+              for job in jobs:
+                  name = job.get("name", "")
+                  if not name.startswith("release "):
+                      continue
+                  conclusion = job.get("conclusion") or job.get("status") or "unknown"
+                  if conclusion != "success":
+                      failed.append(f"- {name}: {conclusion}")
+              return failed or ["- 未获取到失败 job，请查看运行链接"]
+
+          if result == "success":
+              lines = [
+                  "Chat2DB Pro 灰度包全部上传成功",
+                  f"版本：{version}",
+                  "下载链接：",
+                  *[f"- {base}/{name}" for name in files],
+                  f"运行链接：{run_url}",
+              ]
+          else:
+              lines = [
+                  "Chat2DB Pro 灰度打包未全部成功",
+                  f"版本：{version}",
+                  f"结果：{result}",
+                  "失败/未成功 job：",
+                  *failed_release_jobs(),
+                  f"运行链接：{run_url}",
+              ]
+
           payload = json.dumps(
               {"msg_type": "text", "content": {"text": "\n".join(lines)}},
               ensure_ascii=False,
