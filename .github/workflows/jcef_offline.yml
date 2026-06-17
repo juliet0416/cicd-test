@@ -38,6 +38,7 @@ jobs:
           RELEASE_VERSION: ${{ github.event.inputs.version }}
           UPLOAD_LATEST: ${{ github.event.inputs.upload_latest }}
           UPDATE_LATEST_VERSION_JSON: ${{ github.event.inputs.update_latest_version_json }}
+          RELEASE_CHANNEL: ${{ github.event.inputs.upload_latest == 'true' && github.event.inputs.update_latest_version_json == 'true' && '正式' || '灰度' }}
           RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           if [ -z "$FEISHU_WEBHOOK_URL" ]; then
@@ -52,7 +53,7 @@ jobs:
           import urllib.error
 
           lines = [
-              f"{os.environ['RELEASE_EDITION']} 灰度打包已开始",
+              f"{os.environ['RELEASE_EDITION']} {os.environ['RELEASE_CHANNEL']}打包已开始",
               f"版本：{os.environ['RELEASE_VERSION']}",
               f"upload_latest：{os.environ['UPLOAD_LATEST']}",
               f"update_latest_version_json：{os.environ['UPDATE_LATEST_VERSION_JSON']}",
@@ -106,6 +107,8 @@ jobs:
             build_arg: '--linux --arm64'
 
     runs-on: ${{ matrix.os }}
+    env:
+      RELEASE_CHANNEL: ${{ github.event.inputs.upload_latest == 'true' && github.event.inputs.update_latest_version_json == 'true' && '正式' || '灰度' }}
 
     # 将release_test分支的代码检出（即复制）到 GitHub Actions 的运行环境中。
     steps:
@@ -148,9 +151,10 @@ jobs:
           repository = os.environ.get("GITHUB_REPOSITORY", "")
           run_id = os.environ.get("GITHUB_RUN_ID", "")
           run_url = f"https://github.com/{repository}/actions/runs/{run_id}" if repository and run_id else ""
+          release_channel = os.environ.get("RELEASE_CHANNEL", "灰度")
 
           text = "\n".join([
-              f"{edition} 灰度包上传成功",
+              f"{edition} {release_channel}包上传成功",
               f"版本：{version}",
               f"平台：{platform}",
               f"包名：{package_name}",
@@ -1421,6 +1425,7 @@ jobs:
           FEISHU_WEBHOOK_URL: ${{ secrets.FEISHU_RELEASE_NOTIFY_WEBHOOK }}
           RELEASE_VERSION: ${{ github.event.inputs.version }}
           RELEASE_RESULT: ${{ needs.release.result }}
+          RELEASE_CHANNEL: ${{ github.event.inputs.upload_latest == 'true' && github.event.inputs.update_latest_version_json == 'true' && '正式' || '灰度' }}
           RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
           GITHUB_TOKEN: ${{ github.token }}
         run: |
@@ -1437,6 +1442,7 @@ jobs:
 
           version = os.environ["RELEASE_VERSION"]
           result = os.environ["RELEASE_RESULT"]
+          release_channel = os.environ["RELEASE_CHANNEL"]
           run_url = os.environ["RUN_URL"]
           base = f"https://cdn.chat2db-ai.com/offline/{version}"
           files = [
@@ -1480,7 +1486,7 @@ jobs:
 
           if result == "success":
               lines = [
-                  "Chat2DB Local 灰度包全部上传成功",
+                  f"Chat2DB Local {release_channel}包全部上传成功",
                   f"版本：{version}",
                   "下载链接：",
                   *[f"- {base}/{name}" for name in files],
@@ -1488,7 +1494,7 @@ jobs:
               ]
           else:
               lines = [
-                  "Chat2DB Local 灰度打包未全部成功",
+                  f"Chat2DB Local {release_channel}打包未全部成功",
                   f"版本：{version}",
                   f"结果：{result}",
                   "失败/未成功 job：",
