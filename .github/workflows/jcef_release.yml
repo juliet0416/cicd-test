@@ -114,7 +114,7 @@ jobs:
         with:
           repository: ${{ secrets.REPO_URL }}
           path: ${{ secrets.REPO_PATH }}
-          ref: ${{ secrets.REPO_BRANCH }}
+          ref: gray/schema-large-cell-diagnostics
           token: ${{ secrets.ACCESS_TOKEN }}
 
       # Output basic information
