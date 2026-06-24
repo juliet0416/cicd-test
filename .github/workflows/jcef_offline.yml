@@ -11,6 +11,11 @@ on:
         description: 'Version number'
         required: true
         default: '1.0.0'
+      source_branch:
+        description: 'Source repository branch; empty uses REPO_BRANCH secret'
+        required: false
+        default: ''
+        type: string
       upload_latest:
         description: '是否上传到 latest 目录 (true/false)'
         required: false   # 设为非必须
@@ -114,7 +119,7 @@ jobs:
         with:
           repository: ${{ secrets.REPO_URL }}
           path: ${{ secrets.REPO_PATH }}
-          ref: ${{ secrets.REPO_BRANCH }}
+          ref: ${{ github.event.inputs.source_branch || secrets.REPO_BRANCH }}
           token: ${{ secrets.ACCESS_TOKEN }}
 
       # Output basic information
