@@ -1,0 +1,510 @@
+name: Build Community JCEF Client
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version number'
+        required: true
+        default: '1.0.0'
+      source_ref:
+        description: 'Chat2DB source branch/ref'
+        required: true
+        default: 'community-migration'
+      upload_oss:
+        description: '是否上传到 community 目录 (true/false)'
+        required: false
+        default: 'false'
+        type: string
+      upload_latest:
+        description: '是否上传到 community/latest 目录 (true/false)'
+        required: false
+        default: 'false'
+        type: string
+      update_latest_version_json:
+        description: '是否更新 community/updates/latest_version.json (true/false)'
+        required: false
+        default: 'false'
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  release:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            arch: x86_64
+            artifact_suffix: x64
+          - os: macos-latest
+            arch: arm64
+            artifact_suffix: arm64
+          - os: windows-latest
+            arch: x64
+            artifact_suffix: win-x64
+          - os: ubuntu-22.04
+            arch: x86_64
+            artifact_suffix: linux-x86_64
+          - os: ubuntu-22.04-arm
+            arch: arm64
+            artifact_suffix: linux-arm64
+
+    runs-on: ${{ matrix.os }}
+
+    env:
+      SOURCE_ROOT: ${{ github.workspace }}/${{ secrets.REPO_PATH }}
+      SERVER_ROOT: ${{ github.workspace }}/${{ secrets.REPO_PATH }}/chat2db-server
+      CLIENT_ROOT: ${{ github.workspace }}/${{ secrets.REPO_PATH }}/chat2db-client
+      COMMUNITY_APP_NAME: Chat2DB-Community
+      COMMUNITY_UPDATE_BASE_URL: https://cdn.chat2db-ai.com/community/updates
+
+    steps:
+      - name: Check out Chat2DB source
+        uses: actions/checkout@v2
+        with:
+          repository: ${{ secrets.REPO_URL }}
+          path: ${{ secrets.REPO_PATH }}
+          ref: ${{ github.event.inputs.source_ref }}
+          token: ${{ secrets.ACCESS_TOKEN }}
+
+      - name: Print package context
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "version=${{ github.event.inputs.version }}"
+          echo "source_ref=${{ github.event.inputs.source_ref }}"
+          echo "runner.os=${RUNNER_OS}"
+          echo "matrix.arch=${{ matrix.arch }}"
+          git -C "$SOURCE_ROOT" rev-parse --abbrev-ref HEAD || true
+          git -C "$SOURCE_ROOT" rev-parse HEAD
+
+      - name: Setup Windows JBR for build/runtime
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          curl.exe -L -o jbr.tar.gz "https://cache-redirector.jetbrains.com/intellij-jbr/jbr_jcef-17.0.12-windows-x64-b1207.37.tar.gz"
+          New-Item -Path "jbr-for-build" -ItemType Directory -Force | Out-Null
+          tar.exe -xzf jbr.tar.gz -C jbr-for-build --strip-components=1
+          $jbrPath = Resolve-Path -Path "jbr-for-build"
+          "JBR_BUILD_PATH=$jbrPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Setup Windows OpenJDK for jpackage
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          curl.exe -L -o openjdk.zip "https://download.java.net/java/GA/jdk17.0.2/dfd4a8d0985749f896bed50d7138ee7f/8/GPL/openjdk-17.0.2_windows-x64_bin.zip"
+          New-Item -Path "openjdk-custom" -ItemType Directory -Force | Out-Null
+          7z.exe x openjdk.zip -o"openjdk-custom" -y
+          $jdkHome = Get-ChildItem -Path "openjdk-custom" | Select-Object -First 1 | ForEach-Object { $_.FullName }
+          "OPENJDK_PATH=$jdkHome" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Setup macOS JBR for build/runtime
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ matrix.arch }}" = "arm64" ]; then
+            JBR_URL="https://cache-redirector.jetbrains.com/intellij-jbr/jbr_jcef-17.0.12-osx-aarch64-b1207.37.tar.gz"
+          else
+            JBR_URL="https://cache-redirector.jetbrains.com/intellij-jbr/jbr_jcef-17.0.12-osx-x64-b1207.37.tar.gz"
+          fi
+          curl -L -o jbr.tar.gz "$JBR_URL"
+          mkdir -p jbr-default
+          tar -xzf jbr.tar.gz -C jbr-default --strip-components=1
+          JBR_HOME_PATH=$(cd jbr-default/Contents/Home && pwd)
+          echo "JAVA_HOME=$JBR_HOME_PATH" >> "$GITHUB_ENV"
+          echo "$JBR_HOME_PATH/bin" >> "$GITHUB_PATH"
+
+      - name: Setup Linux JBR runtime
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ matrix.arch }}" = "arm64" ]; then
+            JBR_URL="https://cache-redirector.jetbrains.com/intellij-jbr/jbr_jcef-17.0.12-linux-aarch64-b1207.37.tar.gz"
+          else
+            JBR_URL="https://cache-redirector.jetbrains.com/intellij-jbr/jbr_jcef-17.0.12-linux-x64-b1207.37.tar.gz"
+          fi
+          curl -L -o jbr-linux.tar.gz "$JBR_URL"
+          mkdir -p jbr-linux
+          tar -xzf jbr-linux.tar.gz -C jbr-linux --strip-components=1
+          JBR_HOME_PATH=$(cd jbr-linux && pwd)
+          echo "JBR_LINUX_PATH=$JBR_HOME_PATH" >> "$GITHUB_ENV"
+
+      - name: Install Linux packaging dependencies
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y fakeroot rpm desktop-file-utils file jq
+
+      - name: Install Windows packaging dependencies
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          choco install jq innosetup winscp -y --no-progress
+
+      - name: Resolve Windows signing tools
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $winScpCandidates = @(
+            "C:\Program Files (x86)\WinSCP\WinSCP.com",
+            "C:\Program Files\WinSCP\WinSCP.com",
+            "C:\ProgramData\chocolatey\bin\winscp.com"
+          )
+          $winScpPath = $winScpCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $winScpPath) {
+            Write-Error "WinSCP.com was not found after installation."
+            exit 1
+          }
+          "WINSCP_PATH=$winScpPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          (Split-Path -Path $winScpPath -Parent) | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+          $isccCandidates = @(
+            "C:\Program Files (x86)\Inno Setup 6\ISCC.exe",
+            "C:\Program Files\Inno Setup 6\ISCC.exe"
+          )
+          $isccPath = $isccCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $isccPath) {
+            Write-Error "ISCC.exe was not found after Inno Setup installation."
+            exit 1
+          }
+          Write-Host "Resolved ISCC: $isccPath"
+
+      - name: Copy Windows runtime image
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $runtime = Join-Path $env:SERVER_ROOT "jpackage/input/runtime/win/Home"
+          New-Item -Path $runtime -ItemType Directory -Force | Out-Null
+          Copy-Item -Path "$env:JBR_BUILD_PATH\*" -Destination $runtime -Recurse -Force
+
+      - name: Copy macOS runtime image
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$SERVER_ROOT/jpackage/input/runtime/mac"
+          cp -R "$JAVA_HOME" "$SERVER_ROOT/jpackage/input/runtime/mac"
+          chmod -R 777 "$SERVER_ROOT/jpackage/input/runtime/mac"
+          mkdir -p "$SERVER_ROOT/jpackage/input/mac"
+          cp -R "$JAVA_HOME/../Frameworks" "$SERVER_ROOT/jpackage/input/mac"
+          rm -rf "$SERVER_ROOT/jpackage/input/mac/Frameworks/cef_server.app"
+
+      - name: Copy Linux runtime image
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$SERVER_ROOT/jpackage/input/runtime/linux/Home"
+          cp -R "$JBR_LINUX_PATH"/* "$SERVER_ROOT/jpackage/input/runtime/linux/Home"
+          rm -rf "$SERVER_ROOT/jpackage/input/runtime/linux/Home/legal"
+          chmod -R 777 "$SERVER_ROOT/jpackage/input/runtime/linux"
+
+      - name: Setup Temurin JDK for Linux build/package
+        if: runner.os == 'Linux'
+        uses: actions/setup-java@main
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          java-package: 'jdk'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@main
+        with:
+          node-version: '18.17.0'
+          cache: 'yarn'
+          cache-dependency-path: ${{ github.workspace }}/${{ secrets.REPO_PATH }}/chat2db-client/yarn.lock
+
+      - name: Setup ossutil
+        if: ${{ (runner.os == 'Windows' || github.event.inputs.upload_oss == 'true' || github.event.inputs.upload_latest == 'true' || github.event.inputs.update_latest_version_json == 'true') && !(runner.os == 'Linux' && matrix.arch == 'arm64') }}
+        uses: yizhoumo/setup-ossutil@v1
+        with:
+          endpoint: ${{ secrets.OSS_ENDPOINT }}
+          access-key-id: ${{ secrets.OSS_ACCESS_KEY_ID }}
+          access-key-secret: ${{ secrets.OSS_ACCESS_KEY_SECRET }}
+          ossutil-version: '1.7.16'
+
+      - name: Setup ossutil for Linux arm64
+        if: ${{ runner.os == 'Linux' && matrix.arch == 'arm64' && (github.event.inputs.upload_oss == 'true' || github.event.inputs.upload_latest == 'true' || github.event.inputs.update_latest_version_json == 'true') }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          OSSUTIL_PATH="$RUNNER_TEMP/ossutil"
+          curl -L -o "$OSSUTIL_PATH" "https://gosspublic.alicdn.com/ossutil/1.7.16/ossutilarm64"
+          chmod 755 "$OSSUTIL_PATH"
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+          "$OSSUTIL_PATH" config \
+            --endpoint "${{ secrets.OSS_ENDPOINT }}" \
+            --access-key-id "${{ secrets.OSS_ACCESS_KEY_ID }}" \
+            --access-key-secret "${{ secrets.OSS_ACCESS_KEY_SECRET }}"
+
+      - name: Prepare community package input
+        shell: bash
+        env:
+          COMMUNITY_UPDATE_BASE_URL: ${{ env.COMMUNITY_UPDATE_BASE_URL }}
+        run: |
+          set -euo pipefail
+          if [ "${RUNNER_OS}" = "Windows" ]; then
+            export JAVA_HOME="$JBR_BUILD_PATH"
+            export PATH="$JAVA_HOME/bin:$PATH"
+          fi
+          bash "$SOURCE_ROOT/script/package-community-jcef.sh" "${{ github.event.inputs.version }}" prepare
+
+      - name: Import Code-Signing Certificate
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          echo "${{ secrets.MAC_CERTS }}" | base64 --decode > certificate.p12
+          KEYCHAIN_PATH=$RUNNER_TEMP/build.keychain
+          security create-keychain -p "${{ secrets.MAC_CERTS_PASSWORD }}" "$KEYCHAIN_PATH"
+          security default-keychain -s "$KEYCHAIN_PATH"
+          security unlock-keychain -p "${{ secrets.MAC_CERTS_PASSWORD }}" "$KEYCHAIN_PATH"
+          security import certificate.p12 -k "$KEYCHAIN_PATH" -P "${{ secrets.MAC_CERTS_PASSWORD }}" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "${{ secrets.MAC_CERTS_PASSWORD }}" "$KEYCHAIN_PATH"
+
+      - name: Sign native libraries inside macOS package JAR
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          SIGN_ID="Developer ID Application: JinYu Fan (6MXS42K9F4)"
+          INPUT_DIR="$SERVER_ROOT/jpackage/input/mac"
+          find "$INPUT_DIR" -name "*.jar" | while read jar_file; do
+            JAR_ABS="$(cd "$(dirname "$jar_file")" && pwd)/$(basename "$jar_file")"
+            WORK_DIR=$(mktemp -d)
+            unzip -q -o "$JAR_ABS" -d "$WORK_DIR" 2>/dev/null || { rm -rf "$WORK_DIR"; continue; }
+
+            find "$WORK_DIR" -name "*.jar" 2>/dev/null | while read nested_jar; do
+              if unzip -l "$nested_jar" 2>/dev/null | grep -qE '\.(dylib|jnilib)$'; then
+                NESTED_TMP=$(mktemp -d)
+                unzip -q -o "$nested_jar" -d "$NESTED_TMP"
+                find "$NESTED_TMP" -type f \( -name "*.dylib" -o -name "*.jnilib" \) | while read lib; do
+                  codesign --force --sign "$SIGN_ID" --timestamp "$lib"
+                done
+                rm -f "$nested_jar"
+                (cd "$NESTED_TMP" && zip -q -r -0 "$nested_jar" .)
+                rm -rf "$NESTED_TMP"
+                touch "$WORK_DIR/.modified"
+              fi
+            done
+
+            find "$WORK_DIR" -type f \( -name "*.dylib" -o -name "*.jnilib" \) 2>/dev/null | while read lib; do
+              codesign --force --sign "$SIGN_ID" --timestamp "$lib"
+              touch "$WORK_DIR/.modified"
+            done
+
+            if [ -f "$WORK_DIR/.modified" ]; then
+              rm -f "$WORK_DIR/.modified"
+              rm -f "$JAR_ABS"
+              (cd "$WORK_DIR" && zip -q -r -0 "$JAR_ABS" .)
+            fi
+            rm -rf "$WORK_DIR"
+          done
+
+      - name: Setup Temurin JDK for macOS jpackage
+        if: runner.os == 'macOS'
+        uses: actions/setup-java@main
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          java-package: 'jdk'
+          architecture: ${{ matrix.arch }}
+
+      - name: Package macOS arm64
+        if: runner.os == 'macOS' && matrix.arch == 'arm64'
+        shell: bash
+        run: |
+          bash "$SERVER_ROOT/package_macos_community.sh" \
+            "${{ github.event.inputs.version }}" \
+            "Chat2DB-Community-${{ github.event.inputs.version }}-arm64.dmg"
+
+      - name: Package macOS x64
+        if: runner.os == 'macOS' && matrix.arch == 'x86_64'
+        shell: bash
+        run: |
+          bash "$SERVER_ROOT/package_macos_community.sh" \
+            "${{ github.event.inputs.version }}" \
+            "Chat2DB-Community-${{ github.event.inputs.version }}-x64.dmg"
+
+      - name: Package Linux
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          bash "$SERVER_ROOT/package_linux_community.sh" "${{ github.event.inputs.version }}"
+
+      - name: Package Windows MSI
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          export JAVA_HOME="$OPENJDK_PATH"
+          export PATH="$JAVA_HOME/bin:$PATH"
+          bash "$SERVER_ROOT/package_win_community.sh" "${{ github.event.inputs.version }}"
+
+      - name: Upload unsigned Community MSI to OSS staging
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          ossutil cp -f \
+            "$SERVER_ROOT/jpackage/output/Chat2DB-Community-${{ github.event.inputs.version }}.msi" \
+            "oss://${{ secrets.BUCKET_NAME }}/community/updates/${{ github.event.inputs.version }}/temp-msi/Chat2DB-Community-${{ github.event.inputs.version }}.msi"
+
+      - name: Sign Community MSI on remote signing server
+        if: runner.os == 'Windows'
+        timeout-minutes: 15
+        shell: pwsh
+        env:
+          SCP_PASSWORD: ${{ secrets.WIN_SSH_PRIVATE_KEY }}
+          REMOTE_HOST: ${{ secrets.WIN_SERVER_IP }}
+          REMOTE_USER: ${{ secrets.WIN_SERVER_USER }}
+          REMOTE_MSI_PATH: '${{ secrets.REMOTE_SIGN_PATH }}/Chat2DB-Community-${{ github.event.inputs.version }}.msi'
+          REMOTE_OSS: ${{ secrets.REMOTE_SIGN_SCRIPT_OSS }}
+          SIGN_MSI_SHA1: '${{ secrets.REMOTE_SIGN_SCRIPT }} --alg SHA-1 ${{ secrets.REMOTE_SIGN_PATH }}/Chat2DB-Community-${{ github.event.inputs.version }}.msi'
+          SIGN_MSI_SHA256: '${{ secrets.REMOTE_SIGN_SCRIPT }} --alg SHA-256 ${{ secrets.REMOTE_SIGN_PATH }}/Chat2DB-Community-${{ github.event.inputs.version }}.msi'
+        run: |
+          & "${env:WINSCP_PATH}" /log=winscp-community-msi.log /command `
+            "option batch abort" `
+            "option confirm off" `
+            "open scp://${{ env.REMOTE_USER }}:${{ env.SCP_PASSWORD }}@${{ env.REMOTE_HOST }} -hostkey=*" `
+            "call ${{ env.REMOTE_OSS }} oss://${{ secrets.BUCKET_NAME }}/community/updates/${{ github.event.inputs.version }}/temp-msi/Chat2DB-Community-${{ github.event.inputs.version }}.msi ${env:REMOTE_MSI_PATH}" `
+            "call ${env:SIGN_MSI_SHA1}" `
+            "call ${env:SIGN_MSI_SHA256}" `
+            "call ${{ env.REMOTE_OSS }} ${env:REMOTE_MSI_PATH} oss://${{ secrets.BUCKET_NAME }}/community/updates/${{ github.event.inputs.version }}/signed-msi/Chat2DB-Community-${{ github.event.inputs.version }}.msi" `
+            "exit"
+
+      - name: Download signed Community MSI
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          ossutil cp -f \
+            "oss://${{ secrets.BUCKET_NAME }}/community/updates/${{ github.event.inputs.version }}/signed-msi/Chat2DB-Community-${{ github.event.inputs.version }}.msi" \
+            "$SERVER_ROOT/jpackage/output/Chat2DB-Community-${{ github.event.inputs.version }}.msi"
+
+      - name: Wrap Windows installer
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          bash "$SERVER_ROOT/wrap_win_installer_community.sh" "${{ github.event.inputs.version }}"
+
+      - name: Upload unsigned Community EXE to OSS staging
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          ossutil cp -f \
+            "$SERVER_ROOT/jpackage/output/Chat2DB-Community-${{ github.event.inputs.version }}.exe" \
+            "oss://${{ secrets.BUCKET_NAME }}/community/updates/${{ github.event.inputs.version }}/temp-exe/Chat2DB-Community-${{ github.event.inputs.version }}.exe"
+
+      - name: Sign Community EXE on remote signing server
+        if: runner.os == 'Windows'
+        timeout-minutes: 15
+        shell: pwsh
+        env:
+          SCP_PASSWORD: ${{ secrets.WIN_SSH_PRIVATE_KEY }}
+          REMOTE_HOST: ${{ secrets.WIN_SERVER_IP }}
+          REMOTE_USER: ${{ secrets.WIN_SERVER_USER }}
+          REMOTE_EXE_PATH: '${{ secrets.REMOTE_SIGN_PATH }}/Chat2DB-Community-${{ github.event.inputs.version }}.exe'
+          REMOTE_OSS: ${{ secrets.REMOTE_SIGN_SCRIPT_OSS }}
+          SIGN_EXE_SHA1: '${{ secrets.REMOTE_SIGN_SCRIPT }} --alg SHA-1 ${{ secrets.REMOTE_SIGN_PATH }}/Chat2DB-Community-${{ github.event.inputs.version }}.exe'
+          SIGN_EXE_SHA256: '${{ secrets.REMOTE_SIGN_SCRIPT }} --alg SHA-256 ${{ secrets.REMOTE_SIGN_PATH }}/Chat2DB-Community-${{ github.event.inputs.version }}.exe'
+        run: |
+          & "${env:WINSCP_PATH}" /log=winscp-community-exe.log /command `
+            "option batch abort" `
+            "option confirm off" `
+            "open scp://${{ env.REMOTE_USER }}:${{ env.SCP_PASSWORD }}@${{ env.REMOTE_HOST }} -hostkey=*" `
+            "call ${{ env.REMOTE_OSS }} oss://${{ secrets.BUCKET_NAME }}/community/updates/${{ github.event.inputs.version }}/temp-exe/Chat2DB-Community-${{ github.event.inputs.version }}.exe ${env:REMOTE_EXE_PATH}" `
+            "call ${env:SIGN_EXE_SHA1}" `
+            "call ${env:SIGN_EXE_SHA256}" `
+            "call ${{ env.REMOTE_OSS }} ${env:REMOTE_EXE_PATH} oss://${{ secrets.BUCKET_NAME }}/community/updates/${{ github.event.inputs.version }}/signed-exe/Chat2DB-Community-${{ github.event.inputs.version }}.exe" `
+            "exit"
+
+      - name: Download signed Community EXE
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          ossutil cp -f \
+            "oss://${{ secrets.BUCKET_NAME }}/community/updates/${{ github.event.inputs.version }}/signed-exe/Chat2DB-Community-${{ github.event.inputs.version }}.exe" \
+            "$SERVER_ROOT/jpackage/output/Chat2DB-Community-${{ github.event.inputs.version }}.exe"
+
+      - name: Notarize macOS package
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          if [ "${{ matrix.arch }}" = "arm64" ]; then
+            DMG="$SERVER_ROOT/jpackage/output/Chat2DB-Community-${{ github.event.inputs.version }}-arm64.dmg"
+          else
+            DMG="$SERVER_ROOT/jpackage/output/Chat2DB-Community-${{ github.event.inputs.version }}-x64.dmg"
+          fi
+          xcrun notarytool store-credentials Chat2DBCommunity \
+            --apple-id "${{ secrets.MAC_APPLE_ID }}" \
+            --password "${{ secrets.MAC_APPLE_PASSWORD }}" \
+            --team-id "${{ secrets.MAC_TEAM_ID }}"
+          xcrun notarytool submit "$DMG" --keychain-profile Chat2DBCommunity --wait --verbose
+          xcrun stapler staple "$DMG"
+
+      - name: Upload GitHub artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: community-${{ github.event.inputs.version }}-${{ matrix.artifact_suffix }}
+          path: |
+            ${{ env.SERVER_ROOT }}/jpackage/output/*.dmg
+            ${{ env.SERVER_ROOT }}/jpackage/output/*.exe
+            ${{ env.SERVER_ROOT }}/jpackage/output/*.msi
+            ${{ env.SERVER_ROOT }}/jpackage/output/*.deb
+            ${{ env.SERVER_ROOT }}/jpackage/output/*.rpm
+            ${{ env.SERVER_ROOT }}/jpackage/output/*.AppImage
+
+      - name: Upload community package to OSS
+        if: github.event.inputs.upload_oss == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          for pattern in "*.dmg" "*.exe" "*.deb" "*.rpm" "*.AppImage"; do
+            for file in "$SERVER_ROOT"/jpackage/output/$pattern; do
+              [ -f "$file" ] || continue
+              ossutil cp -f "$file" "oss://${{ secrets.BUCKET_NAME }}/community/${{ github.event.inputs.version }}/$(basename "$file")"
+            done
+          done
+
+      - name: Upload community update payload to OSS
+        if: github.event.inputs.upload_oss == 'true' && runner.os == 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          ossutil cp -f "$SERVER_ROOT/jpackage/input/sourceFile/version.json" "oss://${{ secrets.BUCKET_NAME }}/community/updates/${{ github.event.inputs.version }}/version.json"
+          ossutil cp -r -f "$SERVER_ROOT/jpackage/input/sourceFile" "oss://${{ secrets.BUCKET_NAME }}/community/updates/${{ github.event.inputs.version }}/" --include "*.jar" --include "*.zip"
+
+      - name: Upload community latest package to OSS
+        if: github.event.inputs.upload_latest == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          for pattern in "*.dmg" "*.exe" "*.deb" "*.rpm" "*.AppImage"; do
+            for file in "$SERVER_ROOT"/jpackage/output/$pattern; do
+              [ -f "$file" ] || continue
+              name=$(basename "$file")
+              ossutil cp -f "$file" "oss://${{ secrets.BUCKET_NAME }}/community/latest/${name}"
+            done
+          done
+
+      - name: Generate and upload community latest_version.json
+        if: github.event.inputs.update_latest_version_json == 'true' && runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $metadataUrl = "https://cdn.chat2db-ai.com/community/updates/${{ github.event.inputs.version }}/version.json"
+          $payload = @{
+            latestVersion = "${{ github.event.inputs.version }}"
+            metadataUrl = $metadataUrl
+            forceUpdate = $false
+          } | ConvertTo-Json -Depth 3
+          $outputFile = Join-Path $env:RUNNER_TEMP "community_latest_version.json"
+          Set-Content -Path $outputFile -Value $payload -Encoding utf8
+          ossutil cp -f $outputFile "oss://${{ secrets.BUCKET_NAME }}/community/updates/latest_version.json"
