@@ -107,6 +107,10 @@ jobs:
 
     runs-on: ${{ matrix.os }}
 
+    env:
+      JCEF_PROJECT_ROOT: ${{ github.workspace }}/${{ secrets.REPO_PATH }}
+      JCEF_PACKAGE_SCRIPT_DIR: ${{ github.workspace }}/${{ secrets.REPO_PATH }}/script/package
+
     # 将release_test分支的代码检出（即复制）到 GitHub Actions 的运行环境中。
     steps:
       - name: Check out second repository
@@ -464,9 +468,9 @@ jobs:
         run: |
           # mkdir -p ${{ secrets.REPO_STATIC_PATH }} 
           # cp -r "${{ env.JAVA_HOME }}" ${{ secrets.REPO_JRE_PATH }}
-          mkdir -p ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/runtime/win/Home
-          cp -r ${{ env.JAVA_HOME }}/* ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/runtime/win/Home
-          ls ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/runtime/win/Home
+          mkdir -p ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/runtime/win/Home
+          cp -r ${{ env.JAVA_HOME }}/* ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/runtime/win/Home
+          ls ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/runtime/win/Home
 
       # Copy jre macOS
       - name: Copy Jre for macOS arm64
@@ -476,11 +480,11 @@ jobs:
           mkdir -p ${{ secrets.REPO_STATIC_PATH }} 
           cp -r $JAVA_HOME ${{ secrets.REPO_JRE_PATH }} 
           chmod -R 777 ${{ secrets.REPO_JRE_PATH }}
-          mkdir -p ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/runtime/mac
-          cp -r $JAVA_HOME ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/runtime/mac
-          chmod -R 777 ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/runtime/mac
-          cp -r $JAVA_HOME/../Frameworks ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/mac
-          rm -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/mac/Frameworks/cef_server.app
+          mkdir -p ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/runtime/mac
+          cp -r $JAVA_HOME ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/runtime/mac
+          chmod -R 777 ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/runtime/mac
+          cp -r $JAVA_HOME/../Frameworks ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/mac
+          rm -rf ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/mac/Frameworks/cef_server.app
       
 
       # Copy jre Linux
@@ -492,9 +496,9 @@ jobs:
           mkdir -p ${{ secrets.REPO_STATIC_PATH }} 
           cp -r $JAVA_HOME ${{ secrets.REPO_JRE_PATH }} 
           chmod -R 777 ${{ secrets.REPO_JRE_PATH }}
-          mkdir -p ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/runtime/linux/Home
-          cp -r $JAVA_HOME/* ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/runtime/linux/Home
-          chmod -R 777 ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/runtime/linux
+          mkdir -p ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/runtime/linux/Home
+          cp -r $JAVA_HOME/* ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/runtime/linux/Home
+          chmod -R 777 ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/runtime/linux
 
       # Linux
       - name: Delete File
@@ -504,7 +508,7 @@ jobs:
           ls -la
           rm -rf legal
           ls -la
-          rm -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/runtime/linux/Home/legal
+          rm -rf ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/runtime/linux/Home/legal
 
       - name: Setup Temurin JDK for Linux Build and Packaging
         if: ${{ runner.os == 'Linux' }}
@@ -781,22 +785,22 @@ jobs:
           echo "Returned to the original directory. Current path is:"
           pwd
           
-          mkdir -p ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile
-          cp ${{ secrets.REPO_FRONT_PATH }}/dist.zip ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile
+          mkdir -p ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile
+          cp ${{ secrets.REPO_FRONT_PATH }}/dist.zip ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile
           
-          mkdir -p ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/mac
-          mkdir -p ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/win
-          mkdir -p ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/linux
-          cp -r ${{ secrets.REPO_FRONT_PATH }}/dist ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/mac
-          cp -r ${{ secrets.REPO_FRONT_PATH }}/dist ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/win
-          cp -r ${{ secrets.REPO_FRONT_PATH }}/dist ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/linux
+          mkdir -p ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/mac
+          mkdir -p ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/win
+          mkdir -p ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/linux
+          cp -r ${{ secrets.REPO_FRONT_PATH }}/dist ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/mac
+          cp -r ${{ secrets.REPO_FRONT_PATH }}/dist ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/win
+          cp -r ${{ secrets.REPO_FRONT_PATH }}/dist ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/linux
 
           echo "start build version file"
-          sh ${{secrets.JCEF_PROJECT_ROOT}}/generate_metadata.sh  ${{ github.event.inputs.version }}  ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile  https://cdn.chat2db-ai.com/offline/updates
-          cp ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/version.json   ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/local_version.json
-          cp ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/local_version.json ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/mac
-          cp ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/local_version.json ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/win
-          cp ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/local_version.json ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/linux
+          sh ${{ env.JCEF_PACKAGE_SCRIPT_DIR }}/generate_metadata.sh  ${{ github.event.inputs.version }}  ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile  https://cdn.chat2db-ai.com/offline/updates
+          cp ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile/version.json   ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile/local_version.json
+          cp ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile/local_version.json ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/mac
+          cp ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile/local_version.json ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/win
+          cp ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile/local_version.json ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/linux
       
 
       # Step specifically for Windows
@@ -820,22 +824,22 @@ jobs:
           pwd
           
           # The rest of the script is the same, as the commands are compatible
-          mkdir -p ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile
-          cp ${{ secrets.REPO_FRONT_PATH }}/dist.zip ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile
+          mkdir -p ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile
+          cp ${{ secrets.REPO_FRONT_PATH }}/dist.zip ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile
           
-          mkdir -p ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/mac
-          mkdir -p ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/win
-          mkdir -p ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/linux
-          cp -r ${{ secrets.REPO_FRONT_PATH }}/dist ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/mac
-          cp -r ${{ secrets.REPO_FRONT_PATH }}/dist ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/win
-          cp -r ${{ secrets.REPO_FRONT_PATH }}/dist ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/linux
+          mkdir -p ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/mac
+          mkdir -p ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/win
+          mkdir -p ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/linux
+          cp -r ${{ secrets.REPO_FRONT_PATH }}/dist ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/mac
+          cp -r ${{ secrets.REPO_FRONT_PATH }}/dist ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/win
+          cp -r ${{ secrets.REPO_FRONT_PATH }}/dist ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/linux
 
           echo "start build version file"
-          sh ${{secrets.JCEF_PROJECT_ROOT}}/generate_metadata.sh ${{ github.event.inputs.version }} ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile https://cdn.chat2db-ai.com/offline/updates
-          cp ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/version.json ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/local_version.json
-          cp ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/local_version.json ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/mac
-          cp ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/local_version.json ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/win
-          cp ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/local_version.json ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/linux
+          sh ${{ env.JCEF_PACKAGE_SCRIPT_DIR }}/generate_metadata.sh ${{ github.event.inputs.version }} ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile https://cdn.chat2db-ai.com/offline/updates
+          cp ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile/version.json ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile/local_version.json
+          cp ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile/local_version.json ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/mac
+          cp ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile/local_version.json ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/win
+          cp ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile/local_version.json ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/linux
           
           # 打包前端资源
           # - name: Build FE Static
@@ -855,22 +859,22 @@ jobs:
           #     echo "Returned to the original directory. Current path is:"
           #     pwd
           
-          #     mkdir -p ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile
-          #     cp ${{ secrets.REPO_FRONT_PATH }}/dist.zip ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile
+          #     mkdir -p ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile
+          #     cp ${{ secrets.REPO_FRONT_PATH }}/dist.zip ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile
           
-          #     mkdir -p ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/mac
-          #     mkdir -p ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/win
-          #     mkdir -p ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/linux
-          #     cp -r ${{ secrets.REPO_FRONT_PATH }}/dist ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/mac
-          #     cp -r ${{ secrets.REPO_FRONT_PATH }}/dist ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/win
-          #     cp -r ${{ secrets.REPO_FRONT_PATH }}/dist ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/linux
+          #     mkdir -p ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/mac
+          #     mkdir -p ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/win
+          #     mkdir -p ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/linux
+          #     cp -r ${{ secrets.REPO_FRONT_PATH }}/dist ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/mac
+          #     cp -r ${{ secrets.REPO_FRONT_PATH }}/dist ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/win
+          #     cp -r ${{ secrets.REPO_FRONT_PATH }}/dist ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/linux
           
           #     echo "start build version file"
-          #     sh ${{secrets.JCEF_PROJECT_ROOT}}/generate_metadata.sh  ${{ github.event.inputs.version }}  ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile  https://cdn.chat2db-ai.com/offline/updates
-          #     cp ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/version.json   ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/local_version.json
-          #     cp ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/local_version.json ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/mac
-          #     cp ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/local_version.json ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/win
-          #     cp ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/local_version.json ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/linux
+          #     sh ${{ env.JCEF_PACKAGE_SCRIPT_DIR }}/generate_metadata.sh  ${{ github.event.inputs.version }}  ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile  https://cdn.chat2db-ai.com/offline/updates
+          #     cp ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile/version.json   ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile/local_version.json
+          #     cp ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile/local_version.json ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/mac
+          #     cp ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile/local_version.json ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/win
+          #     cp ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile/local_version.json ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/linux
 
 
       - name: Import Code-Signing Certificate
@@ -893,7 +897,7 @@ jobs:
         run: |
           echo "=== Signing native libraries inside JAR files for Apple notarization ==="
           SIGN_ID="Developer ID Application: JinYu Fan (6MXS42K9F4)"
-          INPUT_DIR="${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input"
+          INPUT_DIR="${{ env.JCEF_PROJECT_ROOT }}/jpackage/input"
 
           echo "Scanning for JARs in: $INPUT_DIR"
           find "$INPUT_DIR" -name "*.jar" | while read jar_file; do
@@ -981,26 +985,26 @@ jobs:
       - name: package mac arm64
         if: ${{ runner.os == 'macOS' && matrix.arch == 'arm64' }}
         run: |
-          sh ${{secrets.JCEF_PROJECT_ROOT}}/package_macos_offline.sh  ${{ github.event.inputs.version }} "${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg"
+          sh ${{ env.JCEF_PACKAGE_SCRIPT_DIR }}/package_macos_offline.sh  ${{ github.event.inputs.version }} "${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg"
 
       - name: package mac x86_64
         if: ${{ runner.os == 'macOS' && matrix.arch == 'x86_64' }}
         run: |
-          sh ${{secrets.JCEF_PROJECT_ROOT}}/package_macos_offline.sh  ${{ github.event.inputs.version }} ${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.dmg
+          sh ${{ env.JCEF_PACKAGE_SCRIPT_DIR }}/package_macos_offline.sh  ${{ github.event.inputs.version }} ${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.dmg
 
       - name: package linux
         if: ${{ runner.os == 'Linux' }}
         run: |
-          bash ${{secrets.JCEF_PROJECT_ROOT}}/package_linux_offline.sh ${{ github.event.inputs.version }}
+          bash ${{ env.JCEF_PACKAGE_SCRIPT_DIR }}/package_linux_offline.sh ${{ github.event.inputs.version }}
 
         # 公证&签名 Mac App
       - name: Notarize MacOS x86_64 App
         if: matrix.os == 'macos-latest' && matrix.arch == 'x86_64'
         run: |
           xcrun notarytool store-credentials ${{ secrets.PRODUCT_BASE_NAME }} --apple-id "${{ secrets.MAC_APPLE_ID }}" --password "${{ secrets.MAC_APPLE_PASSWORD }}" --team-id "${{ secrets.MAC_TEAM_ID }}"
-          xcrun notarytool submit ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.dmg --keychain-profile ${{ secrets.PRODUCT_BASE_NAME }} --wait --verbose
-          xcrun stapler staple ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.dmg
-          ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/*-x64.dmg "oss://${{ secrets.BUCKET_NAME }}/offline/${{ github.event.inputs.version }}/"
+          xcrun notarytool submit ${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.dmg --keychain-profile ${{ secrets.PRODUCT_BASE_NAME }} --wait --verbose
+          xcrun stapler staple ${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.dmg
+          ossutil cp -rf ${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/*-x64.dmg "oss://${{ secrets.BUCKET_NAME }}/offline/${{ github.event.inputs.version }}/"
           PACKAGE_FILE="${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.dmg"
           FEISHU_WEBHOOK_URL="${{ secrets.FEISHU_RELEASE_NOTIFY_WEBHOOK }}" \
             PACKAGE_EDITION="Chat2DB Local" \
@@ -1009,18 +1013,18 @@ jobs:
             PACKAGE_NAME="$PACKAGE_FILE" \
             PACKAGE_URL="https://cdn.chat2db-ai.com/offline/${{ github.event.inputs.version }}/$PACKAGE_FILE" \
             python3 "$RUNNER_TEMP/notify_package.py"
-          # ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/version.json "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/"
-          # ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/*.jar "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/"
-          # ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/*.zip "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/"
+          # ossutil cp -rf ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile/version.json "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/"
+          # ossutil cp -rf ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile/*.jar "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/"
+          # ossutil cp -rf ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile/*.zip "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/"
           echo "oss successful"
       # 公证&签名 Mac App
       - name: Notarize MacOS ARM App
         if: matrix.os == 'macos-latest' && matrix.arch == 'arm64'
         run: |
           xcrun notarytool store-credentials ${{ secrets.PRODUCT_BASE_NAME }} --apple-id "${{ secrets.MAC_APPLE_ID }}" --password "${{ secrets.MAC_APPLE_PASSWORD }}" --team-id "${{ secrets.MAC_TEAM_ID }}"
-          xcrun notarytool submit ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg --keychain-profile ${{ secrets.PRODUCT_BASE_NAME }} --wait --verbose
-          xcrun stapler staple ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg
-          ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/*-arm64.dmg "oss://${{ secrets.BUCKET_NAME }}/offline/${{ github.event.inputs.version }}/"
+          xcrun notarytool submit ${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg --keychain-profile ${{ secrets.PRODUCT_BASE_NAME }} --wait --verbose
+          xcrun stapler staple ${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg
+          ossutil cp -rf ${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/*-arm64.dmg "oss://${{ secrets.BUCKET_NAME }}/offline/${{ github.event.inputs.version }}/"
           PACKAGE_FILE="${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg"
           FEISHU_WEBHOOK_URL="${{ secrets.FEISHU_RELEASE_NOTIFY_WEBHOOK }}" \
             PACKAGE_EDITION="Chat2DB Local" \
@@ -1029,9 +1033,9 @@ jobs:
             PACKAGE_NAME="$PACKAGE_FILE" \
             PACKAGE_URL="https://cdn.chat2db-ai.com/offline/${{ github.event.inputs.version }}/$PACKAGE_FILE" \
             python3 "$RUNNER_TEMP/notify_package.py"
-          # ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/version.json "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/"
-          # ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/*.jar "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/"
-          # ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile/*.zip "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/"
+          # ossutil cp -rf ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile/version.json "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/"
+          # ossutil cp -rf ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile/*.jar "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/"
+          # ossutil cp -rf ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile/*.zip "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/"
           echo "oss successful"
 
       - name: Upload arm64 DMG to OSS if requested
@@ -1039,12 +1043,12 @@ jobs:
         if: matrix.os == 'macos-latest' && matrix.arch == 'arm64' && github.event.inputs.upload_latest == 'true'
         run: |
           echo "检测到需要上传 arm64 DMG，正在执行上传..."
-          ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg "oss://${{ secrets.BUCKET_NAME }}/offline/latest/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-arm64-latest.dmg"
-          rclone copyto "${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg" "${R2_REMOTE}/offline/latest/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-arm64-latest.dmg"
+          ossutil cp -rf ${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg "oss://${{ secrets.BUCKET_NAME }}/offline/latest/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-arm64-latest.dmg"
+          rclone copyto "${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg" "${R2_REMOTE}/offline/latest/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-arm64-latest.dmg"
 
           if [ "${DOWNLOAD_SERVER_READY:-false}" = "true" ]; then
             bash "$DOWNLOAD_UPLOAD_SCRIPT" \
-              "${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg" \
+              "${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg" \
               "offline/latest/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-arm64-latest.dmg" \
               || echo "::warning::download server upload failed (OSS/R2 succeeded)"
           fi
@@ -1055,12 +1059,12 @@ jobs:
         if: matrix.os == 'macos-latest' && matrix.arch == 'x86_64' && github.event.inputs.upload_latest == 'true'
         run: |
           echo "检测到需要上传 x64 DMG，正在执行上传..."
-          ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.dmg "oss://${{ secrets.BUCKET_NAME }}/offline/latest/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-latest.dmg"
-          rclone copyto "${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.dmg" "${R2_REMOTE}/offline/latest/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-latest.dmg"
+          ossutil cp -rf ${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.dmg "oss://${{ secrets.BUCKET_NAME }}/offline/latest/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-latest.dmg"
+          rclone copyto "${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.dmg" "${R2_REMOTE}/offline/latest/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-latest.dmg"
 
           if [ "${DOWNLOAD_SERVER_READY:-false}" = "true" ]; then
             bash "$DOWNLOAD_UPLOAD_SCRIPT" \
-              "${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.dmg" \
+              "${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.dmg" \
               "offline/latest/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-latest.dmg" \
               || echo "::warning::download server upload failed (OSS/R2 succeeded)"
           fi
@@ -1091,11 +1095,11 @@ jobs:
           }
 
           echo "上传 Linux 离线版本产物到 OSS..."
-          ossutil cp -rf "${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${DEB_FILE}" "oss://${{ secrets.BUCKET_NAME }}/offline/${{ github.event.inputs.version }}/"
+          ossutil cp -rf "${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/${DEB_FILE}" "oss://${{ secrets.BUCKET_NAME }}/offline/${{ github.event.inputs.version }}/"
           notify_package "Linux ${{ matrix.arch }} deb" "$DEB_FILE"
-          ossutil cp -rf "${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${RPM_FILE}" "oss://${{ secrets.BUCKET_NAME }}/offline/${{ github.event.inputs.version }}/"
+          ossutil cp -rf "${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/${RPM_FILE}" "oss://${{ secrets.BUCKET_NAME }}/offline/${{ github.event.inputs.version }}/"
           notify_package "Linux ${{ matrix.arch }} rpm" "$RPM_FILE"
-          ossutil cp -rf "${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${APPIMAGE_FILE}" "oss://${{ secrets.BUCKET_NAME }}/offline/${{ github.event.inputs.version }}/"
+          ossutil cp -rf "${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/${APPIMAGE_FILE}" "oss://${{ secrets.BUCKET_NAME }}/offline/${{ github.event.inputs.version }}/"
           notify_package "Linux ${{ matrix.arch }} AppImage" "$APPIMAGE_FILE"
 
       - name: Upload Linux packages to latest if requested
@@ -1120,21 +1124,21 @@ jobs:
           fi
 
           echo "检测到需要上传 Linux latest 离线产物，正在执行上传..."
-          ossutil cp -rf "${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${DEB_FILE}" "oss://${{ secrets.BUCKET_NAME }}/offline/latest/${LATEST_DEB}"
-          ossutil cp -rf "${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${RPM_FILE}" "oss://${{ secrets.BUCKET_NAME }}/offline/latest/${LATEST_RPM}"
-          ossutil cp -rf "${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${APPIMAGE_FILE}" "oss://${{ secrets.BUCKET_NAME }}/offline/latest/${LATEST_APPIMAGE}"
+          ossutil cp -rf "${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/${DEB_FILE}" "oss://${{ secrets.BUCKET_NAME }}/offline/latest/${LATEST_DEB}"
+          ossutil cp -rf "${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/${RPM_FILE}" "oss://${{ secrets.BUCKET_NAME }}/offline/latest/${LATEST_RPM}"
+          ossutil cp -rf "${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/${APPIMAGE_FILE}" "oss://${{ secrets.BUCKET_NAME }}/offline/latest/${LATEST_APPIMAGE}"
 
-          ossutil cp -rf "${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${DEB_FILE}" "oss://${{ secrets.BUCKET_NAME }}/offline/latest/linux/${ARCH_DIR}/${DEB_FILE}"
-          ossutil cp -rf "${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${RPM_FILE}" "oss://${{ secrets.BUCKET_NAME }}/offline/latest/linux/${ARCH_DIR}/${RPM_FILE}"
-          ossutil cp -rf "${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${APPIMAGE_FILE}" "oss://${{ secrets.BUCKET_NAME }}/offline/latest/linux/${ARCH_DIR}/${APPIMAGE_FILE}"
+          ossutil cp -rf "${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/${DEB_FILE}" "oss://${{ secrets.BUCKET_NAME }}/offline/latest/linux/${ARCH_DIR}/${DEB_FILE}"
+          ossutil cp -rf "${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/${RPM_FILE}" "oss://${{ secrets.BUCKET_NAME }}/offline/latest/linux/${ARCH_DIR}/${RPM_FILE}"
+          ossutil cp -rf "${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/${APPIMAGE_FILE}" "oss://${{ secrets.BUCKET_NAME }}/offline/latest/linux/${ARCH_DIR}/${APPIMAGE_FILE}"
 
-          rclone copyto "${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${DEB_FILE}" "${R2_REMOTE}/offline/latest/${LATEST_DEB}"
-          rclone copyto "${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${RPM_FILE}" "${R2_REMOTE}/offline/latest/${LATEST_RPM}"
-          rclone copyto "${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${APPIMAGE_FILE}" "${R2_REMOTE}/offline/latest/${LATEST_APPIMAGE}"
+          rclone copyto "${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/${DEB_FILE}" "${R2_REMOTE}/offline/latest/${LATEST_DEB}"
+          rclone copyto "${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/${RPM_FILE}" "${R2_REMOTE}/offline/latest/${LATEST_RPM}"
+          rclone copyto "${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/${APPIMAGE_FILE}" "${R2_REMOTE}/offline/latest/${LATEST_APPIMAGE}"
 
-          rclone copyto "${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${DEB_FILE}" "${R2_REMOTE}/offline/latest/linux/${ARCH_DIR}/${DEB_FILE}"
-          rclone copyto "${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${RPM_FILE}" "${R2_REMOTE}/offline/latest/linux/${ARCH_DIR}/${RPM_FILE}"
-          rclone copyto "${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${APPIMAGE_FILE}" "${R2_REMOTE}/offline/latest/linux/${ARCH_DIR}/${APPIMAGE_FILE}"
+          rclone copyto "${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/${DEB_FILE}" "${R2_REMOTE}/offline/latest/linux/${ARCH_DIR}/${DEB_FILE}"
+          rclone copyto "${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/${RPM_FILE}" "${R2_REMOTE}/offline/latest/linux/${ARCH_DIR}/${RPM_FILE}"
+          rclone copyto "${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/${APPIMAGE_FILE}" "${R2_REMOTE}/offline/latest/linux/${ARCH_DIR}/${APPIMAGE_FILE}"
 
           if [ "${DOWNLOAD_SERVER_READY:-false}" = "true" ]; then
             for pair in \
@@ -1147,7 +1151,7 @@ jobs:
               local_file="${pair%%::*}"
               remote_rel="${pair##*::}"
               bash "$DOWNLOAD_UPLOAD_SCRIPT" \
-                "${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${local_file}" \
+                "${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/${local_file}" \
                 "${remote_rel}" \
                 || echo "::warning::download server upload failed for ${remote_rel}"
             done
@@ -1159,7 +1163,7 @@ jobs:
         shell: pwsh
         run: |
           # 1. 定义变量
-          $SourceDir = "${{secrets.JCEF_PROJECT_ROOT}}/jpackage/input/sourceFile" # PowerShell也能很好地处理正斜杠
+          $SourceDir = "${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile" # PowerShell也能很好地处理正斜杠
           $DestURL = "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/"
           
           # 2. 上传 version.json
@@ -1181,9 +1185,9 @@ jobs:
           JAVA_HOME: ${{ env.OPENJDK_PATH }}
           PATH: ${{ env.OPENJDK_PATH }}/bin:$PATH
         run: |
-          # sh ${{secrets.JCEF_PROJECT_ROOT}}/package_win.sh  ${{ github.event.inputs.version }} "${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg"
-          sh ${{secrets.JCEF_PROJECT_ROOT}}/package_win_offline.sh  ${{ github.event.inputs.version }}
-          # ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/*.exe "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/"
+          # sh ${{ env.JCEF_PACKAGE_SCRIPT_DIR }}/package_win.sh  ${{ github.event.inputs.version }} "${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg"
+          sh ${{ env.JCEF_PACKAGE_SCRIPT_DIR }}/package_win_offline.sh  ${{ github.event.inputs.version }}
+          # ossutil cp -rf ${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/*.exe "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/"
           # echo "oss successful"
 
       # ==============================================================
@@ -1240,7 +1244,7 @@ jobs:
       - name: Upload unsigned MSI to OSS staging
         if: matrix.os == 'windows-latest'
         run: |
-          ossutil cp -rf "${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.msi" "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/temp-msi/"
+          ossutil cp -rf "${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.msi" "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/temp-msi/"
 
       - name: Sign MSI on remote signing server
         if: ${{ runner.os == 'Windows' }}
@@ -1268,7 +1272,7 @@ jobs:
       - name: Download signed MSI from OSS
         if: ${{ runner.os == 'Windows' }}
         run: |
-          ossutil cp -rf "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/signed-msi/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.msi" ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/
+          ossutil cp -rf "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/signed-msi/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.msi" ${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/
 
       # ---- Wrap the signed MSI in an Inno Setup EXE (still unsigned outer) ----
 
@@ -1276,7 +1280,7 @@ jobs:
         if: ${{ runner.os == 'Windows' }}
         shell: bash
         run: |
-          sh ${{secrets.JCEF_PROJECT_ROOT}}/wrap_win_installer.sh ${{ github.event.inputs.version }} local
+          sh ${{ env.JCEF_PACKAGE_SCRIPT_DIR }}/wrap_win_installer.sh ${{ github.event.inputs.version }} local
 
       # ---- Sign the outer EXE (existing flow, now operates on the wrapped EXE) ----
 
@@ -1286,7 +1290,7 @@ jobs:
         run: |
           pwd
           mkdir -p  ${{ secrets.REPO_FRONT_PATH }}/release
-          cp -r ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe ${{ secrets.REPO_FRONT_PATH }}/release
+          cp -r ${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe ${{ secrets.REPO_FRONT_PATH }}/release
           ls ${{ secrets.REPO_FRONT_PATH }}/release
           cp -r ${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe ${{ github.workspace }}
 
@@ -1329,7 +1333,7 @@ jobs:
         if: ${{ runner.os == 'Windows' }}
         shell: pwsh
         run: |
-          ossutil cp -rf oss://${{ secrets.BUCKET_NAME }}/offline/${{ github.event.inputs.version }}/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/
+          ossutil cp -rf oss://${{ secrets.BUCKET_NAME }}/offline/${{ github.event.inputs.version }}/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe ${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/
           $packageFile = "${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe"
           $env:FEISHU_WEBHOOK_URL = "${{ secrets.FEISHU_RELEASE_NOTIFY_WEBHOOK }}"
           $env:PACKAGE_EDITION = "Chat2DB Local"
@@ -1344,11 +1348,11 @@ jobs:
         if: matrix.os == 'windows-latest' && github.event.inputs.upload_latest == 'true'
         run: |
           echo "检测到需要上传 x64 exe，正在执行上传..."
-          ossutil cp -rf ${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe "oss://${{ secrets.BUCKET_NAME }}/offline/latest/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-latest.exe"
-          rclone copyto "${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe" "${env:R2_REMOTE}/offline/latest/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-latest.exe"
+          ossutil cp -rf ${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe "oss://${{ secrets.BUCKET_NAME }}/offline/latest/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-latest.exe"
+          rclone copyto "${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe" "${env:R2_REMOTE}/offline/latest/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-latest.exe"
 
           if ($env:DOWNLOAD_SERVER_READY -eq "true") {
-            $src = "${{secrets.JCEF_PROJECT_ROOT}}/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe"
+            $src = "${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe"
             $final = "/data/downloads/offline/latest/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-latest.exe"
             $dir = $final.Substring(0, $final.LastIndexOf('/'))
             $tmp = "$final.uploading.$($env:GITHUB_RUN_ID).$($env:GITHUB_RUN_ATTEMPT).$([System.Guid]::NewGuid().ToString('N').Substring(0,8))"
