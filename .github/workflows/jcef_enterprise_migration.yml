@@ -400,14 +400,16 @@ jobs:
         if: ${{ runner.os == 'macOS' }}
         run: |
           echo $JAVA_HOME
-          mkdir -p ${{ env.JCEF_STATIC_PATH }}
-          cp -r $JAVA_HOME ${{ env.JCEF_JRE_PATH }}
-          chmod -R 777 ${{ env.JCEF_JRE_PATH }}
-          mkdir -p ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/runtime/mac
-          cp -r $JAVA_HOME ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/runtime/mac
-          chmod -R 777 ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/runtime/mac
-          cp -r $JAVA_HOME/../Frameworks ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/mac
-          rm -rf ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/mac/Frameworks/cef_server.app
+          mkdir -p "${JCEF_STATIC_PATH}"
+          rm -rf "${JCEF_JRE_PATH}"
+          cp -R "$JAVA_HOME" "${JCEF_JRE_PATH}"
+          chmod -R 777 "${JCEF_JRE_PATH}"
+          rm -rf "${JCEF_PROJECT_ROOT}/jpackage/input/runtime/mac"
+          mkdir -p "${JCEF_PROJECT_ROOT}/jpackage/input/runtime/mac/Contents"
+          cp -R "$JAVA_HOME" "${JCEF_PROJECT_ROOT}/jpackage/input/runtime/mac/Contents/"
+          chmod -R 777 "${JCEF_PROJECT_ROOT}/jpackage/input/runtime/mac"
+          cp -R "$JAVA_HOME/../Frameworks" "${JCEF_PROJECT_ROOT}/jpackage/input/mac"
+          rm -rf "${JCEF_PROJECT_ROOT}/jpackage/input/mac/Frameworks/cef_server.app"
 
 
       # Copy jre Linux
@@ -751,7 +753,11 @@ jobs:
         if: runner.os == 'Windows'
         shell: bash
         run: |
-          pushd ${{ env.JCEF_FRONT_PATH }}
+          FRONT_PATH="$(cygpath -u "${JCEF_FRONT_PATH}")"
+          PROJECT_ROOT="$(cygpath -u "${JCEF_PROJECT_ROOT}")"
+          PACKAGE_SCRIPT_DIR="$(cygpath -u "${JCEF_PACKAGE_SCRIPT_DIR}")"
+
+          pushd "$FRONT_PATH"
           yarn
           yarn run build:web:desktop --app_version=${{ github.event.inputs.version }}
 
@@ -767,15 +773,15 @@ jobs:
           pwd
 
           # The rest of the script is the same, as the commands are compatible
-          mkdir -p ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile
-          cp ${{ env.JCEF_FRONT_PATH }}/dist.zip ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile
+          mkdir -p "$PROJECT_ROOT/jpackage/input/sourceFile"
+          cp "$FRONT_PATH/dist.zip" "$PROJECT_ROOT/jpackage/input/sourceFile"
 
-          mkdir -p ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/mac
-          mkdir -p ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/win
-          mkdir -p ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/linux
-          cp -r ${{ env.JCEF_FRONT_PATH }}/dist ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/mac
-          cp -r ${{ env.JCEF_FRONT_PATH }}/dist ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/win
-          cp -r ${{ env.JCEF_FRONT_PATH }}/dist ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/linux
+          mkdir -p "$PROJECT_ROOT/jpackage/input/mac"
+          mkdir -p "$PROJECT_ROOT/jpackage/input/win"
+          mkdir -p "$PROJECT_ROOT/jpackage/input/linux"
+          cp -r "$FRONT_PATH/dist" "$PROJECT_ROOT/jpackage/input/mac"
+          cp -r "$FRONT_PATH/dist" "$PROJECT_ROOT/jpackage/input/win"
+          cp -r "$FRONT_PATH/dist" "$PROJECT_ROOT/jpackage/input/linux"
 
           echo "start build version file"
           CHAT2DB_PACKAGE_EDITION="pro" \
@@ -783,11 +789,11 @@ jobs:
           CHAT2DB_SOURCE_REF="${JCEF_SOURCE_REF}" \
           CHAT2DB_ENTERPRISE_SOURCE_REF="${JCEF_SOURCE_REF}" \
           CHAT2DB_COMMUNITY_SOURCE_REF="${JCEF_COMMUNITY_SOURCE_REF}" \
-            bash ${{ env.JCEF_PACKAGE_SCRIPT_DIR }}/generate_metadata.sh ${{ github.event.inputs.version }} ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile https://cdn.chat2db-ai.com/download/updates
-          cp ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile/version.json ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile/local_version.json
-          cp ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile/local_version.json ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/mac
-          cp ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile/local_version.json ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/win
-          cp ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile/local_version.json ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/linux
+            bash "$PACKAGE_SCRIPT_DIR/generate_metadata.sh" ${{ github.event.inputs.version }} "$PROJECT_ROOT/jpackage/input/sourceFile" https://cdn.chat2db-ai.com/download/updates
+          cp "$PROJECT_ROOT/jpackage/input/sourceFile/version.json" "$PROJECT_ROOT/jpackage/input/sourceFile/local_version.json"
+          cp "$PROJECT_ROOT/jpackage/input/sourceFile/local_version.json" "$PROJECT_ROOT/jpackage/input/mac"
+          cp "$PROJECT_ROOT/jpackage/input/sourceFile/local_version.json" "$PROJECT_ROOT/jpackage/input/win"
+          cp "$PROJECT_ROOT/jpackage/input/sourceFile/local_version.json" "$PROJECT_ROOT/jpackage/input/linux"
 
       - name: Upload build provenance artifact
         uses: actions/upload-artifact@v4
@@ -909,12 +915,12 @@ jobs:
       - name: package mac arm64
         if: ${{ runner.os == 'macOS' && matrix.arch == 'arm64' }}
         run: |
-          sh ${{ env.JCEF_PACKAGE_SCRIPT_DIR }}/package_macos.sh  ${{ github.event.inputs.version }} "${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg"
+          bash ${{ env.JCEF_PACKAGE_SCRIPT_DIR }}/package_macos.sh  ${{ github.event.inputs.version }} "${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg"
 
       - name: package mac x86_64
         if: ${{ runner.os == 'macOS' && matrix.arch == 'x86_64' }}
         run: |
-          sh ${{ env.JCEF_PACKAGE_SCRIPT_DIR }}/package_macos.sh  ${{ github.event.inputs.version }} ${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.dmg
+          bash ${{ env.JCEF_PACKAGE_SCRIPT_DIR }}/package_macos.sh  ${{ github.event.inputs.version }} ${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.dmg
 
       - name: package linux
         if: ${{ runner.os == 'Linux' }}
@@ -1977,14 +1983,16 @@ jobs:
         if: ${{ runner.os == 'macOS' }}
         run: |
           echo $JAVA_HOME
-          mkdir -p ${{ env.JCEF_STATIC_PATH }}
-          cp -r $JAVA_HOME ${{ env.JCEF_JRE_PATH }}
-          chmod -R 777 ${{ env.JCEF_JRE_PATH }}
-          mkdir -p ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/runtime/mac
-          cp -r $JAVA_HOME ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/runtime/mac
-          chmod -R 777 ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/runtime/mac
-          cp -r $JAVA_HOME/../Frameworks ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/mac
-          rm -rf ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/mac/Frameworks/cef_server.app
+          mkdir -p "${JCEF_STATIC_PATH}"
+          rm -rf "${JCEF_JRE_PATH}"
+          cp -R "$JAVA_HOME" "${JCEF_JRE_PATH}"
+          chmod -R 777 "${JCEF_JRE_PATH}"
+          rm -rf "${JCEF_PROJECT_ROOT}/jpackage/input/runtime/mac"
+          mkdir -p "${JCEF_PROJECT_ROOT}/jpackage/input/runtime/mac/Contents"
+          cp -R "$JAVA_HOME" "${JCEF_PROJECT_ROOT}/jpackage/input/runtime/mac/Contents/"
+          chmod -R 777 "${JCEF_PROJECT_ROOT}/jpackage/input/runtime/mac"
+          cp -R "$JAVA_HOME/../Frameworks" "${JCEF_PROJECT_ROOT}/jpackage/input/mac"
+          rm -rf "${JCEF_PROJECT_ROOT}/jpackage/input/mac/Frameworks/cef_server.app"
 
 
       # Copy jre Linux
@@ -2328,7 +2336,11 @@ jobs:
         if: runner.os == 'Windows'
         shell: bash
         run: |
-          pushd ${{ env.JCEF_FRONT_PATH }}
+          FRONT_PATH="$(cygpath -u "${JCEF_FRONT_PATH}")"
+          PROJECT_ROOT="$(cygpath -u "${JCEF_PROJECT_ROOT}")"
+          PACKAGE_SCRIPT_DIR="$(cygpath -u "${JCEF_PACKAGE_SCRIPT_DIR}")"
+
+          pushd "$FRONT_PATH"
           yarn
           yarn run modify:package:name chat2db-local Chat2DB-Local
           yarn run build:web:offline --app_version=${{ github.event.inputs.version }}
@@ -2344,15 +2356,15 @@ jobs:
           pwd
 
           # The rest of the script is the same, as the commands are compatible
-          mkdir -p ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile
-          cp ${{ env.JCEF_FRONT_PATH }}/dist.zip ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile
+          mkdir -p "$PROJECT_ROOT/jpackage/input/sourceFile"
+          cp "$FRONT_PATH/dist.zip" "$PROJECT_ROOT/jpackage/input/sourceFile"
 
-          mkdir -p ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/mac
-          mkdir -p ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/win
-          mkdir -p ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/linux
-          cp -r ${{ env.JCEF_FRONT_PATH }}/dist ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/mac
-          cp -r ${{ env.JCEF_FRONT_PATH }}/dist ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/win
-          cp -r ${{ env.JCEF_FRONT_PATH }}/dist ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/linux
+          mkdir -p "$PROJECT_ROOT/jpackage/input/mac"
+          mkdir -p "$PROJECT_ROOT/jpackage/input/win"
+          mkdir -p "$PROJECT_ROOT/jpackage/input/linux"
+          cp -r "$FRONT_PATH/dist" "$PROJECT_ROOT/jpackage/input/mac"
+          cp -r "$FRONT_PATH/dist" "$PROJECT_ROOT/jpackage/input/win"
+          cp -r "$FRONT_PATH/dist" "$PROJECT_ROOT/jpackage/input/linux"
 
           echo "start build version file"
           CHAT2DB_PACKAGE_EDITION="local" \
@@ -2360,11 +2372,11 @@ jobs:
           CHAT2DB_SOURCE_REF="${JCEF_SOURCE_REF}" \
           CHAT2DB_ENTERPRISE_SOURCE_REF="${JCEF_SOURCE_REF}" \
           CHAT2DB_COMMUNITY_SOURCE_REF="${JCEF_COMMUNITY_SOURCE_REF}" \
-            bash ${{ env.JCEF_PACKAGE_SCRIPT_DIR }}/generate_metadata.sh ${{ github.event.inputs.version }} ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile https://cdn.chat2db-ai.com/offline/updates
-          cp ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile/version.json ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile/local_version.json
-          cp ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile/local_version.json ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/mac
-          cp ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile/local_version.json ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/win
-          cp ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile/local_version.json ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/linux
+            bash "$PACKAGE_SCRIPT_DIR/generate_metadata.sh" ${{ github.event.inputs.version }} "$PROJECT_ROOT/jpackage/input/sourceFile" https://cdn.chat2db-ai.com/offline/updates
+          cp "$PROJECT_ROOT/jpackage/input/sourceFile/version.json" "$PROJECT_ROOT/jpackage/input/sourceFile/local_version.json"
+          cp "$PROJECT_ROOT/jpackage/input/sourceFile/local_version.json" "$PROJECT_ROOT/jpackage/input/mac"
+          cp "$PROJECT_ROOT/jpackage/input/sourceFile/local_version.json" "$PROJECT_ROOT/jpackage/input/win"
+          cp "$PROJECT_ROOT/jpackage/input/sourceFile/local_version.json" "$PROJECT_ROOT/jpackage/input/linux"
 
           # 打包前端资源
           # - name: Build FE Static
@@ -2517,12 +2529,12 @@ jobs:
       - name: package mac arm64
         if: ${{ runner.os == 'macOS' && matrix.arch == 'arm64' }}
         run: |
-          sh ${{ env.JCEF_PACKAGE_SCRIPT_DIR }}/package_macos_offline.sh  ${{ github.event.inputs.version }} "${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg"
+          bash ${{ env.JCEF_PACKAGE_SCRIPT_DIR }}/package_macos_offline.sh  ${{ github.event.inputs.version }} "${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg"
 
       - name: package mac x86_64
         if: ${{ runner.os == 'macOS' && matrix.arch == 'x86_64' }}
         run: |
-          sh ${{ env.JCEF_PACKAGE_SCRIPT_DIR }}/package_macos_offline.sh  ${{ github.event.inputs.version }} ${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.dmg
+          bash ${{ env.JCEF_PACKAGE_SCRIPT_DIR }}/package_macos_offline.sh  ${{ github.event.inputs.version }} ${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.dmg
 
       - name: package linux
         if: ${{ runner.os == 'Linux' }}
