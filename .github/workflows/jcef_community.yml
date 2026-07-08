@@ -348,8 +348,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          rm -rf "$JPACKAGE_ROOT/input/runtime/mac"
           mkdir -p "$JPACKAGE_ROOT/input/runtime/mac"
-          cp -R "$JAVA_HOME" "$JPACKAGE_ROOT/input/runtime/mac"
+          cp -R "$JAVA_HOME/.."/* "$JPACKAGE_ROOT/input/runtime/mac"
+          test -d "$JPACKAGE_ROOT/input/runtime/mac/Contents/Home/lib"
           chmod -R 777 "$JPACKAGE_ROOT/input/runtime/mac"
           mkdir -p "$JPACKAGE_ROOT/input/mac"
           cp -R "$JAVA_HOME/../Frameworks" "$JPACKAGE_ROOT/input/mac"
