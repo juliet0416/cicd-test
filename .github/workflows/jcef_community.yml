@@ -343,21 +343,6 @@ jobs:
           New-Item -Path $runtime -ItemType Directory -Force | Out-Null
           Copy-Item -Path "$env:JBR_BUILD_PATH\*" -Destination $runtime -Recurse -Force
 
-      - name: Copy macOS runtime image
-        if: runner.os == 'macOS'
-        shell: bash
-        run: |
-          set -euo pipefail
-          rm -rf "$JPACKAGE_ROOT/input/runtime/mac"
-          mkdir -p "$JPACKAGE_ROOT/input/runtime/mac"
-          cp -R "$JAVA_HOME/../.."/* "$JPACKAGE_ROOT/input/runtime/mac"
-          test -d "$JPACKAGE_ROOT/input/runtime/mac/Contents/Home/lib"
-          find "$JPACKAGE_ROOT/input/runtime/mac" -maxdepth 3 -type d | sort | head -20
-          chmod -R 777 "$JPACKAGE_ROOT/input/runtime/mac"
-          mkdir -p "$JPACKAGE_ROOT/input/mac"
-          cp -R "$JAVA_HOME/../Frameworks" "$JPACKAGE_ROOT/input/mac"
-          rm -rf "$JPACKAGE_ROOT/input/mac/Frameworks/cef_server.app"
-
       - name: Copy Linux runtime image
         if: runner.os == 'Linux'
         shell: bash
@@ -417,6 +402,22 @@ jobs:
             export PATH="$JAVA_HOME/bin:$PATH"
           fi
           bash "$PACKAGE_SCRIPT_DIR/package-community-jcef.sh" "${{ github.event.inputs.version }}" prepare
+
+      - name: Copy macOS runtime image
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf "$JPACKAGE_ROOT/input/runtime/mac"
+          mkdir -p "$JPACKAGE_ROOT/input/runtime/mac"
+          cp -R "$JAVA_HOME/../.."/* "$JPACKAGE_ROOT/input/runtime/mac"
+          test -d "$JPACKAGE_ROOT/input/runtime/mac/Contents/Home/lib"
+          find "$JPACKAGE_ROOT/input/runtime/mac" -maxdepth 3 -type d | sort | head -20
+          chmod -R 777 "$JPACKAGE_ROOT/input/runtime/mac"
+          mkdir -p "$JPACKAGE_ROOT/input/mac"
+          rm -rf "$JPACKAGE_ROOT/input/mac/Frameworks"
+          cp -R "$JAVA_HOME/../Frameworks" "$JPACKAGE_ROOT/input/mac"
+          rm -rf "$JPACKAGE_ROOT/input/mac/Frameworks/cef_server.app"
 
       - name: Import Code-Signing Certificate
         if: runner.os == 'macOS'
