@@ -11,6 +11,10 @@ on:
         description: 'Version number'
         required: true
         default: '1.0.0'
+      source_ref:
+        description: 'Chat2DB source branch/ref; empty uses REPO_BRANCH secret'
+        required: false
+        default: ''
       upload_latest:
         description: '是否上传到 latest 目录 (true/false)'
         required: false   # 设为非必须
@@ -36,6 +40,7 @@ jobs:
           FEISHU_WEBHOOK_URL: ${{ secrets.FEISHU_RELEASE_NOTIFY_WEBHOOK }}
           RELEASE_EDITION: Chat2DB Pro
           RELEASE_VERSION: ${{ github.event.inputs.version }}
+          SOURCE_REF: ${{ github.event.inputs.source_ref || secrets.REPO_BRANCH }}
           UPLOAD_LATEST: ${{ github.event.inputs.upload_latest }}
           UPDATE_LATEST_VERSION_JSON: ${{ github.event.inputs.update_latest_version_json }}
           RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
@@ -54,6 +59,7 @@ jobs:
           lines = [
               f"{os.environ['RELEASE_EDITION']} 灰度打包已开始",
               f"版本：{os.environ['RELEASE_VERSION']}",
+              f"源码分支：{os.environ['SOURCE_REF']}",
               f"upload_latest：{os.environ['UPLOAD_LATEST']}",
               f"update_latest_version_json：{os.environ['UPDATE_LATEST_VERSION_JSON']}",
               f"运行链接：{os.environ['RUN_URL']}",
@@ -110,6 +116,7 @@ jobs:
     env:
       JCEF_PROJECT_ROOT: ${{ github.workspace }}/${{ secrets.REPO_PATH }}
       JCEF_PACKAGE_SCRIPT_DIR: ${{ github.workspace }}/${{ secrets.REPO_PATH }}/script/package
+      JCEF_SOURCE_REF: ${{ github.event.inputs.source_ref || secrets.REPO_BRANCH }}
 
     # 将release_test分支的代码检出（即复制）到 GitHub Actions 的运行环境中。
     steps:
@@ -118,13 +125,16 @@ jobs:
         with:
           repository: ${{ secrets.REPO_URL }}
           path: ${{ secrets.REPO_PATH }}
-          ref: ${{ secrets.REPO_BRANCH }}
+          ref: ${{ github.event.inputs.source_ref || secrets.REPO_BRANCH }}
           token: ${{ secrets.ACCESS_TOKEN }}
 
       # Output basic information
       - name: Print basic information
         run: |
           echo "current version: ${{ github.run_id }}"
+          echo "source ref: ${JCEF_SOURCE_REF}"
+          git -C "${{ env.JCEF_PROJECT_ROOT }}" rev-parse --abbrev-ref HEAD || true
+          git -C "${{ env.JCEF_PROJECT_ROOT }}" rev-parse HEAD
 
       - name: Create Feishu package notification helper
         shell: python
@@ -635,7 +645,12 @@ jobs:
           cp -r ${{ secrets.REPO_FRONT_PATH }}/dist ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/linux
 
           echo "start build version file"
-          sh ${{ env.JCEF_PACKAGE_SCRIPT_DIR }}/generate_metadata.sh  ${{ github.event.inputs.version }}  ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile  https://cdn.chat2db-ai.com/download/updates
+          CHAT2DB_PACKAGE_EDITION="pro" \
+          CHAT2DB_PACKAGE_MODE="enterprise-over-community" \
+          CHAT2DB_SOURCE_REF="${JCEF_SOURCE_REF}" \
+          CHAT2DB_ENTERPRISE_SOURCE_REF="${JCEF_SOURCE_REF}" \
+          CHAT2DB_COMMUNITY_SOURCE_REF="${JCEF_SOURCE_REF}" \
+            sh ${{ env.JCEF_PACKAGE_SCRIPT_DIR }}/generate_metadata.sh  ${{ github.event.inputs.version }}  ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile  https://cdn.chat2db-ai.com/download/updates
           cp ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile/version.json   ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile/local_version.json
           cp ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile/local_version.json ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/mac
           cp ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile/local_version.json ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/win
@@ -674,11 +689,23 @@ jobs:
           cp -r ${{ secrets.REPO_FRONT_PATH }}/dist ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/linux
 
           echo "start build version file"
-          sh ${{ env.JCEF_PACKAGE_SCRIPT_DIR }}/generate_metadata.sh ${{ github.event.inputs.version }} ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile https://cdn.chat2db-ai.com/download/updates
+          CHAT2DB_PACKAGE_EDITION="pro" \
+          CHAT2DB_PACKAGE_MODE="enterprise-over-community" \
+          CHAT2DB_SOURCE_REF="${JCEF_SOURCE_REF}" \
+          CHAT2DB_ENTERPRISE_SOURCE_REF="${JCEF_SOURCE_REF}" \
+          CHAT2DB_COMMUNITY_SOURCE_REF="${JCEF_SOURCE_REF}" \
+            sh ${{ env.JCEF_PACKAGE_SCRIPT_DIR }}/generate_metadata.sh ${{ github.event.inputs.version }} ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile https://cdn.chat2db-ai.com/download/updates
           cp ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile/version.json ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile/local_version.json
           cp ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile/local_version.json ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/mac
           cp ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile/local_version.json ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/win
           cp ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile/local_version.json ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/linux
+
+      - name: Upload build provenance artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-provenance-${{ matrix.os }}-${{ matrix.file_name }}
+          path: ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile/build-provenance.json
+          if-no-files-found: warn
 
 
       - name: Import Code-Signing Certificate
@@ -986,6 +1013,14 @@ jobs:
           # 2. 上传 version.json
           Write-Host "Uploading version.json..."
           ossutil cp -f "${SourceDir}/version.json" "${DestURL}"
+
+          $ProvenanceFile = "${SourceDir}/build-provenance.json"
+          if (Test-Path $ProvenanceFile) {
+            Write-Host "Uploading build-provenance.json..."
+            ossutil cp -f $ProvenanceFile "${DestURL}"
+          } else {
+            Write-Warning "build-provenance.json not found; skip provenance upload."
+          }
 
           # 3. 【推荐】一次性递归上传整个目录，但只包含 .jar 和 .zip 文件
           #    -r 表示递归, -f 表示强制, --include 是过滤器
