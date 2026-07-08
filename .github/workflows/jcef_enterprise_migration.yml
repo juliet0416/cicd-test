@@ -386,28 +386,34 @@ jobs:
       - name: Copy Jre for Windows
         if: ${{ runner.os == 'Windows' }}
         # 在这个步骤中，临时覆盖 JAVA_HOME，让 Maven 使用 JBR
+        shell: pwsh
         env:
           JAVA_HOME: ${{ env.JBR_BUILD_PATH }}
         run: |
-          # mkdir -p ${{ env.JCEF_STATIC_PATH }}
-          # cp -r "${{ env.JAVA_HOME }}" ${{ env.JCEF_JRE_PATH }}
-          mkdir -p ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/runtime/win/Home
-          cp -r ${{ env.JAVA_HOME }}/* ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/runtime/win/Home
-          ls ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/runtime/win/Home
+          $runtime = Join-Path $env:JCEF_PROJECT_ROOT "jpackage/input/runtime/win/Home"
+          New-Item -Path $runtime -ItemType Directory -Force | Out-Null
+          Copy-Item -Path "$env:JAVA_HOME\*" -Destination $runtime -Recurse -Force
+          Get-ChildItem -Path $runtime | Select-Object -First 20
 
       # Copy jre macOS
       - name: Copy Jre for macOS arm64
         if: ${{ runner.os == 'macOS' }}
+        shell: bash
         run: |
-          echo $JAVA_HOME
+          set -euo pipefail
+          echo "$JAVA_HOME"
           mkdir -p "${JCEF_STATIC_PATH}"
           rm -rf "${JCEF_JRE_PATH}"
           cp -R "$JAVA_HOME" "${JCEF_JRE_PATH}"
           chmod -R 777 "${JCEF_JRE_PATH}"
           rm -rf "${JCEF_PROJECT_ROOT}/jpackage/input/runtime/mac"
-          mkdir -p "${JCEF_PROJECT_ROOT}/jpackage/input/runtime/mac/Contents"
-          cp -R "$JAVA_HOME" "${JCEF_PROJECT_ROOT}/jpackage/input/runtime/mac/Contents/"
+          mkdir -p "${JCEF_PROJECT_ROOT}/jpackage/input/runtime/mac"
+          cp -R "$JAVA_HOME/../.."/* "${JCEF_PROJECT_ROOT}/jpackage/input/runtime/mac"
+          test -d "${JCEF_PROJECT_ROOT}/jpackage/input/runtime/mac/Contents/Home/lib"
+          find "${JCEF_PROJECT_ROOT}/jpackage/input/runtime/mac" -maxdepth 3 -type d | sort | head -20
           chmod -R 777 "${JCEF_PROJECT_ROOT}/jpackage/input/runtime/mac"
+          mkdir -p "${JCEF_PROJECT_ROOT}/jpackage/input/mac"
+          rm -rf "${JCEF_PROJECT_ROOT}/jpackage/input/mac/Frameworks"
           cp -R "$JAVA_HOME/../Frameworks" "${JCEF_PROJECT_ROOT}/jpackage/input/mac"
           rm -rf "${JCEF_PROJECT_ROOT}/jpackage/input/mac/Frameworks/cef_server.app"
 
@@ -1139,15 +1145,15 @@ jobs:
       - name: package win x64
         if: ${{ runner.os == 'Windows' }}
         shell: bash
-        env:
-          # 在这个步骤中，临时将 JAVA_HOME 设置为 OpenJDK 的路径
-          JAVA_HOME: ${{ env.OPENJDK_PATH }}
-          PATH: ${{ env.OPENJDK_PATH }}/bin:$PATH
         run: |
-          # sh ${{ env.JCEF_PACKAGE_SCRIPT_DIR }}/package_win.sh  ${{ github.event.inputs.version }} "${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg"
-          sh ${{ env.JCEF_PACKAGE_SCRIPT_DIR }}/package_win.sh  ${{ github.event.inputs.version }}
-          # ossutil cp -rf ${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/*.exe "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/"
-          # echo "oss successful"
+          set -euo pipefail
+          PACKAGE_SCRIPT_DIR="$(cygpath -u "${JCEF_PACKAGE_SCRIPT_DIR}")"
+          OPENJDK_UNIX="$(cygpath -u "${OPENJDK_PATH}")"
+          export JAVA_HOME="$OPENJDK_UNIX"
+          export PATH="$JAVA_HOME/bin:$PATH"
+          java -version
+          jpackage --version
+          bash "$PACKAGE_SCRIPT_DIR/package_win.sh" "${{ github.event.inputs.version }}"
 
       # ==============================================================
       # Windows installer: sign MSI -> wrap in Inno Setup EXE -> sign EXE
@@ -1201,8 +1207,11 @@ jobs:
 
       - name: Upload unsigned MSI to OSS staging
         if: matrix.os == 'windows-latest'
+        shell: bash
         run: |
-          ossutil cp -rf "${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.msi" "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/temp-msi/"
+          set -euo pipefail
+          PROJECT_ROOT="$(cygpath -u "${JCEF_PROJECT_ROOT}")"
+          ossutil cp -rf "$PROJECT_ROOT/jpackage/output/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.msi" "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/temp-msi/"
 
       - name: Sign MSI on remote signing server
         if: ${{ runner.os == 'Windows' }}
@@ -1229,8 +1238,11 @@ jobs:
 
       - name: Download signed MSI from OSS
         if: ${{ runner.os == 'Windows' }}
+        shell: bash
         run: |
-          ossutil cp -rf "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/signed-msi/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.msi" ${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/
+          set -euo pipefail
+          PROJECT_ROOT="$(cygpath -u "${JCEF_PROJECT_ROOT}")"
+          ossutil cp -rf "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/signed-msi/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.msi" "$PROJECT_ROOT/jpackage/output/"
 
       # ---- Wrap the signed MSI in an Inno Setup EXE (still unsigned outer) ----
 
@@ -1238,26 +1250,36 @@ jobs:
         if: ${{ runner.os == 'Windows' }}
         shell: bash
         run: |
-          sh ${{ env.JCEF_PACKAGE_SCRIPT_DIR }}/wrap_win_installer.sh ${{ github.event.inputs.version }}
+          set -euo pipefail
+          PACKAGE_SCRIPT_DIR="$(cygpath -u "${JCEF_PACKAGE_SCRIPT_DIR}")"
+          bash "$PACKAGE_SCRIPT_DIR/wrap_win_installer.sh" "${{ github.event.inputs.version }}"
 
       # ---- Sign the outer EXE (existing flow, now operates on the wrapped EXE) ----
 
       # 准备发往OSS的文件
       - name: Prepare upload for OSS
         if: ${{ runner.os == 'Windows' }}
+        shell: bash
         run: |
+          set -euo pipefail
+          PROJECT_ROOT="$(cygpath -u "${JCEF_PROJECT_ROOT}")"
+          FRONT_PATH="$(cygpath -u "${JCEF_FRONT_PATH}")"
+          WORKSPACE_PATH="$(cygpath -u "${GITHUB_WORKSPACE}")"
           pwd
-          mkdir -p  ${{ env.JCEF_FRONT_PATH }}/release
-          cp -r ${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe ${{ env.JCEF_FRONT_PATH }}/release
-          ls ${{ env.JCEF_FRONT_PATH }}/release
-          cp -r ${{ env.JCEF_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe ${{ github.workspace }}
+          mkdir -p "$FRONT_PATH/release"
+          cp -r "$PROJECT_ROOT/jpackage/output/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe" "$FRONT_PATH/release"
+          ls "$FRONT_PATH/release"
+          cp -r "$FRONT_PATH/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe" "$WORKSPACE_PATH"
 
       # 上传文件到OSS准备
       - name: Upload to OSS for windows
         if: matrix.os == 'windows-latest'
+        shell: bash
         run: |
+          set -euo pipefail
+          WORKSPACE_PATH="$(cygpath -u "${GITHUB_WORKSPACE}")"
           # ossutil cp -rf "${{ env.JCEF_FRONT_PATH }}/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe" "oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/temp/"
-          ossutil cp -rf "${{ github.workspace }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe" "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/temp/"
+          ossutil cp -rf "$WORKSPACE_PATH/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe" "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/temp/"
 
       # 上传文件到远程服务器
       - name: Copy files to remote server
@@ -1969,28 +1991,34 @@ jobs:
       - name: Copy Jre for Windows
         if: ${{ runner.os == 'Windows' }}
         # 在这个步骤中，临时覆盖 JAVA_HOME，让 Maven 使用 JBR
+        shell: pwsh
         env:
           JAVA_HOME: ${{ env.JBR_BUILD_PATH }}
         run: |
-          # mkdir -p ${{ env.JCEF_STATIC_PATH }}
-          # cp -r "${{ env.JAVA_HOME }}" ${{ env.JCEF_JRE_PATH }}
-          mkdir -p ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/runtime/win/Home
-          cp -r ${{ env.JAVA_HOME }}/* ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/runtime/win/Home
-          ls ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/runtime/win/Home
+          $runtime = Join-Path $env:JCEF_PROJECT_ROOT "jpackage/input/runtime/win/Home"
+          New-Item -Path $runtime -ItemType Directory -Force | Out-Null
+          Copy-Item -Path "$env:JAVA_HOME\*" -Destination $runtime -Recurse -Force
+          Get-ChildItem -Path $runtime | Select-Object -First 20
 
       # Copy jre macOS
       - name: Copy Jre for macOS arm64
         if: ${{ runner.os == 'macOS' }}
+        shell: bash
         run: |
-          echo $JAVA_HOME
+          set -euo pipefail
+          echo "$JAVA_HOME"
           mkdir -p "${JCEF_STATIC_PATH}"
           rm -rf "${JCEF_JRE_PATH}"
           cp -R "$JAVA_HOME" "${JCEF_JRE_PATH}"
           chmod -R 777 "${JCEF_JRE_PATH}"
           rm -rf "${JCEF_PROJECT_ROOT}/jpackage/input/runtime/mac"
-          mkdir -p "${JCEF_PROJECT_ROOT}/jpackage/input/runtime/mac/Contents"
-          cp -R "$JAVA_HOME" "${JCEF_PROJECT_ROOT}/jpackage/input/runtime/mac/Contents/"
+          mkdir -p "${JCEF_PROJECT_ROOT}/jpackage/input/runtime/mac"
+          cp -R "$JAVA_HOME/../.."/* "${JCEF_PROJECT_ROOT}/jpackage/input/runtime/mac"
+          test -d "${JCEF_PROJECT_ROOT}/jpackage/input/runtime/mac/Contents/Home/lib"
+          find "${JCEF_PROJECT_ROOT}/jpackage/input/runtime/mac" -maxdepth 3 -type d | sort | head -20
           chmod -R 777 "${JCEF_PROJECT_ROOT}/jpackage/input/runtime/mac"
+          mkdir -p "${JCEF_PROJECT_ROOT}/jpackage/input/mac"
+          rm -rf "${JCEF_PROJECT_ROOT}/jpackage/input/mac/Frameworks"
           cp -R "$JAVA_HOME/../Frameworks" "${JCEF_PROJECT_ROOT}/jpackage/input/mac"
           rm -rf "${JCEF_PROJECT_ROOT}/jpackage/input/mac/Frameworks/cef_server.app"
 
@@ -2732,15 +2760,15 @@ jobs:
       - name: package win x64
         if: ${{ runner.os == 'Windows' }}
         shell: bash
-        env:
-          # 在这个步骤中，临时将 JAVA_HOME 设置为 OpenJDK 的路径
-          JAVA_HOME: ${{ env.OPENJDK_PATH }}
-          PATH: ${{ env.OPENJDK_PATH }}/bin:$PATH
         run: |
-          # sh ${{ env.JCEF_PACKAGE_SCRIPT_DIR }}/package_win.sh  ${{ github.event.inputs.version }} "${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg"
-          sh ${{ env.JCEF_PACKAGE_SCRIPT_DIR }}/package_win_offline.sh  ${{ github.event.inputs.version }}
-          # ossutil cp -rf ${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/*.exe "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/"
-          # echo "oss successful"
+          set -euo pipefail
+          PACKAGE_SCRIPT_DIR="$(cygpath -u "${JCEF_PACKAGE_SCRIPT_DIR}")"
+          OPENJDK_UNIX="$(cygpath -u "${OPENJDK_PATH}")"
+          export JAVA_HOME="$OPENJDK_UNIX"
+          export PATH="$JAVA_HOME/bin:$PATH"
+          java -version
+          jpackage --version
+          bash "$PACKAGE_SCRIPT_DIR/package_win_offline.sh" "${{ github.event.inputs.version }}"
 
       # ==============================================================
       # Windows installer: sign MSI -> wrap in Inno Setup EXE -> sign EXE
@@ -2795,8 +2823,11 @@ jobs:
 
       - name: Upload unsigned MSI to OSS staging
         if: matrix.os == 'windows-latest'
+        shell: bash
         run: |
-          ossutil cp -rf "${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.msi" "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/temp-msi/"
+          set -euo pipefail
+          PROJECT_ROOT="$(cygpath -u "${JCEF_PROJECT_ROOT}")"
+          ossutil cp -rf "$PROJECT_ROOT/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.msi" "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/temp-msi/"
 
       - name: Sign MSI on remote signing server
         if: ${{ runner.os == 'Windows' }}
@@ -2823,8 +2854,11 @@ jobs:
 
       - name: Download signed MSI from OSS
         if: ${{ runner.os == 'Windows' }}
+        shell: bash
         run: |
-          ossutil cp -rf "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/signed-msi/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.msi" ${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/
+          set -euo pipefail
+          PROJECT_ROOT="$(cygpath -u "${JCEF_PROJECT_ROOT}")"
+          ossutil cp -rf "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/signed-msi/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.msi" "$PROJECT_ROOT/jpackage/output/"
 
       # ---- Wrap the signed MSI in an Inno Setup EXE (still unsigned outer) ----
 
@@ -2832,26 +2866,36 @@ jobs:
         if: ${{ runner.os == 'Windows' }}
         shell: bash
         run: |
-          sh ${{ env.JCEF_PACKAGE_SCRIPT_DIR }}/wrap_win_installer.sh ${{ github.event.inputs.version }} local
+          set -euo pipefail
+          PACKAGE_SCRIPT_DIR="$(cygpath -u "${JCEF_PACKAGE_SCRIPT_DIR}")"
+          bash "$PACKAGE_SCRIPT_DIR/wrap_win_installer.sh" "${{ github.event.inputs.version }}" local
 
       # ---- Sign the outer EXE (existing flow, now operates on the wrapped EXE) ----
 
       # 准备发往OSS的文件
       - name: Prepare upload for OSS
         if: ${{ runner.os == 'Windows' }}
+        shell: bash
         run: |
+          set -euo pipefail
+          PROJECT_ROOT="$(cygpath -u "${JCEF_PROJECT_ROOT}")"
+          FRONT_PATH="$(cygpath -u "${JCEF_FRONT_PATH}")"
+          WORKSPACE_PATH="$(cygpath -u "${GITHUB_WORKSPACE}")"
           pwd
-          mkdir -p  ${{ env.JCEF_FRONT_PATH }}/release
-          cp -r ${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe ${{ env.JCEF_FRONT_PATH }}/release
-          ls ${{ env.JCEF_FRONT_PATH }}/release
-          cp -r ${{ env.JCEF_FRONT_PATH }}/release/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe ${{ github.workspace }}
+          mkdir -p "$FRONT_PATH/release"
+          cp -r "$PROJECT_ROOT/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe" "$FRONT_PATH/release"
+          ls "$FRONT_PATH/release"
+          cp -r "$FRONT_PATH/release/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe" "$WORKSPACE_PATH"
 
       # 上传文件到OSS准备
       - name: Upload to OSS for windows
         if: matrix.os == 'windows-latest'
+        shell: bash
         run: |
+          set -euo pipefail
+          WORKSPACE_PATH="$(cygpath -u "${GITHUB_WORKSPACE}")"
           # ossutil cp -rf "${{ env.JCEF_FRONT_PATH }}/release/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe" "oss://${{ secrets.BUCKET_NAME }}/offline/${{ github.event.inputs.version }}/temp/"
-          ossutil cp -rf "${{ github.workspace }}/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe" "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/temp/"
+          ossutil cp -rf "$WORKSPACE_PATH/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe" "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/temp/"
 
       # 上传文件到远程服务器
       - name: Copy files to remote server
