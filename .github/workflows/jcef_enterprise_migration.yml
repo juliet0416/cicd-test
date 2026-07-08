@@ -801,6 +801,53 @@ jobs:
           cp "$PROJECT_ROOT/jpackage/input/sourceFile/local_version.json" "$PROJECT_ROOT/jpackage/input/win"
           cp "$PROJECT_ROOT/jpackage/input/sourceFile/local_version.json" "$PROJECT_ROOT/jpackage/input/linux"
 
+      - name: Restore Windows runtime image after build clean
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          JAVA_HOME: ${{ env.JBR_BUILD_PATH }}
+        run: |
+          $runtime = Join-Path $env:JCEF_PROJECT_ROOT "jpackage/input/runtime/win/Home"
+          if (Test-Path $runtime) {
+            Remove-Item -Path $runtime -Recurse -Force
+          }
+          New-Item -Path $runtime -ItemType Directory -Force | Out-Null
+          Copy-Item -Path "$env:JAVA_HOME\*" -Destination $runtime -Recurse -Force
+          $jvmCfg = Join-Path $runtime "lib\jvm.cfg"
+          if (-not (Test-Path $jvmCfg)) {
+            throw "runtime image missing $jvmCfg"
+          }
+          Get-ChildItem -Path $runtime | Select-Object -First 20
+
+      - name: Restore macOS runtime image after build clean
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf "${JCEF_PROJECT_ROOT}/jpackage/input/runtime/mac"
+          mkdir -p "${JCEF_PROJECT_ROOT}/jpackage/input/runtime/mac"
+          cp -R "$JAVA_HOME/../.."/* "${JCEF_PROJECT_ROOT}/jpackage/input/runtime/mac"
+          test -d "${JCEF_PROJECT_ROOT}/jpackage/input/runtime/mac/Contents/Home/lib"
+          chmod -R 777 "${JCEF_PROJECT_ROOT}/jpackage/input/runtime/mac"
+          mkdir -p "${JCEF_PROJECT_ROOT}/jpackage/input/mac"
+          rm -rf "${JCEF_PROJECT_ROOT}/jpackage/input/mac/Frameworks"
+          cp -R "$JAVA_HOME/../Frameworks" "${JCEF_PROJECT_ROOT}/jpackage/input/mac"
+          rm -rf "${JCEF_PROJECT_ROOT}/jpackage/input/mac/Frameworks/cef_server.app"
+
+      - name: Restore Linux runtime image after build clean
+        if: runner.os == 'Linux'
+        shell: bash
+        env:
+          JAVA_HOME: ${{ env.JBR_LINUX_PATH }}
+        run: |
+          set -euo pipefail
+          rm -rf "${JCEF_PROJECT_ROOT}/jpackage/input/runtime/linux/Home"
+          mkdir -p "${JCEF_PROJECT_ROOT}/jpackage/input/runtime/linux/Home"
+          cp -R "$JAVA_HOME"/* "${JCEF_PROJECT_ROOT}/jpackage/input/runtime/linux/Home"
+          rm -rf "${JCEF_PROJECT_ROOT}/jpackage/input/runtime/linux/Home/legal"
+          test -x "${JCEF_PROJECT_ROOT}/jpackage/input/runtime/linux/Home/bin/java"
+          chmod -R 777 "${JCEF_PROJECT_ROOT}/jpackage/input/runtime/linux"
+
       - name: Upload build provenance artifact
         uses: actions/upload-artifact@v4
         with:
@@ -2405,6 +2452,53 @@ jobs:
           cp "$PROJECT_ROOT/jpackage/input/sourceFile/local_version.json" "$PROJECT_ROOT/jpackage/input/mac"
           cp "$PROJECT_ROOT/jpackage/input/sourceFile/local_version.json" "$PROJECT_ROOT/jpackage/input/win"
           cp "$PROJECT_ROOT/jpackage/input/sourceFile/local_version.json" "$PROJECT_ROOT/jpackage/input/linux"
+
+      - name: Restore Windows runtime image after build clean
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          JAVA_HOME: ${{ env.JBR_BUILD_PATH }}
+        run: |
+          $runtime = Join-Path $env:JCEF_PROJECT_ROOT "jpackage/input/runtime/win/Home"
+          if (Test-Path $runtime) {
+            Remove-Item -Path $runtime -Recurse -Force
+          }
+          New-Item -Path $runtime -ItemType Directory -Force | Out-Null
+          Copy-Item -Path "$env:JAVA_HOME\*" -Destination $runtime -Recurse -Force
+          $jvmCfg = Join-Path $runtime "lib\jvm.cfg"
+          if (-not (Test-Path $jvmCfg)) {
+            throw "runtime image missing $jvmCfg"
+          }
+          Get-ChildItem -Path $runtime | Select-Object -First 20
+
+      - name: Restore macOS runtime image after build clean
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf "${JCEF_PROJECT_ROOT}/jpackage/input/runtime/mac"
+          mkdir -p "${JCEF_PROJECT_ROOT}/jpackage/input/runtime/mac"
+          cp -R "$JAVA_HOME/../.."/* "${JCEF_PROJECT_ROOT}/jpackage/input/runtime/mac"
+          test -d "${JCEF_PROJECT_ROOT}/jpackage/input/runtime/mac/Contents/Home/lib"
+          chmod -R 777 "${JCEF_PROJECT_ROOT}/jpackage/input/runtime/mac"
+          mkdir -p "${JCEF_PROJECT_ROOT}/jpackage/input/mac"
+          rm -rf "${JCEF_PROJECT_ROOT}/jpackage/input/mac/Frameworks"
+          cp -R "$JAVA_HOME/../Frameworks" "${JCEF_PROJECT_ROOT}/jpackage/input/mac"
+          rm -rf "${JCEF_PROJECT_ROOT}/jpackage/input/mac/Frameworks/cef_server.app"
+
+      - name: Restore Linux runtime image after build clean
+        if: runner.os == 'Linux'
+        shell: bash
+        env:
+          JAVA_HOME: ${{ env.JBR_LINUX_PATH }}
+        run: |
+          set -euo pipefail
+          rm -rf "${JCEF_PROJECT_ROOT}/jpackage/input/runtime/linux/Home"
+          mkdir -p "${JCEF_PROJECT_ROOT}/jpackage/input/runtime/linux/Home"
+          cp -R "$JAVA_HOME"/* "${JCEF_PROJECT_ROOT}/jpackage/input/runtime/linux/Home"
+          rm -rf "${JCEF_PROJECT_ROOT}/jpackage/input/runtime/linux/Home/legal"
+          test -x "${JCEF_PROJECT_ROOT}/jpackage/input/runtime/linux/Home/bin/java"
+          chmod -R 777 "${JCEF_PROJECT_ROOT}/jpackage/input/runtime/linux"
 
           # 打包前端资源
           # - name: Build FE Static
