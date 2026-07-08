@@ -174,8 +174,7 @@ jobs:
             fi
           done
 
-          while IFS= read -r script_file; do
-            relative_path="${script_file#$SOURCE_ROOT/}"
+          while IFS= read -r relative_path; do
             case "$relative_path" in
               script/package/generate_metadata.sh|\
               script/package/package-community-jcef.sh|\
@@ -189,7 +188,7 @@ jobs:
                 exit 1
                 ;;
             esac
-          done < <(find "$SOURCE_ROOT/script" -type f -print)
+          done < <(cd "$SOURCE_ROOT" && find script -type f -print)
 
       - name: Create Feishu package notification helper
         shell: python
