@@ -109,8 +109,8 @@ jobs:
 
     env:
       SOURCE_ROOT: ${{ github.workspace }}/${{ secrets.REPO_PATH }}
-      SERVER_ROOT: ${{ github.workspace }}/${{ secrets.REPO_PATH }}/chat2db-server
-      CLIENT_ROOT: ${{ github.workspace }}/${{ secrets.REPO_PATH }}/chat2db-client
+      SERVER_ROOT: ${{ github.workspace }}/${{ secrets.REPO_PATH }}/chat2db-community-server
+      CLIENT_ROOT: ${{ github.workspace }}/${{ secrets.REPO_PATH }}/chat2db-community-client
       PACKAGE_SCRIPT_DIR: ${{ github.workspace }}/${{ secrets.REPO_PATH }}/script/package
       JPACKAGE_ROOT: ${{ github.workspace }}/${{ secrets.REPO_PATH }}/jpackage
       COMMUNITY_APP_NAME: Chat2DB-Community
@@ -135,6 +135,61 @@ jobs:
           echo "matrix.arch=${{ matrix.arch }}"
           git -C "$SOURCE_ROOT" rev-parse --abbrev-ref HEAD || true
           git -C "$SOURCE_ROOT" rev-parse HEAD
+
+      - name: Validate Community package layout
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          test -d "$CLIENT_ROOT" || { echo "::error::missing Community client root: $CLIENT_ROOT"; exit 1; }
+          test -d "$SERVER_ROOT" || { echo "::error::missing Community server root: $SERVER_ROOT"; exit 1; }
+          test -d "$JPACKAGE_ROOT" || { echo "::error::missing jpackage root: $JPACKAGE_ROOT"; exit 1; }
+          test -d "$PACKAGE_SCRIPT_DIR" || { echo "::error::missing package script directory: $PACKAGE_SCRIPT_DIR"; exit 1; }
+
+          required_scripts=(
+            generate_metadata.sh
+            package-community-jcef.sh
+            package_macos_community.sh
+            package_linux_community.sh
+            package_win_community.sh
+            wrap_win_installer_community.sh
+          )
+          for script in "${required_scripts[@]}"; do
+            test -f "$PACKAGE_SCRIPT_DIR/$script" || { echo "::error::missing required Community package script: $script"; exit 1; }
+          done
+
+          unexpected_scripts=(
+            package_macos.sh
+            package_linux.sh
+            package_win.sh
+            package_macos_offline.sh
+            package_linux_offline.sh
+            package_win_offline.sh
+            wrap_win_installer.sh
+          )
+          for script in "${unexpected_scripts[@]}"; do
+            if [ -e "$PACKAGE_SCRIPT_DIR/$script" ]; then
+              echo "::error::unexpected Pro/Local package script in Community source tree: $script"
+              exit 1
+            fi
+          done
+
+          while IFS= read -r script_file; do
+            relative_path="${script_file#$SOURCE_ROOT/}"
+            case "$relative_path" in
+              script/package/generate_metadata.sh|\
+              script/package/package-community-jcef.sh|\
+              script/package/package_macos_community.sh|\
+              script/package/package_linux_community.sh|\
+              script/package/package_win_community.sh|\
+              script/package/wrap_win_installer_community.sh)
+                ;;
+              *)
+                echo "::error::unexpected script file in Community source tree: $relative_path"
+                exit 1
+                ;;
+            esac
+          done < <(find "$SOURCE_ROOT/script" -type f -print)
 
       - name: Create Feishu package notification helper
         shell: python
@@ -324,7 +379,7 @@ jobs:
         with:
           node-version: '18.17.0'
           cache: 'yarn'
-          cache-dependency-path: ${{ github.workspace }}/${{ secrets.REPO_PATH }}/chat2db-client/yarn.lock
+          cache-dependency-path: ${{ github.workspace }}/${{ secrets.REPO_PATH }}/chat2db-community-client/yarn.lock
 
       - name: Setup ossutil
         if: ${{ (runner.os == 'Windows' || github.event.inputs.upload_oss == 'true' || github.event.inputs.upload_latest == 'true' || github.event.inputs.update_latest_version_json == 'true') && !(runner.os == 'Linux' && matrix.arch == 'arm64') }}
