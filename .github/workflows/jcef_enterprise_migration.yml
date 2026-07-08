@@ -24,6 +24,14 @@ on:
         description: 'Chat2DB source branch/ref'
         required: false
         default: 'enterprise-migration'
+      community_ref:
+        description: 'Chat2DB community source branch/ref'
+        required: false
+        default: 'community-migration'
+      community_repository:
+        description: 'Community repository override (owner/repo); blank uses enterprise repository'
+        required: false
+        default: ''
       upload_latest:
         description: '是否上传到 latest 目录 (true/false)'
         required: false
@@ -55,6 +63,7 @@ jobs:
           RELEASE_EDITION: Chat2DB Pro Enterprise Migration
           RELEASE_VERSION: ${{ github.event.inputs.version }}
           SOURCE_REF: ${{ github.event.inputs.source_ref || 'enterprise-migration' }}
+          COMMUNITY_REF: ${{ github.event.inputs.community_ref || 'community-migration' }}
           UPLOAD_LATEST: ${{ github.event.inputs.upload_latest }}
           UPDATE_LATEST_VERSION_JSON: ${{ github.event.inputs.update_latest_version_json }}
           RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
@@ -74,6 +83,7 @@ jobs:
               f"{os.environ['RELEASE_EDITION']} 灰度打包已开始",
               f"版本：{os.environ['RELEASE_VERSION']}",
               f"源码分支：{os.environ['SOURCE_REF']}",
+              f"社区源码分支：{os.environ['COMMUNITY_REF']}",
               f"upload_latest：{os.environ['UPLOAD_LATEST']}",
               f"update_latest_version_json：{os.environ['UPDATE_LATEST_VERSION_JSON']}",
               f"运行链接：{os.environ['RUN_URL']}",
@@ -132,6 +142,10 @@ jobs:
       JCEF_PROJECT_ROOT: ${{ github.workspace }}/${{ secrets.REPO_PATH }}
       JCEF_PACKAGE_SCRIPT_DIR: ${{ github.workspace }}/${{ secrets.REPO_PATH }}/script/package
       JCEF_SOURCE_REF: ${{ github.event.inputs.source_ref || 'enterprise-migration' }}
+      JCEF_COMMUNITY_REPOSITORY: ${{ github.event.inputs.community_repository || secrets.REPO_URL }}
+      JCEF_COMMUNITY_SOURCE_REF: ${{ github.event.inputs.community_ref || 'community-migration' }}
+      JCEF_COMMUNITY_ROOT: ${{ github.workspace }}/chat2db-community-source
+      JCEF_COMMUNITY_POM_PATH: ${{ github.workspace }}/chat2db-community-source/chat2db-community-server/pom.xml
       JCEF_FRONT_PATH: ${{ github.workspace }}/${{ secrets.REPO_PATH }}/chat2db-enterprise-client
       JCEF_YARN_LOCK_PATH: ${{ github.workspace }}/${{ secrets.REPO_PATH }}/chat2db-enterprise-client/yarn.lock
       JCEF_POM_PATH: ${{ github.workspace }}/${{ secrets.REPO_PATH }}/chat2db-enterprise-server/pom.xml
@@ -148,13 +162,25 @@ jobs:
           ref: ${{ github.event.inputs.source_ref || 'enterprise-migration' }}
           token: ${{ secrets.ACCESS_TOKEN }}
 
+      - name: Check out community repository
+        uses: actions/checkout@v2
+        with:
+          repository: ${{ github.event.inputs.community_repository || secrets.REPO_URL }}
+          path: chat2db-community-source
+          ref: ${{ github.event.inputs.community_ref || 'community-migration' }}
+          token: ${{ secrets.ACCESS_TOKEN }}
+
       # Output basic information
       - name: Print basic information
         run: |
           echo "current version: ${{ github.run_id }}"
           echo "source ref: ${JCEF_SOURCE_REF}"
+          echo "community repository: ${JCEF_COMMUNITY_REPOSITORY}"
+          echo "community ref: ${JCEF_COMMUNITY_SOURCE_REF}"
           git -C "${{ env.JCEF_PROJECT_ROOT }}" rev-parse --abbrev-ref HEAD || true
           git -C "${{ env.JCEF_PROJECT_ROOT }}" rev-parse HEAD
+          git -C "${{ env.JCEF_COMMUNITY_ROOT }}" rev-parse --abbrev-ref HEAD || true
+          git -C "${{ env.JCEF_COMMUNITY_ROOT }}" rev-parse HEAD
 
       - name: Validate enterprise migration paths
         shell: bash
@@ -164,6 +190,8 @@ jobs:
           echo "front path: ${JCEF_FRONT_PATH}"
           echo "yarn lock path: ${JCEF_YARN_LOCK_PATH}"
           echo "pom path: ${JCEF_POM_PATH}"
+          echo "community root: ${JCEF_COMMUNITY_ROOT}"
+          echo "community pom path: ${JCEF_COMMUNITY_POM_PATH}"
           if [ "${JCEF_SOURCE_REF}" = "main" ]; then
             echo "::error::enterprise migration workflow must not package source_ref=main"
             exit 1
@@ -177,7 +205,10 @@ jobs:
           test -f "${JCEF_YARN_LOCK_PATH}"
           test -f "${JCEF_POM_PATH}"
           test -d "${JCEF_PACKAGE_SCRIPT_DIR}"
+          test -d "${JCEF_COMMUNITY_ROOT}"
+          test -f "${JCEF_COMMUNITY_POM_PATH}"
           find "${JCEF_PROJECT_ROOT}" -maxdepth 2 \( -name package.json -o -name yarn.lock -o -name pom.xml \) -print | sort
+          find "${JCEF_COMMUNITY_ROOT}" -maxdepth 2 \( -name pom.xml \) -print | sort
 
       - name: Create Feishu package notification helper
         shell: python
@@ -431,13 +462,28 @@ jobs:
         #     distribution: 'temurin'
         #     cache: 'maven'
 
-        # 打包依赖包
-      # - name: Check out first repository
-      #   uses: actions/checkout@v2
-      #   with:
-      #     repository: ${{ secrets.REPO_BASE_URL }}
-      #     ref: ${{ secrets.TEST_REPO_BASE_BRANCH }}
-      #     path: ${{ secrets.REPO_BASE_PATH }}
+      - name: Install community artifacts win
+        if: ${{ runner.os == 'Windows' }}
+        env:
+          JAVA_HOME: ${{ env.JBR_BUILD_PATH }}
+        run: |
+          pwd
+          mvn -v
+          mvn clean install -U -B '-Dmaven.test.skip=true' -f ${{ env.JCEF_COMMUNITY_POM_PATH }}
+
+      - name: Install community artifacts mac
+        if: ${{ runner.os == 'macOS' }}
+        run: |
+          pwd
+          mvn -v
+          mvn clean install -U -B '-Dmaven.test.skip=true' -f ${{ env.JCEF_COMMUNITY_POM_PATH }}
+
+      - name: Install community artifacts linux
+        if: ${{ runner.os == 'Linux' }}
+        run: |
+          pwd
+          mvn -v
+          mvn clean install -U -B '-Dmaven.test.skip=true' -f ${{ env.JCEF_COMMUNITY_POM_PATH }}
 
       # 设置OSS
       - name: Set up oss utils
@@ -692,7 +738,7 @@ jobs:
           CHAT2DB_PACKAGE_MODE="enterprise-over-community" \
           CHAT2DB_SOURCE_REF="${JCEF_SOURCE_REF}" \
           CHAT2DB_ENTERPRISE_SOURCE_REF="${JCEF_SOURCE_REF}" \
-          CHAT2DB_COMMUNITY_SOURCE_REF="${JCEF_SOURCE_REF}" \
+          CHAT2DB_COMMUNITY_SOURCE_REF="${JCEF_COMMUNITY_SOURCE_REF}" \
             sh ${{ env.JCEF_PACKAGE_SCRIPT_DIR }}/generate_metadata.sh  ${{ github.event.inputs.version }}  ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile  https://cdn.chat2db-ai.com/download/updates
           cp ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile/version.json   ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile/local_version.json
           cp ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile/local_version.json ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/mac
@@ -736,7 +782,7 @@ jobs:
           CHAT2DB_PACKAGE_MODE="enterprise-over-community" \
           CHAT2DB_SOURCE_REF="${JCEF_SOURCE_REF}" \
           CHAT2DB_ENTERPRISE_SOURCE_REF="${JCEF_SOURCE_REF}" \
-          CHAT2DB_COMMUNITY_SOURCE_REF="${JCEF_SOURCE_REF}" \
+          CHAT2DB_COMMUNITY_SOURCE_REF="${JCEF_COMMUNITY_SOURCE_REF}" \
             sh ${{ env.JCEF_PACKAGE_SCRIPT_DIR }}/generate_metadata.sh ${{ github.event.inputs.version }} ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile https://cdn.chat2db-ai.com/download/updates
           cp ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile/version.json ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile/local_version.json
           cp ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile/local_version.json ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/mac
@@ -1433,6 +1479,7 @@ jobs:
           RELEASE_EDITION: Chat2DB Local Enterprise Migration
           RELEASE_VERSION: ${{ github.event.inputs.version }}
           SOURCE_REF: ${{ github.event.inputs.source_ref || 'enterprise-migration' }}
+          COMMUNITY_REF: ${{ github.event.inputs.community_ref || 'community-migration' }}
           UPLOAD_LATEST: ${{ github.event.inputs.upload_latest }}
           UPDATE_LATEST_VERSION_JSON: ${{ github.event.inputs.update_latest_version_json }}
           RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
@@ -1452,6 +1499,7 @@ jobs:
               f"{os.environ['RELEASE_EDITION']} 灰度打包已开始",
               f"版本：{os.environ['RELEASE_VERSION']}",
               f"源码分支：{os.environ['SOURCE_REF']}",
+              f"社区源码分支：{os.environ['COMMUNITY_REF']}",
               f"upload_latest：{os.environ['UPLOAD_LATEST']}",
               f"update_latest_version_json：{os.environ['UPDATE_LATEST_VERSION_JSON']}",
               f"运行链接：{os.environ['RUN_URL']}",
@@ -1510,6 +1558,10 @@ jobs:
       JCEF_PROJECT_ROOT: ${{ github.workspace }}/${{ secrets.REPO_PATH }}
       JCEF_PACKAGE_SCRIPT_DIR: ${{ github.workspace }}/${{ secrets.REPO_PATH }}/script/package
       JCEF_SOURCE_REF: ${{ github.event.inputs.source_ref || 'enterprise-migration' }}
+      JCEF_COMMUNITY_REPOSITORY: ${{ github.event.inputs.community_repository || secrets.REPO_URL }}
+      JCEF_COMMUNITY_SOURCE_REF: ${{ github.event.inputs.community_ref || 'community-migration' }}
+      JCEF_COMMUNITY_ROOT: ${{ github.workspace }}/chat2db-community-source
+      JCEF_COMMUNITY_POM_PATH: ${{ github.workspace }}/chat2db-community-source/chat2db-community-server/pom.xml
       JCEF_FRONT_PATH: ${{ github.workspace }}/${{ secrets.REPO_PATH }}/chat2db-enterprise-client
       JCEF_YARN_LOCK_PATH: ${{ github.workspace }}/${{ secrets.REPO_PATH }}/chat2db-enterprise-client/yarn.lock
       JCEF_POM_PATH: ${{ github.workspace }}/${{ secrets.REPO_PATH }}/chat2db-enterprise-server/pom.xml
@@ -1526,13 +1578,25 @@ jobs:
           ref: ${{ github.event.inputs.source_ref || 'enterprise-migration' }}
           token: ${{ secrets.ACCESS_TOKEN }}
 
+      - name: Check out community repository
+        uses: actions/checkout@v2
+        with:
+          repository: ${{ github.event.inputs.community_repository || secrets.REPO_URL }}
+          path: chat2db-community-source
+          ref: ${{ github.event.inputs.community_ref || 'community-migration' }}
+          token: ${{ secrets.ACCESS_TOKEN }}
+
       # Output basic information
       - name: Print basic information
         run: |
           echo "current version: ${{ github.run_id }}"
           echo "source ref: ${JCEF_SOURCE_REF}"
+          echo "community repository: ${JCEF_COMMUNITY_REPOSITORY}"
+          echo "community ref: ${JCEF_COMMUNITY_SOURCE_REF}"
           git -C "${{ env.JCEF_PROJECT_ROOT }}" rev-parse --abbrev-ref HEAD || true
           git -C "${{ env.JCEF_PROJECT_ROOT }}" rev-parse HEAD
+          git -C "${{ env.JCEF_COMMUNITY_ROOT }}" rev-parse --abbrev-ref HEAD || true
+          git -C "${{ env.JCEF_COMMUNITY_ROOT }}" rev-parse HEAD
 
       - name: Validate enterprise migration paths
         shell: bash
@@ -1542,6 +1606,8 @@ jobs:
           echo "front path: ${JCEF_FRONT_PATH}"
           echo "yarn lock path: ${JCEF_YARN_LOCK_PATH}"
           echo "pom path: ${JCEF_POM_PATH}"
+          echo "community root: ${JCEF_COMMUNITY_ROOT}"
+          echo "community pom path: ${JCEF_COMMUNITY_POM_PATH}"
           if [ "${JCEF_SOURCE_REF}" = "main" ]; then
             echo "::error::enterprise migration workflow must not package source_ref=main"
             exit 1
@@ -1555,7 +1621,10 @@ jobs:
           test -f "${JCEF_YARN_LOCK_PATH}"
           test -f "${JCEF_POM_PATH}"
           test -d "${JCEF_PACKAGE_SCRIPT_DIR}"
+          test -d "${JCEF_COMMUNITY_ROOT}"
+          test -f "${JCEF_COMMUNITY_POM_PATH}"
           find "${JCEF_PROJECT_ROOT}" -maxdepth 2 \( -name package.json -o -name yarn.lock -o -name pom.xml \) -print | sort
+          find "${JCEF_COMMUNITY_ROOT}" -maxdepth 2 \( -name pom.xml \) -print | sort
 
       - name: Create Feishu package notification helper
         shell: python
@@ -1970,13 +2039,28 @@ jobs:
         #     distribution: 'temurin'
         #     cache: 'maven'
 
-        # 打包依赖包
-      # - name: Check out first repository
-      #   uses: actions/checkout@v2
-      #   with:
-      #     repository: ${{ secrets.REPO_BASE_URL }}
-      #     ref: ${{ secrets.TEST_REPO_BASE_BRANCH }}
-      #     path: ${{ secrets.REPO_BASE_PATH }}
+      - name: Install community artifacts win
+        if: ${{ runner.os == 'Windows' }}
+        env:
+          JAVA_HOME: ${{ env.JBR_BUILD_PATH }}
+        run: |
+          pwd
+          mvn -v
+          mvn clean install -U -B '-Dmaven.test.skip=true' -f ${{ env.JCEF_COMMUNITY_POM_PATH }}
+
+      - name: Install community artifacts mac
+        if: ${{ runner.os == 'macOS' }}
+        run: |
+          pwd
+          mvn -v
+          mvn clean install -U -B '-Dmaven.test.skip=true' -f ${{ env.JCEF_COMMUNITY_POM_PATH }}
+
+      - name: Install community artifacts linux
+        if: ${{ runner.os == 'Linux' }}
+        run: |
+          pwd
+          mvn -v
+          mvn clean install -U -B '-Dmaven.test.skip=true' -f ${{ env.JCEF_COMMUNITY_POM_PATH }}
 
       # 设置OSS
       - name: Set up oss utils
@@ -2231,7 +2315,7 @@ jobs:
           CHAT2DB_PACKAGE_MODE="enterprise-over-community" \
           CHAT2DB_SOURCE_REF="${JCEF_SOURCE_REF}" \
           CHAT2DB_ENTERPRISE_SOURCE_REF="${JCEF_SOURCE_REF}" \
-          CHAT2DB_COMMUNITY_SOURCE_REF="${JCEF_SOURCE_REF}" \
+          CHAT2DB_COMMUNITY_SOURCE_REF="${JCEF_COMMUNITY_SOURCE_REF}" \
             sh ${{ env.JCEF_PACKAGE_SCRIPT_DIR }}/generate_metadata.sh  ${{ github.event.inputs.version }}  ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile  https://cdn.chat2db-ai.com/offline/updates
           cp ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile/version.json   ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile/local_version.json
           cp ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile/local_version.json ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/mac
@@ -2275,7 +2359,7 @@ jobs:
           CHAT2DB_PACKAGE_MODE="enterprise-over-community" \
           CHAT2DB_SOURCE_REF="${JCEF_SOURCE_REF}" \
           CHAT2DB_ENTERPRISE_SOURCE_REF="${JCEF_SOURCE_REF}" \
-          CHAT2DB_COMMUNITY_SOURCE_REF="${JCEF_SOURCE_REF}" \
+          CHAT2DB_COMMUNITY_SOURCE_REF="${JCEF_COMMUNITY_SOURCE_REF}" \
             sh ${{ env.JCEF_PACKAGE_SCRIPT_DIR }}/generate_metadata.sh ${{ github.event.inputs.version }} ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile https://cdn.chat2db-ai.com/offline/updates
           cp ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile/version.json ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile/local_version.json
           cp ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile/local_version.json ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/mac
