@@ -145,6 +145,8 @@ jobs:
           test -d "$SERVER_ROOT" || { echo "::error::missing Community server root: $SERVER_ROOT"; exit 1; }
           test -d "$JPACKAGE_ROOT" || { echo "::error::missing jpackage root: $JPACKAGE_ROOT"; exit 1; }
           test -d "$PACKAGE_SCRIPT_DIR" || { echo "::error::missing package script directory: $PACKAGE_SCRIPT_DIR"; exit 1; }
+          test -f "$CLIENT_ROOT/product.community.ts" || { echo "::error::missing Community product config: $CLIENT_ROOT/product.community.ts"; exit 1; }
+          test -f "$CLIENT_ROOT/src/utils/package.ts" || { echo "::error::invalid Community frontend source: missing $CLIENT_ROOT/src/utils/package.ts"; exit 1; }
 
           required_scripts=(
             generate_metadata.sh

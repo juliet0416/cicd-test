@@ -145,12 +145,17 @@ jobs:
       JCEF_COMMUNITY_REPOSITORY: ${{ github.event.inputs.community_repository || secrets.REPO_URL }}
       JCEF_COMMUNITY_SOURCE_REF: ${{ github.event.inputs.community_ref || 'community-migration' }}
       JCEF_COMMUNITY_ROOT: ${{ github.workspace }}/chat2db-community-source
+      JCEF_COMMUNITY_CLIENT_ROOT: ${{ github.workspace }}/chat2db-community-source/chat2db-community-client
       JCEF_COMMUNITY_POM_PATH: ${{ github.workspace }}/chat2db-community-source/chat2db-community-server/pom.xml
       JCEF_FRONT_PATH: ${{ github.workspace }}/${{ secrets.REPO_PATH }}/chat2db-enterprise-client
+      JCEF_FRONTEND_SRC_ROOT: ${{ github.workspace }}/chat2db-community-source/chat2db-community-client/src
+      JCEF_PRODUCT_CONFIG: ${{ github.workspace }}/${{ secrets.REPO_PATH }}/chat2db-enterprise-client/product.enterprise.ts
       JCEF_YARN_LOCK_PATH: ${{ github.workspace }}/${{ secrets.REPO_PATH }}/chat2db-enterprise-client/yarn.lock
       JCEF_POM_PATH: ${{ github.workspace }}/${{ secrets.REPO_PATH }}/chat2db-enterprise-server/pom.xml
       JCEF_STATIC_PATH: ${{ github.workspace }}/${{ secrets.REPO_PATH }}/chat2db-enterprise-client/static
       JCEF_JRE_PATH: ${{ github.workspace }}/${{ secrets.REPO_PATH }}/chat2db-enterprise-client/static/jre
+      CHAT2DB_FRONTEND_SRC_ROOT: ${{ github.workspace }}/chat2db-community-source/chat2db-community-client/src
+      CHAT2DB_PRODUCT_CONFIG: ${{ github.workspace }}/${{ secrets.REPO_PATH }}/chat2db-enterprise-client/product.enterprise.ts
 
     # 将release_test分支的代码检出（即复制）到 GitHub Actions 的运行环境中。
     steps:
@@ -191,6 +196,9 @@ jobs:
           echo "yarn lock path: ${JCEF_YARN_LOCK_PATH}"
           echo "pom path: ${JCEF_POM_PATH}"
           echo "community root: ${JCEF_COMMUNITY_ROOT}"
+          echo "community client root: ${JCEF_COMMUNITY_CLIENT_ROOT}"
+          echo "frontend source root: ${JCEF_FRONTEND_SRC_ROOT}"
+          echo "product config: ${JCEF_PRODUCT_CONFIG}"
           echo "community pom path: ${JCEF_COMMUNITY_POM_PATH}"
           if [ "${JCEF_SOURCE_REF}" = "main" ]; then
             echo "::error::enterprise migration workflow must not package source_ref=main"
@@ -206,7 +214,18 @@ jobs:
           test -f "${JCEF_POM_PATH}"
           test -d "${JCEF_PACKAGE_SCRIPT_DIR}"
           test -d "${JCEF_COMMUNITY_ROOT}"
+          test -d "${JCEF_COMMUNITY_CLIENT_ROOT}"
+          test -d "${JCEF_FRONTEND_SRC_ROOT}"
+          test -f "${JCEF_FRONTEND_SRC_ROOT}/utils/package.ts"
           test -f "${JCEF_COMMUNITY_POM_PATH}"
+          test -f "${JCEF_PRODUCT_CONFIG}"
+          test -f "${JCEF_FRONT_PATH}/scripts/prepare-frontend-source.js"
+          if [ -L "${JCEF_FRONT_PATH}/src" ]; then
+            rm "${JCEF_FRONT_PATH}/src"
+          elif [ -e "${JCEF_FRONT_PATH}/src" ]; then
+            echo "::error::chat2db-enterprise-client/src must not be a real directory"
+            exit 1
+          fi
           find "${JCEF_PROJECT_ROOT}" -maxdepth 2 \( -name package.json -o -name yarn.lock -o -name pom.xml \) -print | sort
           find "${JCEF_COMMUNITY_ROOT}" -maxdepth 2 \( -name pom.xml \) -print | sort
 
@@ -718,6 +737,9 @@ jobs:
         if: runner.os != 'Windows'
         shell: bash
         run: |
+          export CHAT2DB_FRONTEND_SRC_ROOT="${JCEF_FRONTEND_SRC_ROOT}"
+          export CHAT2DB_PRODUCT_CONFIG="${JCEF_PRODUCT_CONFIG}"
+
           pushd ${{ env.JCEF_FRONT_PATH }}
           yarn
           yarn run build:web:desktop --app_version=${{ github.event.inputs.version }}
@@ -762,6 +784,10 @@ jobs:
           FRONT_PATH="$(cygpath -u "${JCEF_FRONT_PATH}")"
           PROJECT_ROOT="$(cygpath -u "${JCEF_PROJECT_ROOT}")"
           PACKAGE_SCRIPT_DIR="$(cygpath -u "${JCEF_PACKAGE_SCRIPT_DIR}")"
+          FRONTEND_SRC_ROOT="$(cygpath -u "${JCEF_FRONTEND_SRC_ROOT}")"
+          PRODUCT_CONFIG="$(cygpath -u "${JCEF_PRODUCT_CONFIG}")"
+          export CHAT2DB_FRONTEND_SRC_ROOT="$FRONTEND_SRC_ROOT"
+          export CHAT2DB_PRODUCT_CONFIG="$PRODUCT_CONFIG"
 
           pushd "$FRONT_PATH"
           yarn
@@ -1636,12 +1662,17 @@ jobs:
       JCEF_COMMUNITY_REPOSITORY: ${{ github.event.inputs.community_repository || secrets.REPO_URL }}
       JCEF_COMMUNITY_SOURCE_REF: ${{ github.event.inputs.community_ref || 'community-migration' }}
       JCEF_COMMUNITY_ROOT: ${{ github.workspace }}/chat2db-community-source
+      JCEF_COMMUNITY_CLIENT_ROOT: ${{ github.workspace }}/chat2db-community-source/chat2db-community-client
       JCEF_COMMUNITY_POM_PATH: ${{ github.workspace }}/chat2db-community-source/chat2db-community-server/pom.xml
       JCEF_FRONT_PATH: ${{ github.workspace }}/${{ secrets.REPO_PATH }}/chat2db-enterprise-client
+      JCEF_FRONTEND_SRC_ROOT: ${{ github.workspace }}/chat2db-community-source/chat2db-community-client/src
+      JCEF_PRODUCT_CONFIG: ${{ github.workspace }}/${{ secrets.REPO_PATH }}/chat2db-enterprise-client/product.enterprise.ts
       JCEF_YARN_LOCK_PATH: ${{ github.workspace }}/${{ secrets.REPO_PATH }}/chat2db-enterprise-client/yarn.lock
       JCEF_POM_PATH: ${{ github.workspace }}/${{ secrets.REPO_PATH }}/chat2db-enterprise-server/pom.xml
       JCEF_STATIC_PATH: ${{ github.workspace }}/${{ secrets.REPO_PATH }}/chat2db-enterprise-client/static
       JCEF_JRE_PATH: ${{ github.workspace }}/${{ secrets.REPO_PATH }}/chat2db-enterprise-client/static/jre
+      CHAT2DB_FRONTEND_SRC_ROOT: ${{ github.workspace }}/chat2db-community-source/chat2db-community-client/src
+      CHAT2DB_PRODUCT_CONFIG: ${{ github.workspace }}/${{ secrets.REPO_PATH }}/chat2db-enterprise-client/product.enterprise.ts
 
     # 将release_test分支的代码检出（即复制）到 GitHub Actions 的运行环境中。
     steps:
@@ -1682,6 +1713,9 @@ jobs:
           echo "yarn lock path: ${JCEF_YARN_LOCK_PATH}"
           echo "pom path: ${JCEF_POM_PATH}"
           echo "community root: ${JCEF_COMMUNITY_ROOT}"
+          echo "community client root: ${JCEF_COMMUNITY_CLIENT_ROOT}"
+          echo "frontend source root: ${JCEF_FRONTEND_SRC_ROOT}"
+          echo "product config: ${JCEF_PRODUCT_CONFIG}"
           echo "community pom path: ${JCEF_COMMUNITY_POM_PATH}"
           if [ "${JCEF_SOURCE_REF}" = "main" ]; then
             echo "::error::enterprise migration workflow must not package source_ref=main"
@@ -1697,7 +1731,18 @@ jobs:
           test -f "${JCEF_POM_PATH}"
           test -d "${JCEF_PACKAGE_SCRIPT_DIR}"
           test -d "${JCEF_COMMUNITY_ROOT}"
+          test -d "${JCEF_COMMUNITY_CLIENT_ROOT}"
+          test -d "${JCEF_FRONTEND_SRC_ROOT}"
+          test -f "${JCEF_FRONTEND_SRC_ROOT}/utils/package.ts"
           test -f "${JCEF_COMMUNITY_POM_PATH}"
+          test -f "${JCEF_PRODUCT_CONFIG}"
+          test -f "${JCEF_FRONT_PATH}/scripts/prepare-frontend-source.js"
+          if [ -L "${JCEF_FRONT_PATH}/src" ]; then
+            rm "${JCEF_FRONT_PATH}/src"
+          elif [ -e "${JCEF_FRONT_PATH}/src" ]; then
+            echo "::error::chat2db-enterprise-client/src must not be a real directory"
+            exit 1
+          fi
           find "${JCEF_PROJECT_ROOT}" -maxdepth 2 \( -name package.json -o -name yarn.lock -o -name pom.xml \) -print | sort
           find "${JCEF_COMMUNITY_ROOT}" -maxdepth 2 \( -name pom.xml \) -print | sort
 
@@ -2370,6 +2415,9 @@ jobs:
         if: runner.os != 'Windows'
         shell: bash
         run: |
+          export CHAT2DB_FRONTEND_SRC_ROOT="${JCEF_FRONTEND_SRC_ROOT}"
+          export CHAT2DB_PRODUCT_CONFIG="${JCEF_PRODUCT_CONFIG}"
+
           pushd ${{ env.JCEF_FRONT_PATH }}
           yarn
           yarn run modify:package:name chat2db-local Chat2DB-Local
@@ -2414,6 +2462,10 @@ jobs:
           FRONT_PATH="$(cygpath -u "${JCEF_FRONT_PATH}")"
           PROJECT_ROOT="$(cygpath -u "${JCEF_PROJECT_ROOT}")"
           PACKAGE_SCRIPT_DIR="$(cygpath -u "${JCEF_PACKAGE_SCRIPT_DIR}")"
+          FRONTEND_SRC_ROOT="$(cygpath -u "${JCEF_FRONTEND_SRC_ROOT}")"
+          PRODUCT_CONFIG="$(cygpath -u "${JCEF_PRODUCT_CONFIG}")"
+          export CHAT2DB_FRONTEND_SRC_ROOT="$FRONTEND_SRC_ROOT"
+          export CHAT2DB_PRODUCT_CONFIG="$PRODUCT_CONFIG"
 
           pushd "$FRONT_PATH"
           yarn
