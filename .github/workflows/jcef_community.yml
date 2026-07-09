@@ -411,9 +411,9 @@ jobs:
         run: |
           set -euo pipefail
           rm -rf "$JPACKAGE_ROOT/input/runtime/mac"
-          mkdir -p "$JPACKAGE_ROOT/input/runtime/mac"
-          cp -R "$JAVA_HOME/../.."/* "$JPACKAGE_ROOT/input/runtime/mac"
-          test -d "$JPACKAGE_ROOT/input/runtime/mac/Contents/Home/lib"
+          mkdir -p "$JPACKAGE_ROOT/input/runtime/mac/Home"
+          cp -R "$JAVA_HOME"/. "$JPACKAGE_ROOT/input/runtime/mac/Home"
+          test -d "$JPACKAGE_ROOT/input/runtime/mac/Home/lib"
           find "$JPACKAGE_ROOT/input/runtime/mac" -maxdepth 3 -type d | sort | head -20
           chmod -R 777 "$JPACKAGE_ROOT/input/runtime/mac"
           mkdir -p "$JPACKAGE_ROOT/input/mac"
