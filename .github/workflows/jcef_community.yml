@@ -154,7 +154,6 @@ jobs:
             package_macos_community.sh
             package_linux_community.sh
             package_win_community.sh
-            wrap_win_installer_community.sh
           )
           for script in "${required_scripts[@]}"; do
             test -f "$PACKAGE_SCRIPT_DIR/$script" || { echo "::error::missing required Community package script: $script"; exit 1; }
@@ -182,8 +181,7 @@ jobs:
               script/package/package-community-jcef.sh|\
               script/package/package_macos_community.sh|\
               script/package/package_linux_community.sh|\
-              script/package/package_win_community.sh|\
-              script/package/wrap_win_installer_community.sh)
+              script/package/package_win_community.sh)
                 ;;
               *)
                 echo "::error::unexpected script file in Community source tree: $relative_path"
@@ -307,7 +305,7 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          choco install jq innosetup winscp -y --no-progress
+          choco install jq winscp -y --no-progress
 
       - name: Resolve Windows signing tools
         if: runner.os == 'Windows'
@@ -325,17 +323,6 @@ jobs:
           }
           "WINSCP_PATH=$winScpPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           (Split-Path -Path $winScpPath -Parent) | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-
-          $isccCandidates = @(
-            "C:\Program Files (x86)\Inno Setup 6\ISCC.exe",
-            "C:\Program Files\Inno Setup 6\ISCC.exe"
-          )
-          $isccPath = $isccCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
-          if (-not $isccPath) {
-            Write-Error "ISCC.exe was not found after Inno Setup installation."
-            exit 1
-          }
-          Write-Host "Resolved ISCC: $isccPath"
 
       - name: Copy Windows runtime image
         if: runner.os == 'Windows'
@@ -552,53 +539,6 @@ jobs:
             "oss://${{ secrets.BUCKET_NAME }}/community/updates/${{ github.event.inputs.version }}/signed-msi/Chat2DB-Community-${{ github.event.inputs.version }}.msi" \
             "$JPACKAGE_ROOT/output/Chat2DB-Community-${{ github.event.inputs.version }}.msi"
 
-      - name: Wrap Windows installer
-        if: runner.os == 'Windows'
-        shell: bash
-        run: |
-          bash "$PACKAGE_SCRIPT_DIR/wrap_win_installer_community.sh" "${{ github.event.inputs.version }}"
-
-      - name: Upload unsigned Community EXE to OSS staging
-        if: runner.os == 'Windows'
-        shell: bash
-        run: |
-          set -euo pipefail
-          ossutil cp -f \
-            "$JPACKAGE_ROOT/output/Chat2DB-Community-${{ github.event.inputs.version }}.exe" \
-            "oss://${{ secrets.BUCKET_NAME }}/community/updates/${{ github.event.inputs.version }}/temp-exe/Chat2DB-Community-${{ github.event.inputs.version }}.exe"
-
-      - name: Sign Community EXE on remote signing server
-        if: runner.os == 'Windows'
-        timeout-minutes: 15
-        shell: pwsh
-        env:
-          SCP_PASSWORD: ${{ secrets.WIN_SSH_PRIVATE_KEY }}
-          REMOTE_HOST: ${{ secrets.WIN_SERVER_IP }}
-          REMOTE_USER: ${{ secrets.WIN_SERVER_USER }}
-          REMOTE_EXE_PATH: '${{ secrets.REMOTE_SIGN_PATH }}/Chat2DB-Community-${{ github.event.inputs.version }}.exe'
-          REMOTE_OSS: ${{ secrets.REMOTE_SIGN_SCRIPT_OSS }}
-          SIGN_EXE_SHA1: '${{ secrets.REMOTE_SIGN_SCRIPT }} --alg SHA-1 ${{ secrets.REMOTE_SIGN_PATH }}/Chat2DB-Community-${{ github.event.inputs.version }}.exe'
-          SIGN_EXE_SHA256: '${{ secrets.REMOTE_SIGN_SCRIPT }} --alg SHA-256 ${{ secrets.REMOTE_SIGN_PATH }}/Chat2DB-Community-${{ github.event.inputs.version }}.exe'
-        run: |
-          & "${env:WINSCP_PATH}" /log=winscp-community-exe.log /command `
-            "option batch abort" `
-            "option confirm off" `
-            "open scp://${{ env.REMOTE_USER }}:${{ env.SCP_PASSWORD }}@${{ env.REMOTE_HOST }} -hostkey=*" `
-            "call ${{ env.REMOTE_OSS }} oss://${{ secrets.BUCKET_NAME }}/community/updates/${{ github.event.inputs.version }}/temp-exe/Chat2DB-Community-${{ github.event.inputs.version }}.exe ${env:REMOTE_EXE_PATH}" `
-            "call ${env:SIGN_EXE_SHA1}" `
-            "call ${env:SIGN_EXE_SHA256}" `
-            "call ${{ env.REMOTE_OSS }} ${env:REMOTE_EXE_PATH} oss://${{ secrets.BUCKET_NAME }}/community/updates/${{ github.event.inputs.version }}/signed-exe/Chat2DB-Community-${{ github.event.inputs.version }}.exe" `
-            "exit"
-
-      - name: Download signed Community EXE
-        if: runner.os == 'Windows'
-        shell: bash
-        run: |
-          set -euo pipefail
-          ossutil cp -f \
-            "oss://${{ secrets.BUCKET_NAME }}/community/updates/${{ github.event.inputs.version }}/signed-exe/Chat2DB-Community-${{ github.event.inputs.version }}.exe" \
-            "$JPACKAGE_ROOT/output/Chat2DB-Community-${{ github.event.inputs.version }}.exe"
-
       - name: Notarize macOS package
         if: runner.os == 'macOS'
         shell: bash
@@ -621,7 +561,6 @@ jobs:
           name: community-${{ github.event.inputs.version }}-${{ matrix.artifact_suffix }}
           path: |
             ${{ env.JPACKAGE_ROOT }}/output/*.dmg
-            ${{ env.JPACKAGE_ROOT }}/output/*.exe
             ${{ env.JPACKAGE_ROOT }}/output/*.msi
             ${{ env.JPACKAGE_ROOT }}/output/*.deb
             ${{ env.JPACKAGE_ROOT }}/output/*.rpm
@@ -637,7 +576,7 @@ jobs:
             case "$name" in
               *-arm64.dmg) echo "macOS arm64" ;;
               *-x64.dmg) echo "macOS x64" ;;
-              *.exe) echo "Windows x64" ;;
+              *.msi) echo "Windows x64" ;;
               *-arm64.AppImage) echo "Linux arm64 AppImage" ;;
               *-x86_64.AppImage) echo "Linux x86_64 AppImage" ;;
               *-arm64.deb) echo "Linux arm64 deb" ;;
@@ -660,7 +599,7 @@ jobs:
               python3 "$RUNNER_TEMP/notify_package.py"
           }
 
-          for pattern in "*.dmg" "*.exe" "*.deb" "*.rpm" "*.AppImage"; do
+          for pattern in "*.dmg" "*.msi" "*.deb" "*.rpm" "*.AppImage"; do
             for file in "$JPACKAGE_ROOT"/output/$pattern; do
               [ -f "$file" ] || continue
               package_file=$(basename "$file")
@@ -682,7 +621,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for pattern in "*.dmg" "*.exe" "*.deb" "*.rpm" "*.AppImage"; do
+          for pattern in "*.dmg" "*.msi" "*.deb" "*.rpm" "*.AppImage"; do
             for file in "$JPACKAGE_ROOT"/output/$pattern; do
               [ -f "$file" ] || continue
               name=$(basename "$file")
@@ -736,7 +675,7 @@ jobs:
           run_url = os.environ["RUN_URL"]
           base = f"https://cdn.chat2db-ai.com/community/{version}"
           files = [
-              f"Chat2DB-Community-{version}.exe",
+              f"Chat2DB-Community-{version}.msi",
               f"Chat2DB-Community-{version}-x64.dmg",
               f"Chat2DB-Community-{version}-arm64.dmg",
               f"Chat2DB-Community-{version}-x86_64.AppImage",
