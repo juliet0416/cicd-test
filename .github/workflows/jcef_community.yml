@@ -147,6 +147,7 @@ jobs:
           test -d "$PACKAGE_SCRIPT_DIR" || { echo "::error::missing package script directory: $PACKAGE_SCRIPT_DIR"; exit 1; }
           test -f "$CLIENT_ROOT/product.community.ts" || { echo "::error::missing Community product config: $CLIENT_ROOT/product.community.ts"; exit 1; }
           test -f "$CLIENT_ROOT/src/utils/package.ts" || { echo "::error::invalid Community frontend source: missing $CLIENT_ROOT/src/utils/package.ts"; exit 1; }
+          test -f "$SOURCE_ROOT/script/security/init-community-encryption-key.sh" || { echo "::error::missing Community encryption key initializer"; exit 1; }
 
           required_scripts=(
             generate_metadata.sh
@@ -181,7 +182,8 @@ jobs:
               script/package/package-community-jcef.sh|\
               script/package/package_macos_community.sh|\
               script/package/package_linux_community.sh|\
-              script/package/package_win_community.sh)
+              script/package/package_win_community.sh|\
+              script/security/init-community-encryption-key.sh)
                 ;;
               *)
                 echo "::error::unexpected script file in Community source tree: $relative_path"
