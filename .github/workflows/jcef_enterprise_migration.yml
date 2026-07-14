@@ -27,11 +27,7 @@ on:
       community_ref:
         description: 'Chat2DB community source branch/ref'
         required: false
-        default: 'community-migration'
-      community_repository:
-        description: 'Community repository override (owner/repo); blank uses enterprise repository'
-        required: false
-        default: ''
+        default: 'main'
       upload_latest:
         description: '是否上传到 latest 目录 (true/false)'
         required: false
@@ -52,9 +48,35 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  resolve_community_source:
+    name: Resolve Community source commit
+    runs-on: ubuntu-latest
+    outputs:
+      sha: ${{ steps.resolve.outputs.sha }}
+    steps:
+      - name: Check out Community source ref
+        uses: actions/checkout@v4
+        with:
+          repository: OtterMind/Chat2DB
+          ref: ${{ github.event.inputs.community_ref || 'main' }}
+          persist-credentials: false
+
+      - name: Resolve Community source commit
+        id: resolve
+        shell: bash
+        env:
+          COMMUNITY_REQUESTED_REF: ${{ github.event.inputs.community_ref || 'main' }}
+        run: |
+          set -euo pipefail
+          sha="$(git rev-parse HEAD)"
+          echo "sha=${sha}" >> "${GITHUB_OUTPUT}"
+          echo "community requested ref: ${COMMUNITY_REQUESTED_REF}"
+          echo "community resolved SHA: ${sha}"
+
   notify_start_pro:
     name: Notify Feishu enterprise migration pro start
     if: ${{ github.event.inputs.edition == 'pro' || github.event.inputs.edition == 'both' }}
+    needs: resolve_community_source
     runs-on: ubuntu-latest
     steps:
       - name: Send Feishu start notification
@@ -63,7 +85,8 @@ jobs:
           RELEASE_EDITION: Chat2DB Pro Enterprise Migration
           RELEASE_VERSION: ${{ github.event.inputs.version }}
           SOURCE_REF: ${{ github.event.inputs.source_ref || 'enterprise-migration' }}
-          COMMUNITY_REF: ${{ github.event.inputs.community_ref || 'community-migration' }}
+          COMMUNITY_REF: ${{ github.event.inputs.community_ref || 'main' }}
+          COMMUNITY_SOURCE_SHA: ${{ needs.resolve_community_source.outputs.sha }}
           UPLOAD_LATEST: ${{ github.event.inputs.upload_latest }}
           UPDATE_LATEST_VERSION_JSON: ${{ github.event.inputs.update_latest_version_json }}
           RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
@@ -84,6 +107,7 @@ jobs:
               f"版本：{os.environ['RELEASE_VERSION']}",
               f"源码分支：{os.environ['SOURCE_REF']}",
               f"社区源码分支：{os.environ['COMMUNITY_REF']}",
+              f"社区源码提交：{os.environ['COMMUNITY_SOURCE_SHA']}",
               f"upload_latest：{os.environ['UPLOAD_LATEST']}",
               f"update_latest_version_json：{os.environ['UPDATE_LATEST_VERSION_JSON']}",
               f"运行链接：{os.environ['RUN_URL']}",
@@ -107,6 +131,7 @@ jobs:
 
   release_pro:
     if: ${{ github.event.inputs.edition == 'pro' || github.event.inputs.edition == 'both' }}
+    needs: resolve_community_source
     strategy:
       fail-fast: false
       matrix:
@@ -142,8 +167,9 @@ jobs:
       JCEF_PROJECT_ROOT: ${{ github.workspace }}/${{ secrets.REPO_PATH }}
       JCEF_PACKAGE_SCRIPT_DIR: ${{ github.workspace }}/${{ secrets.REPO_PATH }}/script/package
       JCEF_SOURCE_REF: ${{ github.event.inputs.source_ref || 'enterprise-migration' }}
-      JCEF_COMMUNITY_REPOSITORY: ${{ github.event.inputs.community_repository || secrets.REPO_URL }}
-      JCEF_COMMUNITY_SOURCE_REF: ${{ github.event.inputs.community_ref || 'community-migration' }}
+      JCEF_COMMUNITY_REPOSITORY: OtterMind/Chat2DB
+      JCEF_COMMUNITY_REQUESTED_REF: ${{ github.event.inputs.community_ref || 'main' }}
+      JCEF_COMMUNITY_SOURCE_REF: ${{ needs.resolve_community_source.outputs.sha }}
       JCEF_COMMUNITY_ROOT: ${{ github.workspace }}/chat2db-community-source
       JCEF_COMMUNITY_CLIENT_ROOT: ${{ github.workspace }}/chat2db-community-source/chat2db-community-client
       JCEF_COMMUNITY_POM_PATH: ${{ github.workspace }}/chat2db-community-source/chat2db-community-server/pom.xml
@@ -160,20 +186,21 @@ jobs:
     # 将release_test分支的代码检出（即复制）到 GitHub Actions 的运行环境中。
     steps:
       - name: Check out second repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           repository: ${{ secrets.REPO_URL }}
           path: ${{ secrets.REPO_PATH }}
           ref: ${{ github.event.inputs.source_ref || 'enterprise-migration' }}
           token: ${{ secrets.ACCESS_TOKEN }}
+          persist-credentials: false
 
       - name: Check out community repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
-          repository: ${{ github.event.inputs.community_repository || secrets.REPO_URL }}
+          repository: OtterMind/Chat2DB
           path: chat2db-community-source
-          ref: ${{ github.event.inputs.community_ref || 'community-migration' }}
-          token: ${{ secrets.ACCESS_TOKEN }}
+          ref: ${{ needs.resolve_community_source.outputs.sha }}
+          persist-credentials: false
 
       # Output basic information
       - name: Print basic information
@@ -181,7 +208,8 @@ jobs:
           echo "current version: ${{ github.run_id }}"
           echo "source ref: ${JCEF_SOURCE_REF}"
           echo "community repository: ${JCEF_COMMUNITY_REPOSITORY}"
-          echo "community ref: ${JCEF_COMMUNITY_SOURCE_REF}"
+          echo "community requested ref: ${JCEF_COMMUNITY_REQUESTED_REF}"
+          echo "community resolved SHA: ${JCEF_COMMUNITY_SOURCE_REF}"
           git -C "${{ env.JCEF_PROJECT_ROOT }}" rev-parse --abbrev-ref HEAD || true
           git -C "${{ env.JCEF_PROJECT_ROOT }}" rev-parse HEAD
           git -C "${{ env.JCEF_COMMUNITY_ROOT }}" rev-parse --abbrev-ref HEAD || true
@@ -1470,7 +1498,9 @@ jobs:
   notify_summary_pro:
     name: Notify Feishu enterprise migration pro summary
     runs-on: ubuntu-latest
-    needs: release_pro
+    needs:
+      - resolve_community_source
+      - release_pro
     if: ${{ always() && (github.event.inputs.edition == 'pro' || github.event.inputs.edition == 'both') }}
     steps:
       - name: Send Feishu package summary
@@ -1478,6 +1508,8 @@ jobs:
           FEISHU_WEBHOOK_URL: ${{ secrets.FEISHU_RELEASE_NOTIFY_WEBHOOK }}
           RELEASE_VERSION: ${{ github.event.inputs.version }}
           RELEASE_RESULT: ${{ needs.release_pro.result }}
+          COMMUNITY_RESOLVE_RESULT: ${{ needs.resolve_community_source.result }}
+          COMMUNITY_SOURCE_SHA: ${{ needs.resolve_community_source.outputs.sha }}
           RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
           GITHUB_TOKEN: ${{ github.token }}
         run: |
@@ -1494,6 +1526,8 @@ jobs:
 
           version = os.environ["RELEASE_VERSION"]
           result = os.environ["RELEASE_RESULT"]
+          resolve_result = os.environ["COMMUNITY_RESOLVE_RESULT"]
+          community_sha = os.environ.get("COMMUNITY_SOURCE_SHA", "")
           run_url = os.environ["RUN_URL"]
           base = f"https://cdn.chat2db-ai.com/download/{version}"
           files = [
@@ -1509,6 +1543,9 @@ jobs:
           ]
 
           def failed_release_jobs():
+              if resolve_result != "success":
+                  return [f"- Resolve Community source commit: {resolve_result}"]
+
               repo = os.environ["GITHUB_REPOSITORY"]
               run_id = os.environ["GITHUB_RUN_ID"]
               token = os.environ.get("GITHUB_TOKEN", "")
@@ -1535,10 +1572,11 @@ jobs:
                       failed.append(f"- {name}: {conclusion}")
               return failed or ["- 未获取到失败 job，请查看运行链接"]
 
-          if result == "success":
+          if resolve_result == "success" and result == "success":
               lines = [
                   "Chat2DB Pro Enterprise Migration 包全部上传成功",
                   f"版本：{version}",
+                  f"社区源码提交：{community_sha}",
                   "下载链接：",
                   *[f"- {base}/{name}" for name in files],
                   f"运行链接：{run_url}",
@@ -1547,6 +1585,7 @@ jobs:
               lines = [
                   "Chat2DB Pro Enterprise Migration 打包未全部成功",
                   f"版本：{version}",
+                  f"社区源码解析结果：{resolve_result}",
                   f"结果：{result}",
                   "失败/未成功 job：",
                   *failed_release_jobs(),
@@ -1572,6 +1611,7 @@ jobs:
   notify_start_local:
     name: Notify Feishu enterprise migration local start
     if: ${{ github.event.inputs.edition == 'local' || github.event.inputs.edition == 'both' }}
+    needs: resolve_community_source
     runs-on: ubuntu-latest
     steps:
       - name: Send Feishu start notification
@@ -1580,7 +1620,8 @@ jobs:
           RELEASE_EDITION: Chat2DB Local Enterprise Migration
           RELEASE_VERSION: ${{ github.event.inputs.version }}
           SOURCE_REF: ${{ github.event.inputs.source_ref || 'enterprise-migration' }}
-          COMMUNITY_REF: ${{ github.event.inputs.community_ref || 'community-migration' }}
+          COMMUNITY_REF: ${{ github.event.inputs.community_ref || 'main' }}
+          COMMUNITY_SOURCE_SHA: ${{ needs.resolve_community_source.outputs.sha }}
           UPLOAD_LATEST: ${{ github.event.inputs.upload_latest }}
           UPDATE_LATEST_VERSION_JSON: ${{ github.event.inputs.update_latest_version_json }}
           RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
@@ -1601,6 +1642,7 @@ jobs:
               f"版本：{os.environ['RELEASE_VERSION']}",
               f"源码分支：{os.environ['SOURCE_REF']}",
               f"社区源码分支：{os.environ['COMMUNITY_REF']}",
+              f"社区源码提交：{os.environ['COMMUNITY_SOURCE_SHA']}",
               f"upload_latest：{os.environ['UPLOAD_LATEST']}",
               f"update_latest_version_json：{os.environ['UPDATE_LATEST_VERSION_JSON']}",
               f"运行链接：{os.environ['RUN_URL']}",
@@ -1624,6 +1666,7 @@ jobs:
 
   release_local:
     if: ${{ github.event.inputs.edition == 'local' || github.event.inputs.edition == 'both' }}
+    needs: resolve_community_source
     strategy:
       fail-fast: false
       matrix:
@@ -1659,8 +1702,9 @@ jobs:
       JCEF_PROJECT_ROOT: ${{ github.workspace }}/${{ secrets.REPO_PATH }}
       JCEF_PACKAGE_SCRIPT_DIR: ${{ github.workspace }}/${{ secrets.REPO_PATH }}/script/package
       JCEF_SOURCE_REF: ${{ github.event.inputs.source_ref || 'enterprise-migration' }}
-      JCEF_COMMUNITY_REPOSITORY: ${{ github.event.inputs.community_repository || secrets.REPO_URL }}
-      JCEF_COMMUNITY_SOURCE_REF: ${{ github.event.inputs.community_ref || 'community-migration' }}
+      JCEF_COMMUNITY_REPOSITORY: OtterMind/Chat2DB
+      JCEF_COMMUNITY_REQUESTED_REF: ${{ github.event.inputs.community_ref || 'main' }}
+      JCEF_COMMUNITY_SOURCE_REF: ${{ needs.resolve_community_source.outputs.sha }}
       JCEF_COMMUNITY_ROOT: ${{ github.workspace }}/chat2db-community-source
       JCEF_COMMUNITY_CLIENT_ROOT: ${{ github.workspace }}/chat2db-community-source/chat2db-community-client
       JCEF_COMMUNITY_POM_PATH: ${{ github.workspace }}/chat2db-community-source/chat2db-community-server/pom.xml
@@ -1677,20 +1721,21 @@ jobs:
     # 将release_test分支的代码检出（即复制）到 GitHub Actions 的运行环境中。
     steps:
       - name: Check out second repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           repository: ${{ secrets.REPO_URL }}
           path: ${{ secrets.REPO_PATH }}
           ref: ${{ github.event.inputs.source_ref || 'enterprise-migration' }}
           token: ${{ secrets.ACCESS_TOKEN }}
+          persist-credentials: false
 
       - name: Check out community repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
-          repository: ${{ github.event.inputs.community_repository || secrets.REPO_URL }}
+          repository: OtterMind/Chat2DB
           path: chat2db-community-source
-          ref: ${{ github.event.inputs.community_ref || 'community-migration' }}
-          token: ${{ secrets.ACCESS_TOKEN }}
+          ref: ${{ needs.resolve_community_source.outputs.sha }}
+          persist-credentials: false
 
       # Output basic information
       - name: Print basic information
@@ -1698,7 +1743,8 @@ jobs:
           echo "current version: ${{ github.run_id }}"
           echo "source ref: ${JCEF_SOURCE_REF}"
           echo "community repository: ${JCEF_COMMUNITY_REPOSITORY}"
-          echo "community ref: ${JCEF_COMMUNITY_SOURCE_REF}"
+          echo "community requested ref: ${JCEF_COMMUNITY_REQUESTED_REF}"
+          echo "community resolved SHA: ${JCEF_COMMUNITY_SOURCE_REF}"
           git -C "${{ env.JCEF_PROJECT_ROOT }}" rev-parse --abbrev-ref HEAD || true
           git -C "${{ env.JCEF_PROJECT_ROOT }}" rev-parse HEAD
           git -C "${{ env.JCEF_COMMUNITY_ROOT }}" rev-parse --abbrev-ref HEAD || true
@@ -3159,7 +3205,9 @@ jobs:
   notify_summary_local:
     name: Notify Feishu enterprise migration local summary
     runs-on: ubuntu-latest
-    needs: release_local
+    needs:
+      - resolve_community_source
+      - release_local
     if: ${{ always() && (github.event.inputs.edition == 'local' || github.event.inputs.edition == 'both') }}
     steps:
       - name: Send Feishu package summary
@@ -3167,6 +3215,8 @@ jobs:
           FEISHU_WEBHOOK_URL: ${{ secrets.FEISHU_RELEASE_NOTIFY_WEBHOOK }}
           RELEASE_VERSION: ${{ github.event.inputs.version }}
           RELEASE_RESULT: ${{ needs.release_local.result }}
+          COMMUNITY_RESOLVE_RESULT: ${{ needs.resolve_community_source.result }}
+          COMMUNITY_SOURCE_SHA: ${{ needs.resolve_community_source.outputs.sha }}
           RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
           GITHUB_TOKEN: ${{ github.token }}
         run: |
@@ -3183,6 +3233,8 @@ jobs:
 
           version = os.environ["RELEASE_VERSION"]
           result = os.environ["RELEASE_RESULT"]
+          resolve_result = os.environ["COMMUNITY_RESOLVE_RESULT"]
+          community_sha = os.environ.get("COMMUNITY_SOURCE_SHA", "")
           run_url = os.environ["RUN_URL"]
           base = f"https://cdn.chat2db-ai.com/offline/{version}"
           files = [
@@ -3198,6 +3250,9 @@ jobs:
           ]
 
           def failed_release_jobs():
+              if resolve_result != "success":
+                  return [f"- Resolve Community source commit: {resolve_result}"]
+
               repo = os.environ["GITHUB_REPOSITORY"]
               run_id = os.environ["GITHUB_RUN_ID"]
               token = os.environ.get("GITHUB_TOKEN", "")
@@ -3224,10 +3279,11 @@ jobs:
                       failed.append(f"- {name}: {conclusion}")
               return failed or ["- 未获取到失败 job，请查看运行链接"]
 
-          if result == "success":
+          if resolve_result == "success" and result == "success":
               lines = [
                   "Chat2DB Local Enterprise Migration 包全部上传成功",
                   f"版本：{version}",
+                  f"社区源码提交：{community_sha}",
                   "下载链接：",
                   *[f"- {base}/{name}" for name in files],
                   f"运行链接：{run_url}",
@@ -3236,6 +3292,7 @@ jobs:
               lines = [
                   "Chat2DB Local Enterprise Migration 打包未全部成功",
                   f"版本：{version}",
+                  f"社区源码解析结果：{resolve_result}",
                   f"结果：{result}",
                   "失败/未成功 job：",
                   *failed_release_jobs(),
