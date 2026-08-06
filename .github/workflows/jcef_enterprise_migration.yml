@@ -73,6 +73,19 @@ jobs:
           echo "community requested ref: ${COMMUNITY_REQUESTED_REF}"
           echo "community resolved SHA: ${sha}"
 
+      - name: Check out CI packaging helpers
+        uses: actions/checkout@v4
+        with:
+          path: cicd-packaging-source
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Test macOS signing helper
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash "${GITHUB_WORKSPACE}/cicd-packaging-source/.github/scripts/tests/sign-macos-native-libraries-test.sh"
+
   notify_start_pro:
     name: Notify Feishu enterprise migration pro start
     if: ${{ github.event.inputs.edition == 'pro' || github.event.inputs.edition == 'both' }}
@@ -200,6 +213,14 @@ jobs:
           repository: OtterMind/Chat2DB
           path: chat2db-community-source
           ref: ${{ needs.resolve_community_source.outputs.sha }}
+          persist-credentials: false
+
+      - name: Check out CI packaging helpers
+        if: runner.os == 'macOS'
+        uses: actions/checkout@v4
+        with:
+          path: cicd-packaging-source
+          ref: ${{ github.sha }}
           persist-credentials: false
 
       # Output basic information
@@ -925,9 +946,10 @@ jobs:
       - name: Sign native Mach-O payloads inside JARs
         if: ${{ runner.os == 'macOS' }}
         shell: bash
+        timeout-minutes: 30
         run: |
           set -euo pipefail
-          bash "${JCEF_COMMUNITY_ROOT}/script/package/sign-macos-native-libraries.sh" \
+          bash "${GITHUB_WORKSPACE}/cicd-packaging-source/.github/scripts/sign-macos-native-libraries.sh" \
             "${JCEF_PROJECT_ROOT}/jpackage/input/mac"
 
       - name: Setup Temurin JDK (for jpackage)
@@ -1721,6 +1743,14 @@ jobs:
           repository: OtterMind/Chat2DB
           path: chat2db-community-source
           ref: ${{ needs.resolve_community_source.outputs.sha }}
+          persist-credentials: false
+
+      - name: Check out CI packaging helpers
+        if: runner.os == 'macOS'
+        uses: actions/checkout@v4
+        with:
+          path: cicd-packaging-source
+          ref: ${{ github.sha }}
           persist-credentials: false
 
       # Output basic information
@@ -2642,9 +2672,10 @@ jobs:
       - name: Sign native Mach-O payloads inside JARs
         if: ${{ runner.os == 'macOS' }}
         shell: bash
+        timeout-minutes: 30
         run: |
           set -euo pipefail
-          bash "${JCEF_COMMUNITY_ROOT}/script/package/sign-macos-native-libraries.sh" \
+          bash "${GITHUB_WORKSPACE}/cicd-packaging-source/.github/scripts/sign-macos-native-libraries.sh" \
             "${JCEF_PROJECT_ROOT}/jpackage/input/mac"
 
       - name: Setup Temurin JDK (for jpackage)
