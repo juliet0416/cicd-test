@@ -14,12 +14,10 @@ on:
       edition:
         description: 'Build edition'
         required: true
-        default: 'both'
+        default: 'pro'
         type: choice
         options:
-          - both
           - pro
-          - local
       source_ref:
         description: 'Chat2DB source branch/ref'
         required: false
@@ -253,8 +251,8 @@ jobs:
             echo "::error::enterprise migration workflow must not package source_ref=main"
             exit 1
           fi
-          if [ "${{ github.event.inputs.upload_latest }}" = "true" ] || [ "${{ github.event.inputs.update_latest_version_json }}" = "true" ]; then
-            echo "::error::enterprise migration workflow does not update latest channels"
+          if [ "${{ github.event.inputs.upload_latest }}" != "${{ github.event.inputs.update_latest_version_json }}" ]; then
+            echo "::error::upload_latest and update_latest_version_json must both be true or both be false"
             exit 1
           fi
           test -d "${JCEF_PROJECT_ROOT}"
@@ -1276,8 +1274,6 @@ jobs:
         if: ${{ runner.os == 'Windows' }}
         shell: pwsh
         run: |
-          choco install winscp -y --no-progress
-
           $candidates = @(
             "C:\Program Files (x86)\WinSCP\WinSCP.com",
             "C:\Program Files\WinSCP\WinSCP.com",
@@ -1286,7 +1282,23 @@ jobs:
 
           $winScpPath = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
           if (-not $winScpPath) {
-            Write-Error "WinSCP.com was not found after installation."
+            for ($attempt = 1; $attempt -le 3; $attempt++) {
+              Write-Host "Installing WinSCP with Chocolatey (attempt $attempt of 3)..."
+              choco install winscp -y --no-progress
+              $winScpPath = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+              if ($winScpPath) {
+                break
+              }
+              if ($attempt -lt 3) {
+                $delaySeconds = 15 * $attempt
+                Write-Warning "WinSCP installation failed; retrying in $delaySeconds seconds."
+                Start-Sleep -Seconds $delaySeconds
+              }
+            }
+          }
+
+          if (-not $winScpPath) {
+            Write-Error "WinSCP.com was not found after 3 installation attempts."
             exit 1
           }
 
