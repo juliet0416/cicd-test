@@ -31,6 +31,69 @@ permissions:
   actions: read
 
 jobs:
+  resolve_source:
+    name: Resolve Enterprise and Community source commits
+    runs-on: ubuntu-latest
+    outputs:
+      enterprise_sha: ${{ steps.resolve.outputs.enterprise_sha }}
+      community_sha: ${{ steps.resolve.outputs.community_sha }}
+    steps:
+      - name: Check out Enterprise source ref
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ secrets.REPO_URL }}
+          path: enterprise-source
+          ref: ${{ github.event.inputs.source_ref || secrets.REPO_BRANCH }}
+          token: ${{ secrets.ACCESS_TOKEN }}
+          persist-credentials: false
+
+      - name: Resolve source commits
+        id: resolve
+        shell: bash
+        env:
+          REQUESTED_SOURCE_REF: ${{ github.event.inputs.source_ref || secrets.REPO_BRANCH }}
+        run: |
+          set -euo pipefail
+          enterprise_root="${GITHUB_WORKSPACE}/enterprise-source"
+          community_ref_file="${enterprise_root}/.chat2db-community-ref"
+          enterprise_sha="$(git -C "${enterprise_root}" rev-parse HEAD)"
+          test -f "${community_ref_file}"
+          community_sha="$(tr -d '[:space:]' < "${community_ref_file}")"
+          if [[ ! "${enterprise_sha}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::Invalid Enterprise source SHA: ${enterprise_sha}"
+            exit 1
+          fi
+          if [[ ! "${community_sha}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::.chat2db-community-ref must contain one 40-character lowercase SHA"
+            exit 1
+          fi
+          echo "enterprise_sha=${enterprise_sha}" >> "${GITHUB_OUTPUT}"
+          echo "community_sha=${community_sha}" >> "${GITHUB_OUTPUT}"
+          echo "requested Enterprise ref: ${REQUESTED_SOURCE_REF}"
+          echo "resolved Enterprise SHA: ${enterprise_sha}"
+          echo "declared Community SHA: ${community_sha}"
+
+      - name: Verify Community source commit
+        uses: actions/checkout@v4
+        with:
+          repository: OtterMind/Chat2DB
+          path: community-source
+          ref: ${{ steps.resolve.outputs.community_sha }}
+          persist-credentials: false
+
+      - name: Check out CI packaging helpers
+        uses: actions/checkout@v4
+        with:
+          path: cicd-packaging-source
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Test macOS signing helper
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash "${GITHUB_WORKSPACE}/cicd-packaging-source/.github/scripts/tests/sign-macos-native-libraries-test.sh"
+
   notify_start:
     name: Notify Feishu release start
     runs-on: ubuntu-latest
@@ -82,11 +145,12 @@ jobs:
           PY
 
   release:
+    needs: resolve_source
     strategy:
       fail-fast: false
       matrix:
         include:
-          - os: macos-latest
+          - os: macos-15-intel
             arch: x86_64
             file_name: 'latest.dmg'
             file_extension: '-x64.dmg'
@@ -95,7 +159,7 @@ jobs:
             file_extension: '.exe'
             file_name: 'latest.exe'
             build_arg: '--win --x64'
-          - os: macos-latest
+          - os: macos-15
             arch: arm64
             file_name: 'arm64-latest.dmg'
             file_extension: '-arm64.dmg'
@@ -117,24 +181,84 @@ jobs:
       JCEF_PROJECT_ROOT: ${{ github.workspace }}/${{ secrets.REPO_PATH }}
       JCEF_PACKAGE_SCRIPT_DIR: ${{ github.workspace }}/${{ secrets.REPO_PATH }}/script/package
       JCEF_SOURCE_REF: ${{ github.event.inputs.source_ref || secrets.REPO_BRANCH }}
+      JCEF_ENTERPRISE_SOURCE_REF: ${{ needs.resolve_source.outputs.enterprise_sha }}
+      JCEF_COMMUNITY_REPOSITORY: OtterMind/Chat2DB
+      JCEF_COMMUNITY_SOURCE_REF: ${{ needs.resolve_source.outputs.community_sha }}
+      JCEF_COMMUNITY_ROOT: ${{ github.workspace }}/chat2db-community-source
+      JCEF_COMMUNITY_CLIENT_ROOT: ${{ github.workspace }}/chat2db-community-source/chat2db-community-client
+      JCEF_COMMUNITY_POM_PATH: ${{ github.workspace }}/chat2db-community-source/chat2db-community-server/pom.xml
+      JCEF_FRONT_PATH: ${{ github.workspace }}/${{ secrets.REPO_PATH }}/chat2db-enterprise-client
+      JCEF_FRONTEND_SRC_ROOT: ${{ github.workspace }}/chat2db-community-source/chat2db-community-client/src
+      JCEF_PRODUCT_CONFIG: ${{ github.workspace }}/${{ secrets.REPO_PATH }}/chat2db-enterprise-client/product.enterprise.ts
+      JCEF_YARN_LOCK_PATH: ${{ github.workspace }}/${{ secrets.REPO_PATH }}/chat2db-enterprise-client/yarn.lock
+      JCEF_POM_PATH: ${{ github.workspace }}/${{ secrets.REPO_PATH }}/chat2db-enterprise-server/pom.xml
+      JCEF_STATIC_PATH: ${{ github.workspace }}/${{ secrets.REPO_PATH }}/chat2db-enterprise-client/static
+      JCEF_JRE_PATH: ${{ github.workspace }}/${{ secrets.REPO_PATH }}/chat2db-enterprise-client/static/jre
+      CHAT2DB_FRONTEND_SRC_ROOT: ${{ github.workspace }}/chat2db-community-source/chat2db-community-client/src
+      CHAT2DB_PRODUCT_CONFIG: ${{ github.workspace }}/${{ secrets.REPO_PATH }}/chat2db-enterprise-client/product.enterprise.ts
 
     # 将release_test分支的代码检出（即复制）到 GitHub Actions 的运行环境中。
     steps:
       - name: Check out second repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           repository: ${{ secrets.REPO_URL }}
           path: ${{ secrets.REPO_PATH }}
-          ref: ${{ github.event.inputs.source_ref || secrets.REPO_BRANCH }}
+          ref: ${{ needs.resolve_source.outputs.enterprise_sha }}
           token: ${{ secrets.ACCESS_TOKEN }}
+          persist-credentials: false
+
+      - name: Check out community repository
+        uses: actions/checkout@v4
+        with:
+          repository: OtterMind/Chat2DB
+          path: chat2db-community-source
+          ref: ${{ needs.resolve_source.outputs.community_sha }}
+          persist-credentials: false
+
+      - name: Check out CI packaging helpers
+        if: runner.os == 'macOS'
+        uses: actions/checkout@v4
+        with:
+          path: cicd-packaging-source
+          ref: ${{ github.sha }}
+          persist-credentials: false
 
       # Output basic information
       - name: Print basic information
         run: |
           echo "current version: ${{ github.run_id }}"
           echo "source ref: ${JCEF_SOURCE_REF}"
+          echo "enterprise resolved SHA: ${JCEF_ENTERPRISE_SOURCE_REF}"
+          echo "community repository: ${JCEF_COMMUNITY_REPOSITORY}"
+          echo "community resolved SHA: ${JCEF_COMMUNITY_SOURCE_REF}"
           git -C "${{ env.JCEF_PROJECT_ROOT }}" rev-parse --abbrev-ref HEAD || true
           git -C "${{ env.JCEF_PROJECT_ROOT }}" rev-parse HEAD
+          git -C "${{ env.JCEF_COMMUNITY_ROOT }}" rev-parse --abbrev-ref HEAD || true
+          git -C "${{ env.JCEF_COMMUNITY_ROOT }}" rev-parse HEAD
+
+      - name: Validate packaging paths
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -d "${JCEF_PROJECT_ROOT}"
+          test -d "${JCEF_FRONT_PATH}"
+          test -f "${JCEF_YARN_LOCK_PATH}"
+          test -f "${JCEF_POM_PATH}"
+          test -d "${JCEF_PACKAGE_SCRIPT_DIR}"
+          test -d "${JCEF_COMMUNITY_ROOT}"
+          test -d "${JCEF_COMMUNITY_CLIENT_ROOT}"
+          test -d "${JCEF_FRONTEND_SRC_ROOT}"
+          test -f "${JCEF_FRONTEND_SRC_ROOT}/utils/package.ts"
+          test -f "${JCEF_COMMUNITY_POM_PATH}"
+          test -f "${JCEF_PRODUCT_CONFIG}"
+          test -f "${JCEF_FRONT_PATH}/scripts/prepare-frontend-source.js"
+          if [ -L "${JCEF_FRONT_PATH}/src" ]; then
+            rm "${JCEF_FRONT_PATH}/src"
+          elif [ -e "${JCEF_FRONT_PATH}/src" ]; then
+            echo "::error::chat2db-enterprise-client/src must not be a real directory"
+            exit 1
+          fi
 
       - name: Create Feishu package notification helper
         shell: python
@@ -473,28 +597,36 @@ jobs:
       - name: Copy Jre for Windows
         if: ${{ runner.os == 'Windows' }}
         # 在这个步骤中，临时覆盖 JAVA_HOME，让 Maven 使用 JBR
+        shell: pwsh
         env:
           JAVA_HOME: ${{ env.JBR_BUILD_PATH }}
         run: |
-          # mkdir -p ${{ secrets.REPO_STATIC_PATH }} 
-          # cp -r "${{ env.JAVA_HOME }}" ${{ secrets.REPO_JRE_PATH }}
-          mkdir -p ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/runtime/win/Home
-          cp -r ${{ env.JAVA_HOME }}/* ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/runtime/win/Home
-          ls ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/runtime/win/Home
+          $runtime = Join-Path $env:JCEF_PROJECT_ROOT "jpackage/input/runtime/win/Home"
+          New-Item -Path $runtime -ItemType Directory -Force | Out-Null
+          Copy-Item -Path "$env:JAVA_HOME\*" -Destination $runtime -Recurse -Force
+          Get-ChildItem -Path $runtime | Select-Object -First 20
 
       # Copy jre macOS
       - name: Copy Jre for macOS arm64
         if: ${{ runner.os == 'macOS' }}
+        shell: bash
         run: |
-          echo $JAVA_HOME
-          mkdir -p ${{ secrets.REPO_STATIC_PATH }} 
-          cp -r $JAVA_HOME ${{ secrets.REPO_JRE_PATH }} 
-          chmod -R 777 ${{ secrets.REPO_JRE_PATH }}
-          mkdir -p ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/runtime/mac
-          cp -r $JAVA_HOME ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/runtime/mac
-          chmod -R 777 ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/runtime/mac
-          cp -r $JAVA_HOME/../Frameworks ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/mac
-          rm -rf ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/mac/Frameworks/cef_server.app
+          set -euo pipefail
+          echo "$JAVA_HOME"
+          mkdir -p "${JCEF_STATIC_PATH}"
+          rm -rf "${JCEF_JRE_PATH}"
+          cp -R "$JAVA_HOME" "${JCEF_JRE_PATH}"
+          chmod -R 777 "${JCEF_JRE_PATH}"
+          rm -rf "${JCEF_PROJECT_ROOT}/jpackage/input/runtime/mac"
+          mkdir -p "${JCEF_PROJECT_ROOT}/jpackage/input/runtime/mac"
+          cp -R "$JAVA_HOME/../.."/* "${JCEF_PROJECT_ROOT}/jpackage/input/runtime/mac"
+          test -d "${JCEF_PROJECT_ROOT}/jpackage/input/runtime/mac/Contents/Home/lib"
+          find "${JCEF_PROJECT_ROOT}/jpackage/input/runtime/mac" -maxdepth 3 -type d | sort | head -20
+          chmod -R 777 "${JCEF_PROJECT_ROOT}/jpackage/input/runtime/mac"
+          mkdir -p "${JCEF_PROJECT_ROOT}/jpackage/input/mac"
+          rm -rf "${JCEF_PROJECT_ROOT}/jpackage/input/mac/Frameworks"
+          cp -R "$JAVA_HOME/../Frameworks" "${JCEF_PROJECT_ROOT}/jpackage/input/mac"
+          rm -rf "${JCEF_PROJECT_ROOT}/jpackage/input/mac/Frameworks/cef_server.app"
       
 
       # Copy jre Linux
@@ -503,9 +635,9 @@ jobs:
         env:
           JAVA_HOME: ${{ env.JBR_LINUX_PATH }}
         run: |
-          mkdir -p ${{ secrets.REPO_STATIC_PATH }} 
-          cp -r $JAVA_HOME ${{ secrets.REPO_JRE_PATH }} 
-          chmod -R 777 ${{ secrets.REPO_JRE_PATH }}
+          mkdir -p ${{ env.JCEF_STATIC_PATH }}
+          cp -r $JAVA_HOME ${{ env.JCEF_JRE_PATH }}
+          chmod -R 777 ${{ env.JCEF_JRE_PATH }}
           mkdir -p ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/runtime/linux/Home
           cp -r $JAVA_HOME/* ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/runtime/linux/Home
           chmod -R 777 ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/runtime/linux
@@ -514,7 +646,7 @@ jobs:
       - name: Delete File
         if: ${{ runner.os == 'Linux' }}
         run: |
-          cd ${{ secrets.REPO_JRE_PATH }} 
+          cd ${{ env.JCEF_JRE_PATH }}
           ls -la
           rm -rf legal
           ls -la
@@ -537,9 +669,9 @@ jobs:
       - name: Install Node.js
         uses: actions/setup-node@main
         with:
-          node-version: '18.17.0'
+          node-version: '22.22.2'
           cache: 'yarn'
-          cache-dependency-path: ${{ secrets.REPO_YARN_PATH }}
+          cache-dependency-path: ${{ env.JCEF_YARN_LOCK_PATH }}
 
         # 安装Maven
         # - name: Install Java and Maven
@@ -549,13 +681,25 @@ jobs:
         #     distribution: 'temurin'
         #     cache: 'maven'
 
-        # 打包依赖包
-      # - name: Check out first repository
-      #   uses: actions/checkout@v2
-      #   with:
-      #     repository: ${{ secrets.REPO_BASE_URL }}
-      #     ref: ${{ secrets.TEST_REPO_BASE_BRANCH }}
-      #     path: ${{ secrets.REPO_BASE_PATH }}
+      - name: Install community artifacts win
+        if: ${{ runner.os == 'Windows' }}
+        env:
+          JAVA_HOME: ${{ env.JBR_BUILD_PATH }}
+        run: |
+          mvn -v
+          mvn clean install -U -B '-Dmaven.test.skip=true' -f ${{ env.JCEF_COMMUNITY_POM_PATH }}
+
+      - name: Install community artifacts mac
+        if: ${{ runner.os == 'macOS' }}
+        run: |
+          mvn -v
+          mvn clean install -U -B '-Dmaven.test.skip=true' -f ${{ env.JCEF_COMMUNITY_POM_PATH }}
+
+      - name: Install community artifacts linux
+        if: ${{ runner.os == 'Linux' }}
+        run: |
+          mvn -v
+          mvn clean install -U -B '-Dmaven.test.skip=true' -f ${{ env.JCEF_COMMUNITY_POM_PATH }}
 
       # 设置OSS
       - name: Set up oss utils
@@ -753,7 +897,7 @@ jobs:
         run: |
           pwd
           mvn -v 
-          mvn clean install -U -B '-Dmaven.test.skip=true' -f ${{ secrets.REPO_POM_PATH }}
+          mvn clean install -U -B '-Dmaven.test.skip=true' -f ${{ env.JCEF_POM_PATH }}
           # ossutil cp -rf ${{ secrets.REPO_JAR_PATH }} "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/"
           # cp ${{ secrets.REPO_JAR_PATH }} ${{ secrets.REPO_STATIC_JAR_PATH }} 
 
@@ -763,7 +907,7 @@ jobs:
         run: |
           pwd
           mvn -v 
-          mvn clean install -U -B '-Dmaven.test.skip=true' -f ${{ secrets.REPO_POM_PATH }}
+          mvn clean install -U -B '-Dmaven.test.skip=true' -f ${{ env.JCEF_POM_PATH }}
           # ossutil cp -rf ${{ secrets.REPO_JAR_PATH }} "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/"
           # cp ${{ secrets.REPO_JAR_PATH }} ${{ secrets.REPO_STATIC_JAR_PATH }}
 
@@ -772,7 +916,7 @@ jobs:
         run: |
           pwd
           mvn -v
-          mvn clean install -U -B '-Dmaven.test.skip=true' -f ${{ secrets.REPO_POM_PATH }}
+          mvn clean install -U -B '-Dmaven.test.skip=true' -f ${{ env.JCEF_POM_PATH }}
           # ossutil cp -rf ${{ secrets.REPO_JAR_PATH }} "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/"
           # cp ${{ secrets.REPO_JAR_PATH }} ${{ secrets.REPO_STATIC_JAR_PATH }}
       
@@ -782,8 +926,11 @@ jobs:
         if: runner.os != 'Windows'
         shell: bash
         run: |
-          pushd ${{ secrets.REPO_FRONT_PATH }}
-          yarn
+          export CHAT2DB_FRONTEND_SRC_ROOT="${JCEF_FRONTEND_SRC_ROOT}"
+          export CHAT2DB_PRODUCT_CONFIG="${JCEF_PRODUCT_CONFIG}"
+
+          pushd ${{ env.JCEF_FRONT_PATH }}
+          yarn install --frozen-lockfile --non-interactive
           yarn run modify:package:name chat2db-local Chat2DB-Local
           yarn run build:web:offline --app_version=${{ github.event.inputs.version }}
           rm -f dist.zip
@@ -796,22 +943,22 @@ jobs:
           pwd
           
           mkdir -p ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile
-          cp ${{ secrets.REPO_FRONT_PATH }}/dist.zip ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile
+          cp ${{ env.JCEF_FRONT_PATH }}/dist.zip ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile
           
           mkdir -p ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/mac
           mkdir -p ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/win
           mkdir -p ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/linux
-          cp -r ${{ secrets.REPO_FRONT_PATH }}/dist ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/mac
-          cp -r ${{ secrets.REPO_FRONT_PATH }}/dist ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/win
-          cp -r ${{ secrets.REPO_FRONT_PATH }}/dist ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/linux
+          cp -r ${{ env.JCEF_FRONT_PATH }}/dist ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/mac
+          cp -r ${{ env.JCEF_FRONT_PATH }}/dist ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/win
+          cp -r ${{ env.JCEF_FRONT_PATH }}/dist ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/linux
 
           echo "start build version file"
           CHAT2DB_PACKAGE_EDITION="local" \
           CHAT2DB_PACKAGE_MODE="enterprise-over-community" \
           CHAT2DB_SOURCE_REF="${JCEF_SOURCE_REF}" \
-          CHAT2DB_ENTERPRISE_SOURCE_REF="${JCEF_SOURCE_REF}" \
-          CHAT2DB_COMMUNITY_SOURCE_REF="${JCEF_SOURCE_REF}" \
-            sh ${{ env.JCEF_PACKAGE_SCRIPT_DIR }}/generate_metadata.sh  ${{ github.event.inputs.version }}  ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile  https://cdn.chat2db-ai.com/offline/updates
+          CHAT2DB_ENTERPRISE_SOURCE_REF="${JCEF_ENTERPRISE_SOURCE_REF}" \
+          CHAT2DB_COMMUNITY_SOURCE_REF="${JCEF_COMMUNITY_SOURCE_REF}" \
+            bash ${{ env.JCEF_PACKAGE_SCRIPT_DIR }}/generate_metadata.sh  ${{ github.event.inputs.version }}  ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile  https://cdn.chat2db-ai.com/offline/updates
           cp ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile/version.json   ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile/local_version.json
           cp ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile/local_version.json ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/mac
           cp ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile/local_version.json ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/win
@@ -823,8 +970,16 @@ jobs:
         if: runner.os == 'Windows'
         shell: bash
         run: |
-          pushd ${{ secrets.REPO_FRONT_PATH }}
-          yarn
+          FRONT_PATH="$(cygpath -u "${JCEF_FRONT_PATH}")"
+          PROJECT_ROOT="$(cygpath -u "${JCEF_PROJECT_ROOT}")"
+          PACKAGE_SCRIPT_DIR="$(cygpath -u "${JCEF_PACKAGE_SCRIPT_DIR}")"
+          FRONTEND_SRC_ROOT="$(cygpath -u "${JCEF_FRONTEND_SRC_ROOT}")"
+          PRODUCT_CONFIG="$(cygpath -u "${JCEF_PRODUCT_CONFIG}")"
+          export CHAT2DB_FRONTEND_SRC_ROOT="$FRONTEND_SRC_ROOT"
+          export CHAT2DB_PRODUCT_CONFIG="$PRODUCT_CONFIG"
+
+          pushd "$FRONT_PATH"
+          yarn install --frozen-lockfile --non-interactive
           yarn run modify:package:name chat2db-local Chat2DB-Local
           yarn run build:web:offline --app_version=${{ github.event.inputs.version }}
           
@@ -839,63 +994,73 @@ jobs:
           pwd
           
           # The rest of the script is the same, as the commands are compatible
-          mkdir -p ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile
-          cp ${{ secrets.REPO_FRONT_PATH }}/dist.zip ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile
-          
-          mkdir -p ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/mac
-          mkdir -p ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/win
-          mkdir -p ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/linux
-          cp -r ${{ secrets.REPO_FRONT_PATH }}/dist ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/mac
-          cp -r ${{ secrets.REPO_FRONT_PATH }}/dist ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/win
-          cp -r ${{ secrets.REPO_FRONT_PATH }}/dist ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/linux
+          mkdir -p "$PROJECT_ROOT/jpackage/input/sourceFile"
+          cp "$FRONT_PATH/dist.zip" "$PROJECT_ROOT/jpackage/input/sourceFile"
+
+          mkdir -p "$PROJECT_ROOT/jpackage/input/mac"
+          mkdir -p "$PROJECT_ROOT/jpackage/input/win"
+          mkdir -p "$PROJECT_ROOT/jpackage/input/linux"
+          cp -r "$FRONT_PATH/dist" "$PROJECT_ROOT/jpackage/input/mac"
+          cp -r "$FRONT_PATH/dist" "$PROJECT_ROOT/jpackage/input/win"
+          cp -r "$FRONT_PATH/dist" "$PROJECT_ROOT/jpackage/input/linux"
 
           echo "start build version file"
           CHAT2DB_PACKAGE_EDITION="local" \
           CHAT2DB_PACKAGE_MODE="enterprise-over-community" \
           CHAT2DB_SOURCE_REF="${JCEF_SOURCE_REF}" \
-          CHAT2DB_ENTERPRISE_SOURCE_REF="${JCEF_SOURCE_REF}" \
-          CHAT2DB_COMMUNITY_SOURCE_REF="${JCEF_SOURCE_REF}" \
-            sh ${{ env.JCEF_PACKAGE_SCRIPT_DIR }}/generate_metadata.sh ${{ github.event.inputs.version }} ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile https://cdn.chat2db-ai.com/offline/updates
-          cp ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile/version.json ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile/local_version.json
-          cp ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile/local_version.json ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/mac
-          cp ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile/local_version.json ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/win
-          cp ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile/local_version.json ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/linux
-          
-          # 打包前端资源
-          # - name: Build FE Static
-          #   shell: bash
-          #   run: |
-          #     pushd ${{ secrets.REPO_FRONT_PATH }}
-          #     yarn
-          #     yarn run modify:package:name chat2db-local Chat2DB-Local
-          #     yarn run build:web:offline --app_version=${{ github.event.inputs.version }}
-          #     # zip -r dist.zip dist
-          #     tar -a -c -f dist.zip dist
-          #     ossutil cp -rf dist.zip "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/"
-          
-          #     cp -r dist ./static/
-          
-          #     popd
-          #     echo "Returned to the original directory. Current path is:"
-          #     pwd
-          
-          #     mkdir -p ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile
-          #     cp ${{ secrets.REPO_FRONT_PATH }}/dist.zip ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile
-          
-          #     mkdir -p ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/mac
-          #     mkdir -p ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/win
-          #     mkdir -p ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/linux
-          #     cp -r ${{ secrets.REPO_FRONT_PATH }}/dist ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/mac
-          #     cp -r ${{ secrets.REPO_FRONT_PATH }}/dist ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/win
-          #     cp -r ${{ secrets.REPO_FRONT_PATH }}/dist ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/linux
-          
-          #     echo "start build version file"
-          #     sh ${{ env.JCEF_PACKAGE_SCRIPT_DIR }}/generate_metadata.sh  ${{ github.event.inputs.version }}  ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile  https://cdn.chat2db-ai.com/offline/updates
-          #     cp ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile/version.json   ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile/local_version.json
-          #     cp ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile/local_version.json ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/mac
-          #     cp ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile/local_version.json ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/win
-          #     cp ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile/local_version.json ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/linux
+          CHAT2DB_ENTERPRISE_SOURCE_REF="${JCEF_ENTERPRISE_SOURCE_REF}" \
+          CHAT2DB_COMMUNITY_SOURCE_REF="${JCEF_COMMUNITY_SOURCE_REF}" \
+            bash "$PACKAGE_SCRIPT_DIR/generate_metadata.sh" ${{ github.event.inputs.version }} "$PROJECT_ROOT/jpackage/input/sourceFile" https://cdn.chat2db-ai.com/offline/updates
+          cp "$PROJECT_ROOT/jpackage/input/sourceFile/version.json" "$PROJECT_ROOT/jpackage/input/sourceFile/local_version.json"
+          cp "$PROJECT_ROOT/jpackage/input/sourceFile/local_version.json" "$PROJECT_ROOT/jpackage/input/mac"
+          cp "$PROJECT_ROOT/jpackage/input/sourceFile/local_version.json" "$PROJECT_ROOT/jpackage/input/win"
+          cp "$PROJECT_ROOT/jpackage/input/sourceFile/local_version.json" "$PROJECT_ROOT/jpackage/input/linux"
 
+      - name: Restore Windows runtime image after build clean
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          JAVA_HOME: ${{ env.JBR_BUILD_PATH }}
+        run: |
+          $runtime = Join-Path $env:JCEF_PROJECT_ROOT "jpackage/input/runtime/win/Home"
+          if (Test-Path $runtime) {
+            Remove-Item -Path $runtime -Recurse -Force
+          }
+          New-Item -Path $runtime -ItemType Directory -Force | Out-Null
+          Copy-Item -Path "$env:JAVA_HOME\*" -Destination $runtime -Recurse -Force
+          $jvmCfg = Join-Path $runtime "lib\jvm.cfg"
+          if (-not (Test-Path $jvmCfg)) {
+            throw "runtime image missing $jvmCfg"
+          }
+
+      - name: Restore macOS runtime image after build clean
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf "${JCEF_PROJECT_ROOT}/jpackage/input/runtime/mac"
+          mkdir -p "${JCEF_PROJECT_ROOT}/jpackage/input/runtime/mac"
+          cp -R "$JAVA_HOME/../.."/* "${JCEF_PROJECT_ROOT}/jpackage/input/runtime/mac"
+          test -d "${JCEF_PROJECT_ROOT}/jpackage/input/runtime/mac/Contents/Home/lib"
+          chmod -R 777 "${JCEF_PROJECT_ROOT}/jpackage/input/runtime/mac"
+          mkdir -p "${JCEF_PROJECT_ROOT}/jpackage/input/mac"
+          rm -rf "${JCEF_PROJECT_ROOT}/jpackage/input/mac/Frameworks"
+          cp -R "$JAVA_HOME/../Frameworks" "${JCEF_PROJECT_ROOT}/jpackage/input/mac"
+          rm -rf "${JCEF_PROJECT_ROOT}/jpackage/input/mac/Frameworks/cef_server.app"
+
+      - name: Restore Linux runtime image after build clean
+        if: runner.os == 'Linux'
+        shell: bash
+        env:
+          JAVA_HOME: ${{ env.JBR_LINUX_PATH }}
+        run: |
+          set -euo pipefail
+          rm -rf "${JCEF_PROJECT_ROOT}/jpackage/input/runtime/linux/Home"
+          mkdir -p "${JCEF_PROJECT_ROOT}/jpackage/input/runtime/linux/Home"
+          cp -R "$JAVA_HOME"/* "${JCEF_PROJECT_ROOT}/jpackage/input/runtime/linux/Home"
+          rm -rf "${JCEF_PROJECT_ROOT}/jpackage/input/runtime/linux/Home/legal"
+          test -x "${JCEF_PROJECT_ROOT}/jpackage/input/runtime/linux/Home/bin/java"
+          chmod -R 777 "${JCEF_PROJECT_ROOT}/jpackage/input/runtime/linux"
 
       - name: Upload build provenance artifact
         uses: actions/upload-artifact@v4
@@ -916,57 +1081,14 @@ jobs:
           security set-key-partition-list -S apple-tool:,apple: -s -k "${{ secrets.MAC_CERTS_PASSWORD }}" "$KEYCHAIN_PATH"
           echo "Certificate and key successfully installed."
 
-      # Sign native libraries (.dylib/.jnilib) inside JARs for Apple notarization
-      # The fat JAR (chat2db-enterprise.jar) is copied to jpackage/input/mac/ during Build FE Static.
-      # We must sign native libs inside it BEFORE jpackage bundles it into the .app.
-      - name: Sign native libraries inside JARs for notarization
+      - name: Sign native Mach-O payloads inside JARs
         if: ${{ runner.os == 'macOS' }}
+        shell: bash
+        timeout-minutes: 30
         run: |
-          echo "=== Signing native libraries inside JAR files for Apple notarization ==="
-          SIGN_ID="Developer ID Application: JinYu Fan (6MXS42K9F4)"
-          INPUT_DIR="${{ env.JCEF_PROJECT_ROOT }}/jpackage/input"
-
-          echo "Scanning for JARs in: $INPUT_DIR"
-          find "$INPUT_DIR" -name "*.jar" | while read jar_file; do
-            JAR_ABS="$(cd "$(dirname "$jar_file")" && pwd)/$(basename "$jar_file")"
-            WORK_DIR=$(mktemp -d)
-            unzip -q -o "$JAR_ABS" -d "$WORK_DIR" 2>/dev/null || { rm -rf "$WORK_DIR"; continue; }
-
-            find "$WORK_DIR" -name "*.jar" 2>/dev/null | while read nested_jar; do
-              if unzip -l "$nested_jar" 2>/dev/null | grep -qE '\.(dylib|jnilib)$'; then
-                echo "Found native libs in: $(basename "$nested_jar") (inside $(basename "$jar_file"))"
-                NESTED_TMP=$(mktemp -d)
-                unzip -q -o "$nested_jar" -d "$NESTED_TMP"
-
-                find "$NESTED_TMP" -type f \( -name "*.dylib" -o -name "*.jnilib" \) | while read lib; do
-                  echo "  Signing: $(basename "$lib")"
-                  codesign --force --sign "$SIGN_ID" --timestamp "$lib"
-                done
-
-                rm -f "$nested_jar"
-                (cd "$NESTED_TMP" && zip -q -r -0 "$nested_jar" .)
-                rm -rf "$NESTED_TMP"
-                touch "$WORK_DIR/.modified"
-              fi
-            done
-
-            find "$WORK_DIR" -type f \( -name "*.dylib" -o -name "*.jnilib" \) 2>/dev/null | while read lib; do
-              echo "  Signing top-level: $(basename "$lib") (in $(basename "$jar_file"))"
-              codesign --force --sign "$SIGN_ID" --timestamp "$lib"
-              touch "$WORK_DIR/.modified"
-            done
-
-            if [ -f "$WORK_DIR/.modified" ]; then
-              rm -f "$WORK_DIR/.modified"
-              rm -f "$JAR_ABS"
-              (cd "$WORK_DIR" && zip -q -r -0 "$JAR_ABS" .)
-              echo "Repackaged: $(basename "$jar_file")"
-            fi
-
-            rm -rf "$WORK_DIR"
-          done
-
-          echo "=== Native library signing complete ==="
+          set -euo pipefail
+          bash "${GITHUB_WORKSPACE}/cicd-packaging-source/.github/scripts/sign-macos-native-libraries.sh" \
+            "${JCEF_PROJECT_ROOT}/jpackage/input/mac"
 
       - name: Setup Temurin JDK (for jpackage)
         if: runner.os == 'macOS'
@@ -976,7 +1098,7 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
           java-package: 'jdk'
-          architecture: ${{ matrix.arch }}
+          architecture: ${{ matrix.arch == 'x86_64' && 'x64' || 'aarch64' }}
 
       # =================================================================
       # 【第三阶段】在打包前，将环境切换到 Temurin
@@ -1012,62 +1134,93 @@ jobs:
       - name: package mac arm64
         if: ${{ runner.os == 'macOS' && matrix.arch == 'arm64' }}
         run: |
-          sh ${{ env.JCEF_PACKAGE_SCRIPT_DIR }}/package_macos_offline.sh  ${{ github.event.inputs.version }} "${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg"
+          bash ${{ env.JCEF_PACKAGE_SCRIPT_DIR }}/package_macos_offline.sh  ${{ github.event.inputs.version }} "${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg"
 
       - name: package mac x86_64
         if: ${{ runner.os == 'macOS' && matrix.arch == 'x86_64' }}
         run: |
-          sh ${{ env.JCEF_PACKAGE_SCRIPT_DIR }}/package_macos_offline.sh  ${{ github.event.inputs.version }} ${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.dmg
+          bash ${{ env.JCEF_PACKAGE_SCRIPT_DIR }}/package_macos_offline.sh  ${{ github.event.inputs.version }} ${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.dmg
 
       - name: package linux
         if: ${{ runner.os == 'Linux' }}
         run: |
           bash ${{ env.JCEF_PACKAGE_SCRIPT_DIR }}/package_linux_offline.sh ${{ github.event.inputs.version }}
 
-        # 公证&签名 Mac App
-      - name: Notarize MacOS x86_64 App
-        if: matrix.os == 'macos-latest' && matrix.arch == 'x86_64'
+      - name: Notarize macOS package
+        if: runner.os == 'macOS'
+        shell: bash
+        env:
+          MAC_APPLE_ID: ${{ secrets.MAC_APPLE_ID }}
+          MAC_APPLE_PASSWORD: ${{ secrets.MAC_APPLE_PASSWORD }}
+          MAC_TEAM_ID: ${{ secrets.MAC_TEAM_ID }}
         run: |
-          xcrun notarytool store-credentials ${{ secrets.PRODUCT_BASE_NAME }} --apple-id "${{ secrets.MAC_APPLE_ID }}" --password "${{ secrets.MAC_APPLE_PASSWORD }}" --team-id "${{ secrets.MAC_TEAM_ID }}"
-          xcrun notarytool submit ${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.dmg --keychain-profile ${{ secrets.PRODUCT_BASE_NAME }} --wait --verbose
-          xcrun stapler staple ${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.dmg
-          ossutil cp -rf ${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/*-x64.dmg "oss://${{ secrets.BUCKET_NAME }}/offline/${{ github.event.inputs.version }}/"
-          PACKAGE_FILE="${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.dmg"
+          set -euo pipefail
+          case "${{ matrix.arch }}" in
+            arm64)
+              PACKAGE_FILE="${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg"
+              PACKAGE_PLATFORM="macOS arm64"
+              ;;
+            x86_64)
+              PACKAGE_FILE="${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.dmg"
+              PACKAGE_PLATFORM="macOS x64"
+              ;;
+            *)
+              echo "Unexpected macOS architecture: ${{ matrix.arch }}" >&2
+              exit 1
+              ;;
+          esac
+          DMG_PATH="${JCEF_PROJECT_ROOT}/jpackage/output/${PACKAGE_FILE}"
+          test -s "${DMG_PATH}"
+
+          submit_result="${RUNNER_TEMP}/notary-submit.json"
+          wait_result="${RUNNER_TEMP}/notary-wait.json"
+          submit_exit=0
+          xcrun notarytool submit "${DMG_PATH}" \
+            --apple-id "${MAC_APPLE_ID}" \
+            --password "${MAC_APPLE_PASSWORD}" \
+            --team-id "${MAC_TEAM_ID}" \
+            --no-wait \
+            --output-format json > "${submit_result}" || submit_exit=$?
+          cat "${submit_result}"
+          submission_id=$(/usr/bin/plutil -extract id raw -expect string -o - "${submit_result}" 2>/dev/null || true)
+          if [ "${submit_exit}" -ne 0 ] || [ -z "${submission_id}" ]; then
+            echo "Apple notarization submission failed: submission=${submission_id:-unknown}" >&2
+            exit 1
+          fi
+
+          wait_exit=0
+          xcrun notarytool wait "${submission_id}" \
+            --apple-id "${MAC_APPLE_ID}" \
+            --password "${MAC_APPLE_PASSWORD}" \
+            --team-id "${MAC_TEAM_ID}" \
+            --timeout 25m \
+            --output-format json > "${wait_result}" || wait_exit=$?
+          cat "${wait_result}"
+          notary_status=$(/usr/bin/plutil -extract status raw -expect string -o - "${wait_result}" 2>/dev/null || true)
+          if [ "${wait_exit}" -ne 0 ] || [ "${notary_status}" != "Accepted" ]; then
+            echo "Apple notarization failed: status=${notary_status:-unknown}, submission=${submission_id}" >&2
+            xcrun notarytool log "${submission_id}" \
+              --apple-id "${MAC_APPLE_ID}" \
+              --password "${MAC_APPLE_PASSWORD}" \
+              --team-id "${MAC_TEAM_ID}" || true
+            exit 1
+          fi
+
+          xcrun stapler staple "${DMG_PATH}"
+          xcrun stapler validate "${DMG_PATH}"
+          ossutil cp -rf "${DMG_PATH}" "oss://${{ secrets.BUCKET_NAME }}/offline/${{ github.event.inputs.version }}/"
           FEISHU_WEBHOOK_URL="${{ secrets.FEISHU_RELEASE_NOTIFY_WEBHOOK }}" \
             PACKAGE_EDITION="Chat2DB Local" \
             PACKAGE_VERSION="${{ github.event.inputs.version }}" \
-            PACKAGE_PLATFORM="macOS x64" \
-            PACKAGE_NAME="$PACKAGE_FILE" \
-            PACKAGE_URL="https://cdn.chat2db-ai.com/offline/${{ github.event.inputs.version }}/$PACKAGE_FILE" \
-            python3 "$RUNNER_TEMP/notify_package.py"
-          # ossutil cp -rf ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile/version.json "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/"
-          # ossutil cp -rf ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile/*.jar "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/"
-          # ossutil cp -rf ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile/*.zip "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/"
-          echo "oss successful"
-      # 公证&签名 Mac App
-      - name: Notarize MacOS ARM App
-        if: matrix.os == 'macos-latest' && matrix.arch == 'arm64'
-        run: |
-          xcrun notarytool store-credentials ${{ secrets.PRODUCT_BASE_NAME }} --apple-id "${{ secrets.MAC_APPLE_ID }}" --password "${{ secrets.MAC_APPLE_PASSWORD }}" --team-id "${{ secrets.MAC_TEAM_ID }}"
-          xcrun notarytool submit ${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg --keychain-profile ${{ secrets.PRODUCT_BASE_NAME }} --wait --verbose
-          xcrun stapler staple ${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg
-          ossutil cp -rf ${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/*-arm64.dmg "oss://${{ secrets.BUCKET_NAME }}/offline/${{ github.event.inputs.version }}/"
-          PACKAGE_FILE="${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg"
-          FEISHU_WEBHOOK_URL="${{ secrets.FEISHU_RELEASE_NOTIFY_WEBHOOK }}" \
-            PACKAGE_EDITION="Chat2DB Local" \
-            PACKAGE_VERSION="${{ github.event.inputs.version }}" \
-            PACKAGE_PLATFORM="macOS arm64" \
-            PACKAGE_NAME="$PACKAGE_FILE" \
-            PACKAGE_URL="https://cdn.chat2db-ai.com/offline/${{ github.event.inputs.version }}/$PACKAGE_FILE" \
-            python3 "$RUNNER_TEMP/notify_package.py"
-          # ossutil cp -rf ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile/version.json "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/"
-          # ossutil cp -rf ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile/*.jar "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/"
-          # ossutil cp -rf ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile/*.zip "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/"
+            PACKAGE_PLATFORM="${PACKAGE_PLATFORM}" \
+            PACKAGE_NAME="${PACKAGE_FILE}" \
+            PACKAGE_URL="https://cdn.chat2db-ai.com/offline/${{ github.event.inputs.version }}/${PACKAGE_FILE}" \
+            python3 "${RUNNER_TEMP}/notify_package.py"
           echo "oss successful"
 
       - name: Upload arm64 DMG to OSS if requested
         # 只有当触发工作流时，传入的 upload_latest 参数值为 'true'，此步骤才会执行
-        if: matrix.os == 'macos-latest' && matrix.arch == 'arm64' && github.event.inputs.upload_latest == 'true'
+        if: runner.os == 'macOS' && matrix.arch == 'arm64' && github.event.inputs.upload_latest == 'true'
         run: |
           echo "检测到需要上传 arm64 DMG，正在执行上传..."
           ossutil cp -rf ${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg "oss://${{ secrets.BUCKET_NAME }}/offline/latest/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-arm64-latest.dmg"
@@ -1083,7 +1236,7 @@ jobs:
 
       - name: Upload x64 DMG to OSS if requested
         # 只有当触发工作流时，传入的 upload_latest 参数值为 'true'，此步骤才会执行
-        if: matrix.os == 'macos-latest' && matrix.arch == 'x86_64' && github.event.inputs.upload_latest == 'true'
+        if: runner.os == 'macOS' && matrix.arch == 'x86_64' && github.event.inputs.upload_latest == 'true'
         run: |
           echo "检测到需要上传 x64 DMG，正在执行上传..."
           ossutil cp -rf ${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.dmg "oss://${{ secrets.BUCKET_NAME }}/offline/latest/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-latest.dmg"
@@ -1215,15 +1368,15 @@ jobs:
       - name: package win x64
         if: ${{ runner.os == 'Windows' }}
         shell: bash
-        env:
-          # 在这个步骤中，临时将 JAVA_HOME 设置为 OpenJDK 的路径
-          JAVA_HOME: ${{ env.OPENJDK_PATH }}
-          PATH: ${{ env.OPENJDK_PATH }}/bin:$PATH
         run: |
-          # sh ${{ env.JCEF_PACKAGE_SCRIPT_DIR }}/package_win.sh  ${{ github.event.inputs.version }} "${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg"
-          sh ${{ env.JCEF_PACKAGE_SCRIPT_DIR }}/package_win_offline.sh  ${{ github.event.inputs.version }}
-          # ossutil cp -rf ${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/*.exe "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/"
-          # echo "oss successful"
+          set -euo pipefail
+          PACKAGE_SCRIPT_DIR="$(cygpath -u "${JCEF_PACKAGE_SCRIPT_DIR}")"
+          OPENJDK_UNIX="$(cygpath -u "${OPENJDK_PATH}")"
+          export JAVA_HOME="$OPENJDK_UNIX"
+          export PATH="$JAVA_HOME/bin:$PATH"
+          java -version
+          jpackage --version
+          bash "$PACKAGE_SCRIPT_DIR/package_win_offline.sh" "${{ github.event.inputs.version }}"
 
       # ==============================================================
       # Windows installer: sign MSI -> wrap in Inno Setup EXE -> sign EXE
@@ -1278,8 +1431,11 @@ jobs:
 
       - name: Upload unsigned MSI to OSS staging
         if: matrix.os == 'windows-latest'
+        shell: bash
         run: |
-          ossutil cp -rf "${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.msi" "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/temp-msi/"
+          set -euo pipefail
+          PROJECT_ROOT="$(cygpath -u "${JCEF_PROJECT_ROOT}")"
+          ossutil cp -rf "$PROJECT_ROOT/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.msi" "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/temp-msi/"
 
       - name: Sign MSI on remote signing server
         if: ${{ runner.os == 'Windows' }}
@@ -1306,8 +1462,11 @@ jobs:
 
       - name: Download signed MSI from OSS
         if: ${{ runner.os == 'Windows' }}
+        shell: bash
         run: |
-          ossutil cp -rf "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/signed-msi/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.msi" ${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/
+          set -euo pipefail
+          PROJECT_ROOT="$(cygpath -u "${JCEF_PROJECT_ROOT}")"
+          ossutil cp -rf "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/signed-msi/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.msi" "$PROJECT_ROOT/jpackage/output/"
 
       # ---- Wrap the signed MSI in an Inno Setup EXE (still unsigned outer) ----
 
@@ -1315,26 +1474,35 @@ jobs:
         if: ${{ runner.os == 'Windows' }}
         shell: bash
         run: |
-          sh ${{ env.JCEF_PACKAGE_SCRIPT_DIR }}/wrap_win_installer.sh ${{ github.event.inputs.version }} local
+          set -euo pipefail
+          PACKAGE_SCRIPT_DIR="$(cygpath -u "${JCEF_PACKAGE_SCRIPT_DIR}")"
+          bash "$PACKAGE_SCRIPT_DIR/wrap_win_installer.sh" "${{ github.event.inputs.version }}" local
 
       # ---- Sign the outer EXE (existing flow, now operates on the wrapped EXE) ----
 
       # 准备发往OSS的文件
       - name: Prepare upload for OSS
         if: ${{ runner.os == 'Windows' }}
+        shell: bash
         run: |
+          set -euo pipefail
+          PROJECT_ROOT="$(cygpath -u "${JCEF_PROJECT_ROOT}")"
+          FRONT_PATH="$(cygpath -u "${JCEF_FRONT_PATH}")"
+          WORKSPACE_PATH="$(cygpath -u "${GITHUB_WORKSPACE}")"
           pwd
-          mkdir -p  ${{ secrets.REPO_FRONT_PATH }}/release
-          cp -r ${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe ${{ secrets.REPO_FRONT_PATH }}/release
-          ls ${{ secrets.REPO_FRONT_PATH }}/release
-          cp -r ${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe ${{ github.workspace }}
+          mkdir -p "$FRONT_PATH/release"
+          cp -r "$PROJECT_ROOT/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe" "$FRONT_PATH/release"
+          ls "$FRONT_PATH/release"
+          cp -r "$FRONT_PATH/release/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe" "$WORKSPACE_PATH"
 
       # 上传文件到OSS准备
       - name: Upload to OSS for windows
         if: matrix.os == 'windows-latest'
+        shell: bash
         run: |
-          # ossutil cp -rf "${{ secrets.REPO_FRONT_PATH }}/release/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe" "oss://${{ secrets.BUCKET_NAME }}/offline/${{ github.event.inputs.version }}/temp/"
-          ossutil cp -rf "${{ github.workspace }}/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe" "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/temp/"
+          set -euo pipefail
+          WORKSPACE_PATH="$(cygpath -u "${GITHUB_WORKSPACE}")"
+          ossutil cp -rf "$WORKSPACE_PATH/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe" "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/temp/"
 
       # 上传文件到远程服务器
       - name: Copy files to remote server
@@ -1381,6 +1549,7 @@ jobs:
       - name: Upload x64 exe to OSS if requested
         # 只有当触发工作流时，传入的 upload_latest 参数值为 'true'，此步骤才会执行
         if: matrix.os == 'windows-latest' && github.event.inputs.upload_latest == 'true'
+        shell: pwsh
         run: |
           echo "检测到需要上传 x64 exe，正在执行上传..."
           ossutil cp -rf ${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe "oss://${{ secrets.BUCKET_NAME }}/offline/latest/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-latest.exe"
