@@ -34,6 +34,9 @@ set -euo pipefail
 printf '%s' "$(basename "$0")" >> "${PROMOTE_TEST_LOG}"
 printf ' %q' "$@" >> "${PROMOTE_TEST_LOG}"
 printf '\n' >> "${PROMOTE_TEST_LOG}"
+if [ "${PROMOTE_TEST_DRAIN_STDIN:-false}" = "true" ]; then
+    cat >/dev/null
+fi
 BASH
 done
 chmod +x "${FAKE_BIN}"/*
@@ -138,12 +141,16 @@ export CHAT2DB_RELEASE_EPOCH=1
 export CHAT2DB_UPLOAD_LATEST=false
 export CHAT2DB_UPDATE_LATEST_VERSION_JSON=true
 export CHAT2DB_UPDATE_SIGNING_PRIVATE_KEY_B64=test-private-key
+export PROMOTE_TEST_DRAIN_STDIN=true
 rm -rf "${CHAT2DB_PROMOTE_WORK_DIR}"
 bash "${SCRIPT_DIR}/promote-desktop-release.sh"
 grep -Fq 'download/updates-v2/beta/5.3.4-beta.1/package-pro-macos-arm64-macos-app-archive.tar.gz' "${LOG_FILE}"
 grep -Fq 'download/updates-v2/beta/5.3.4-beta.1/package-pro-linux-arm64-linux-appimage.AppImage' "${LOG_FILE}"
 grep -Fq 'download/updates-v2/beta/5.3.4-beta.1/release-index.json' "${LOG_FILE}"
 grep -Fq 'download/updates-v2/beta/latest_version.json' "${LOG_FILE}"
+test "$(grep -Ec '^ossutil cp -f .*/manifest-pro-.* oss://test-bucket/download/updates-v2/beta/5\.3\.4-beta\.1/manifest-pro-' "${LOG_FILE}")" -eq 9
+test "$(grep -Ec '^ossutil cp -f .*/package-pro-.* oss://test-bucket/download/updates-v2/beta/5\.3\.4-beta\.1/package-pro-' "${LOG_FILE}")" -eq 9
+test "$(grep -Ec '^ossutil cp -f .*/release-index\.json oss://test-bucket/download/updates-v2/beta/5\.3\.4-beta\.1/release-index\.json$' "${LOG_FILE}")" -eq 1
 tail -n 1 "${LOG_FILE}" | grep -Fq 'oss://test-bucket/download/updates-v2/beta/latest_version.json'
 
 echo "desktop promotion tests passed"
