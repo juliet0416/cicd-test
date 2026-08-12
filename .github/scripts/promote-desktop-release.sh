@@ -353,10 +353,12 @@ publish_latest_installers() {
     done
 }
 
-case "${CHAT2DB_RELEASE_PROFILE}" in
-    bridge-fat) publish_bridge_update ;;
-    versioned-thin) publish_v2_update ;;
-esac
+if [ "${CHAT2DB_RELEASE_PROFILE}" = "bridge-fat" ] \
+        && [ "${CHAT2DB_RELEASE_CHANNEL}" = "STABLE" ]; then
+    publish_bridge_update
+else
+    publish_v2_update
+fi
 
 if [ "${CHAT2DB_UPLOAD_LATEST}" = "true" ]; then
     publish_latest_installers

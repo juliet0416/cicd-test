@@ -1225,7 +1225,7 @@ jobs:
           python "$env:RUNNER_TEMP/notify_package.py"
 
       - name: Archive updater-v2 full package
-        if: ${{ env.CHAT2DB_MAVEN_PROFILE == 'versioned-thin' && startsWith(matrix.update_target, 'macos-') }}
+        if: ${{ (env.CHAT2DB_MAVEN_PROFILE == 'versioned-thin' || env.CHAT2DB_RELEASE_CHANNEL == 'BETA') && startsWith(matrix.update_target, 'macos-') }}
         shell: bash
         run: |
           set -euo pipefail
@@ -1245,7 +1245,7 @@ jobs:
             package
 
       - name: Upload updater-v2 full package artifact
-        if: ${{ env.CHAT2DB_MAVEN_PROFILE == 'versioned-thin' && startsWith(matrix.update_target, 'macos-') }}
+        if: ${{ (env.CHAT2DB_MAVEN_PROFILE == 'versioned-thin' || env.CHAT2DB_RELEASE_CHANNEL == 'BETA') && startsWith(matrix.update_target, 'macos-') }}
         uses: actions/upload-artifact@v4
         with:
           name: full-package-pro-${{ matrix.update_target }}
@@ -1254,7 +1254,7 @@ jobs:
           retention-days: 7
 
       - name: Archive legacy bridge update payload
-        if: ${{ runner.os == 'Windows' && env.CHAT2DB_MAVEN_PROFILE == 'bridge-fat' }}
+        if: ${{ runner.os == 'Windows' && env.CHAT2DB_MAVEN_PROFILE == 'bridge-fat' && env.CHAT2DB_RELEASE_CHANNEL == 'STABLE' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -1269,7 +1269,7 @@ jobs:
             version.json build-provenance.json chat2db-enterprise.jar chat2db-updater.jar dist.zip
 
       - name: Upload legacy bridge update payload artifact
-        if: ${{ runner.os == 'Windows' && env.CHAT2DB_MAVEN_PROFILE == 'bridge-fat' }}
+        if: ${{ runner.os == 'Windows' && env.CHAT2DB_MAVEN_PROFILE == 'bridge-fat' && env.CHAT2DB_RELEASE_CHANNEL == 'STABLE' }}
         uses: actions/upload-artifact@v4
         with:
           name: bridge-update-pro
@@ -1301,14 +1301,14 @@ jobs:
           persist-credentials: false
 
       - name: Download legacy bridge update payload
-        if: ${{ needs.resolve_source.outputs.release_profile == 'bridge-fat' }}
+        if: ${{ needs.resolve_source.outputs.release_profile == 'bridge-fat' && needs.resolve_source.outputs.release_channel_upper == 'STABLE' }}
         uses: actions/download-artifact@v4
         with:
           name: bridge-update-pro
           path: ${{ runner.temp }}/update-artifacts/bridge-update-pro
 
       - name: Download updater-v2 full packages
-        if: ${{ needs.resolve_source.outputs.release_profile == 'versioned-thin' }}
+        if: ${{ needs.resolve_source.outputs.release_profile == 'versioned-thin' || needs.resolve_source.outputs.release_channel_upper == 'BETA' }}
         uses: actions/download-artifact@v4
         with:
           pattern: full-package-pro-*
