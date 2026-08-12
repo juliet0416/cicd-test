@@ -1408,13 +1408,14 @@ jobs:
         run: |
           set -euo pipefail
           PROJECT_ROOT="$(cygpath -u "${JCEF_PROJECT_ROOT}")"
+          RUNNER_TEMP_UNIX="$(cygpath -u "${RUNNER_TEMP}")"
           SOURCE_DIR="${PROJECT_ROOT}/jpackage/input/sourceFile"
           test -s "${SOURCE_DIR}/version.json"
           test -s "${SOURCE_DIR}/chat2db-enterprise.jar"
           test -s "${SOURCE_DIR}/chat2db-updater.jar"
           test -s "${SOURCE_DIR}/dist.zip"
           test ! -e "${SOURCE_DIR}/lib.zip"
-          tar -C "${SOURCE_DIR}" -czf "${RUNNER_TEMP}/bridge-update.tar.gz" \
+          tar -C "${SOURCE_DIR}" -czf "${RUNNER_TEMP_UNIX}/bridge-update.tar.gz" \
             version.json build-provenance.json chat2db-enterprise.jar chat2db-updater.jar dist.zip
 
       - name: Upload legacy bridge update payload artifact
