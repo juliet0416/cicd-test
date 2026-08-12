@@ -69,21 +69,21 @@ upload_download_server() {
     temporary_path="${final_path}.uploading.${GITHUB_RUN_ID:-local}.${GITHUB_RUN_ATTEMPT:-1}.${RANDOM}"
     # The path is intentionally quoted for the remote shell.
     # shellcheck disable=SC2029
-    ssh "${SSH_OPTIONS[@]}" "${DOWNLOAD_TARGET}" "mkdir -p '${remote_dir}'"
-    scp "${SSH_OPTIONS[@]}" "${source_file}" "${DOWNLOAD_TARGET}:${temporary_path}"
+    ssh "${SSH_OPTIONS[@]}" "${DOWNLOAD_TARGET}" "mkdir -p '${remote_dir}'" </dev/null
+    scp "${SSH_OPTIONS[@]}" "${source_file}" "${DOWNLOAD_TARGET}:${temporary_path}" </dev/null
     # All three paths are intentionally expanded locally.
     # shellcheck disable=SC2029
     ssh "${SSH_OPTIONS[@]}" "${DOWNLOAD_TARGET}" \
-        "chmod 644 '${temporary_path}' && mv -f '${temporary_path}' '${final_path}'"
+        "chmod 644 '${temporary_path}' && mv -f '${temporary_path}' '${final_path}'" </dev/null
 }
 
 upload_immutable() {
     local source_file="$1"
     local remote_relative_path="$2"
     test -s "${source_file}"
-    ossutil cp -f "${source_file}" "oss://${BUCKET_NAME}/${remote_relative_path}"
-    rclone copyto "${source_file}" "${R2_REMOTE}/${remote_relative_path}"
-    upload_download_server "${source_file}" "${remote_relative_path}"
+    ossutil cp -f "${source_file}" "oss://${BUCKET_NAME}/${remote_relative_path}" </dev/null
+    rclone copyto "${source_file}" "${R2_REMOTE}/${remote_relative_path}" </dev/null
+    upload_download_server "${source_file}" "${remote_relative_path}" </dev/null
 }
 
 upload_mutable() {
@@ -91,9 +91,9 @@ upload_mutable() {
     local remote_relative_path="$2"
     test -s "${source_file}"
     # Publish the public OSS object last after both replicas are complete.
-    upload_download_server "${source_file}" "${remote_relative_path}"
-    rclone copyto "${source_file}" "${R2_REMOTE}/${remote_relative_path}"
-    ossutil cp -f "${source_file}" "oss://${BUCKET_NAME}/${remote_relative_path}"
+    upload_download_server "${source_file}" "${remote_relative_path}" </dev/null
+    rclone copyto "${source_file}" "${R2_REMOTE}/${remote_relative_path}" </dev/null
+    ossutil cp -f "${source_file}" "oss://${BUCKET_NAME}/${remote_relative_path}" </dev/null
 }
 
 publish_bridge_update() {
