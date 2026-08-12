@@ -153,4 +153,20 @@ test "$(grep -Ec '^ossutil cp -f .*/package-pro-.* oss://test-bucket/download/up
 test "$(grep -Ec '^ossutil cp -f .*/release-index\.json oss://test-bucket/download/updates-v2/beta/5\.3\.4-beta\.1/release-index\.json$' "${LOG_FILE}")" -eq 1
 tail -n 1 "${LOG_FILE}" | grep -Fq 'oss://test-bucket/download/updates-v2/beta/latest_version.json'
 
+: > "${LOG_FILE}"
+export CHAT2DB_RELEASE_VERSION=5.3.3
+export CHAT2DB_RELEASE_PROFILE=bridge-fat
+export CHAT2DB_RELEASE_CHANNEL=BETA
+export CHAT2DB_RELEASE_EPOCH=1
+export CHAT2DB_ROLLBACK_COMPATIBLE_FROM=5.3.0
+rm -rf "${CHAT2DB_PROMOTE_WORK_DIR}"
+bash "${SCRIPT_DIR}/promote-desktop-release.sh"
+grep -Fq 'download/updates-v2/beta/5.3.3/package-pro-macos-arm64-macos-app-archive.tar.gz' "${LOG_FILE}"
+grep -Fq 'download/updates-v2/beta/5.3.3/manifest-pro-windows-x64-windows-exe.json' "${LOG_FILE}"
+grep -Fq 'download/updates-v2/beta/latest_version.json' "${LOG_FILE}"
+if grep -Fq 'download/updates/5.3.3/version.json' "${LOG_FILE}"; then
+    echo 'beta bridge must not publish the stable v1 bridge pointer' >&2
+    exit 1
+fi
+
 echo "desktop promotion tests passed"

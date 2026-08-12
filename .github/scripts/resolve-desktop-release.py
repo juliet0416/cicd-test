@@ -76,15 +76,16 @@ def resolve(args: argparse.Namespace) -> tuple[str, str]:
         raise ValueError("release_notes_url must be an absolute HTTPS URL")
 
     bridge = SemVer.parse("5.3.3")
-    minimum_beta = SemVer.parse("5.3.3-beta.1")
     comparison = version.compare(bridge)
-    if comparison < 0 and version.compare(minimum_beta) < 0:
-        raise ValueError("desktop update v2 only supports releases starting at 5.3.3-beta.1")
+    if comparison < 0:
+        raise ValueError("desktop updates only support releases starting at 5.3.3")
     if args.version == "5.3.3":
-        if channel != "stable":
-            raise ValueError("the 5.3.3 bridge release must use the stable channel")
-        if release_epoch != 0 or data_schema_version != 0:
-            raise ValueError("the 5.3.3 bridge requires release_epoch=0 and data_schema_version=0")
+        expected_epoch = 0 if channel == "stable" else 1
+        if release_epoch != expected_epoch or data_schema_version != 0:
+            raise ValueError(
+                f"the 5.3.3 {channel} bridge requires "
+                f"release_epoch={expected_epoch} and data_schema_version=0"
+            )
         profile = "bridge-fat"
     else:
         if release_epoch == 0:

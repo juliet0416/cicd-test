@@ -34,6 +34,18 @@ class ResolveDesktopReleaseTest(unittest.TestCase):
         self.assertEqual("bridge-fat", profile)
         self.assertEqual("STABLE", channel)
 
+    def test_resolves_533_beta_as_fat_bridge(self):
+        profile, channel = MODULE.resolve(
+            arguments(
+                version="5.3.3",
+                channel="beta",
+                release_epoch="1",
+                rollback_compatible_from="5.3.0",
+            )
+        )
+        self.assertEqual("bridge-fat", profile)
+        self.assertEqual("BETA", channel)
+
     def test_resolves_stable_thin_release(self):
         self.assertEqual(
             ("versioned-thin", "STABLE"),
@@ -45,18 +57,6 @@ class ResolveDesktopReleaseTest(unittest.TestCase):
             ("versioned-thin", "BETA"),
             MODULE.resolve(
                 arguments(version="5.3.4-beta.1", channel="beta")
-            ),
-        )
-
-    def test_resolves_533_beta_thin_release_from_530_bridge_test_baseline(self):
-        self.assertEqual(
-            ("versioned-thin", "BETA"),
-            MODULE.resolve(
-                arguments(
-                    version="5.3.3-beta.1",
-                    channel="beta",
-                    rollback_compatible_from="5.3.0",
-                )
             ),
         )
 
@@ -75,7 +75,7 @@ class ResolveDesktopReleaseTest(unittest.TestCase):
             )
 
     def test_rejects_release_before_bridge(self):
-        with self.assertRaisesRegex(ValueError, "starting at 5.3.3-beta.1"):
+        with self.assertRaisesRegex(ValueError, "starting at 5.3.3"):
             MODULE.resolve(arguments(version="5.3.2"))
 
     def test_rejects_newer_rollback_floor(self):
