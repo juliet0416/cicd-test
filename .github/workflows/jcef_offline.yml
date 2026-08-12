@@ -21,9 +21,37 @@ on:
         default: 'false'  # 提供一个默认值
         type: string
       update_latest_version_json:
-        description: '是否自动更新 offline/updates/latest_version.json (true/false)'
+        description: '是否在全部平台成功后发布自动更新指针 (true/false)'
         required: false
         default: 'false'
+        type: string
+      channel:
+        description: '自动更新通道'
+        required: true
+        default: 'stable'
+        type: choice
+        options:
+          - stable
+          - beta
+      release_epoch:
+        description: '单调递增的更新发布序号；5.3.3 使用 0'
+        required: true
+        default: '0'
+        type: string
+      data_schema_version:
+        description: '本地 SQLite schema 版本'
+        required: true
+        default: '0'
+        type: string
+      rollback_compatible_from:
+        description: '允许自动回滚到的最低版本'
+        required: true
+        default: '5.3.3'
+        type: string
+      release_notes_url:
+        description: 'HTTPS release notes URL'
+        required: true
+        default: 'https://chat2db.ai/release-notes'
         type: string
 
 permissions:
@@ -37,6 +65,8 @@ jobs:
     outputs:
       enterprise_sha: ${{ steps.resolve.outputs.enterprise_sha }}
       community_sha: ${{ steps.resolve.outputs.community_sha }}
+      release_profile: ${{ steps.release_contract.outputs.release_profile }}
+      release_channel_upper: ${{ steps.release_contract.outputs.release_channel_upper }}
     steps:
       - name: Check out Enterprise source ref
         uses: actions/checkout@v4
@@ -88,6 +118,33 @@ jobs:
           ref: ${{ github.sha }}
           persist-credentials: false
 
+      - name: Validate desktop release contract
+        id: release_contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 "${GITHUB_WORKSPACE}/cicd-packaging-source/.github/scripts/resolve-desktop-release.py" \
+            --version "${{ github.event.inputs.version }}" \
+            --channel "${{ github.event.inputs.channel }}" \
+            --release-epoch "${{ github.event.inputs.release_epoch }}" \
+            --data-schema-version "${{ github.event.inputs.data_schema_version }}" \
+            --rollback-compatible-from "${{ github.event.inputs.rollback_compatible_from }}" \
+            --release-notes-url "${{ github.event.inputs.release_notes_url }}" \
+            >> "${GITHUB_OUTPUT}"
+
+      - name: Test desktop release contract
+        run: |
+          python3 "${GITHUB_WORKSPACE}/cicd-packaging-source/.github/scripts/tests/resolve-desktop-release-test.py"
+
+      - name: Validate trusted update key configuration
+        env:
+          CHAT2DB_UPDATE_KEY_ID: ${{ secrets.CHAT2DB_UPDATE_KEY_ID }}
+          CHAT2DB_UPDATE_PUBLIC_KEY_B64: ${{ secrets.CHAT2DB_UPDATE_PUBLIC_KEY_B64 }}
+        run: |
+          set -euo pipefail
+          test -n "${CHAT2DB_UPDATE_KEY_ID}"
+          test -n "${CHAT2DB_UPDATE_PUBLIC_KEY_B64}"
+
       - name: Test macOS signing helper
         shell: bash
         run: |
@@ -106,6 +163,7 @@ jobs:
           SOURCE_REF: ${{ github.event.inputs.source_ref || secrets.REPO_BRANCH }}
           UPLOAD_LATEST: ${{ github.event.inputs.upload_latest }}
           UPDATE_LATEST_VERSION_JSON: ${{ github.event.inputs.update_latest_version_json }}
+          RELEASE_CHANNEL: ${{ github.event.inputs.channel }}
           RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           if [ -z "$FEISHU_WEBHOOK_URL" ]; then
@@ -125,6 +183,7 @@ jobs:
               f"源码分支：{os.environ['SOURCE_REF']}",
               f"upload_latest：{os.environ['UPLOAD_LATEST']}",
               f"update_latest_version_json：{os.environ['UPDATE_LATEST_VERSION_JSON']}",
+              f"channel：{os.environ['RELEASE_CHANNEL']}",
               f"运行链接：{os.environ['RUN_URL']}",
           ]
           payload = json.dumps(
@@ -152,25 +211,41 @@ jobs:
         include:
           - os: macos-15-intel
             arch: x86_64
+            update_target: macos-x64
+            update_platform: MACOS
+            update_arch: X64
             file_name: 'latest.dmg'
             file_extension: '-x64.dmg'
             build_arg: '--mac --x64'
           - os: windows-latest
+            arch: x86_64
+            update_target: windows-x64
+            update_platform: WINDOWS
+            update_arch: X64
             file_extension: '.exe'
             file_name: 'latest.exe'
             build_arg: '--win --x64'
           - os: macos-15
             arch: arm64
+            update_target: macos-arm64
+            update_platform: MACOS
+            update_arch: ARM64
             file_name: 'arm64-latest.dmg'
             file_extension: '-arm64.dmg'
             build_arg: '--mac --arm64'
           - os: ubuntu-22.04
             arch: x86_64
+            update_target: linux-x64
+            update_platform: LINUX
+            update_arch: X64
             file_name: 'latest.AppImage'
             file_extension: '-x86_64.AppImage'
             build_arg: '--linux --x64'
           - os: ubuntu-22.04-arm
             arch: arm64
+            update_target: linux-arm64
+            update_platform: LINUX
+            update_arch: ARM64
             file_name: 'arm64-latest.AppImage'
             file_extension: '-arm64.AppImage'
             build_arg: '--linux --arm64'
@@ -196,6 +271,14 @@ jobs:
       JCEF_JRE_PATH: ${{ github.workspace }}/${{ secrets.REPO_PATH }}/chat2db-enterprise-client/static/jre
       CHAT2DB_FRONTEND_SRC_ROOT: ${{ github.workspace }}/chat2db-community-source/chat2db-community-client/src
       CHAT2DB_PRODUCT_CONFIG: ${{ github.workspace }}/${{ secrets.REPO_PATH }}/chat2db-enterprise-client/product.enterprise.ts
+      CHAT2DB_RELEASE_EPOCH: ${{ github.event.inputs.release_epoch }}
+      CHAT2DB_DATA_SCHEMA_VERSION: ${{ github.event.inputs.data_schema_version }}
+      CHAT2DB_ROLLBACK_COMPATIBLE_FROM: ${{ github.event.inputs.rollback_compatible_from }}
+      CHAT2DB_RELEASE_NOTES_URL: ${{ github.event.inputs.release_notes_url }}
+      CHAT2DB_UPDATE_KEY_ID: ${{ secrets.CHAT2DB_UPDATE_KEY_ID }}
+      CHAT2DB_UPDATE_PUBLIC_KEY_B64: ${{ secrets.CHAT2DB_UPDATE_PUBLIC_KEY_B64 }}
+      CHAT2DB_MAVEN_PROFILE: ${{ needs.resolve_source.outputs.release_profile }}
+      CHAT2DB_RELEASE_CHANNEL: ${{ needs.resolve_source.outputs.release_channel_upper }}
 
     # 将release_test分支的代码检出（即复制）到 GitHub Actions 的运行环境中。
     steps:
@@ -374,8 +457,8 @@ jobs:
           # 获取 JBR 的绝对路径并设置为默认的 JAVA_HOME
           JBR_HOME_PATH=$(cd jbr-default/Contents/Home && pwd)
           echo "Setting default JAVA_HOME to JBR: $JBR_HOME_PATH"
-          echo "JAVA_HOME=$JBR_HOME_PATH" >> $GITHUB_ENV
-          echo "$JBR_HOME_PATH/bin" >> $GITHUB_PATH
+          echo "JAVA_HOME=$JBR_HOME_PATH" >> "$GITHUB_ENV"
+          echo "$JBR_HOME_PATH/bin" >> "$GITHUB_PATH"
           
           
           # # Install jre Windows
@@ -556,7 +639,7 @@ jobs:
           tar -xzf jbr-linux.tar.gz -C jbr-linux --strip-components=1
 
           JBR_HOME_PATH=$(cd jbr-linux && pwd)
-          echo "JBR_LINUX_PATH=$JBR_HOME_PATH" >> $GITHUB_ENV
+          echo "JBR_LINUX_PATH=$JBR_HOME_PATH" >> "$GITHUB_ENV"
           echo "Linux JBR JCEF is ready at: $JBR_HOME_PATH"
 
       - name: Install Ubuntu packaging dependencies
@@ -591,7 +674,7 @@ jobs:
       - name: Enable tls1
         if: ${{ runner.os == 'macOS' }}
         run: |
-          sed -i '' "s/\(^jdk.tls.disabledAlgorithms=\)\(.*\)\( TLSv1, TLSv1.1,\)\(.*\)/\1\2\4/" $JAVA_HOME/conf/security/java.security
+          sed -i '' "s/\(^jdk.tls.disabledAlgorithms=\)\(.*\)\( TLSv1, TLSv1.1,\)\(.*\)/\1\2\4/" "$JAVA_HOME/conf/security/java.security"
 
       # Copy jre Windows
       - name: Copy Jre for Windows
@@ -635,22 +718,22 @@ jobs:
         env:
           JAVA_HOME: ${{ env.JBR_LINUX_PATH }}
         run: |
-          mkdir -p ${{ env.JCEF_STATIC_PATH }}
-          cp -r $JAVA_HOME ${{ env.JCEF_JRE_PATH }}
-          chmod -R 777 ${{ env.JCEF_JRE_PATH }}
-          mkdir -p ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/runtime/linux/Home
-          cp -r $JAVA_HOME/* ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/runtime/linux/Home
-          chmod -R 777 ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/runtime/linux
+          mkdir -p "${JCEF_STATIC_PATH}"
+          cp -r "$JAVA_HOME" "${JCEF_JRE_PATH}"
+          chmod -R 777 "${JCEF_JRE_PATH}"
+          mkdir -p "${JCEF_PROJECT_ROOT}/jpackage/input/runtime/linux/Home"
+          cp -r "$JAVA_HOME"/* "${JCEF_PROJECT_ROOT}/jpackage/input/runtime/linux/Home"
+          chmod -R 777 "${JCEF_PROJECT_ROOT}/jpackage/input/runtime/linux"
 
       # Linux
       - name: Delete File
         if: ${{ runner.os == 'Linux' }}
         run: |
-          cd ${{ env.JCEF_JRE_PATH }}
+          cd "${JCEF_JRE_PATH}"
           ls -la
           rm -rf legal
           ls -la
-          rm -rf ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/runtime/linux/Home/legal
+          rm -rf "${JCEF_PROJECT_ROOT}/jpackage/input/runtime/linux/Home/legal"
 
       - name: Setup Temurin JDK for Linux Build and Packaging
         if: ${{ runner.os == 'Linux' }}
@@ -663,7 +746,7 @@ jobs:
       - name: Enable tls1
         if: ${{ runner.os == 'Linux' }}
         run: |
-          sed -i "s/\(^jdk.tls.disabledAlgorithms=\)\(.*\)\( TLSv1, TLSv1.1,\)\(.*\)/\1\2\4/" $JAVA_HOME/conf/security/java.security
+          sed -i "s/\(^jdk.tls.disabledAlgorithms=\)\(.*\)\( TLSv1, TLSv1.1,\)\(.*\)/\1\2\4/" "$JAVA_HOME/conf/security/java.security"
 
       # 安装Node.js
       - name: Install Node.js
@@ -722,182 +805,21 @@ jobs:
           echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
           "$OSSUTIL_PATH" config --endpoint "${{ secrets.OSS_ENDPOINT }}" --access-key-id "${{ secrets.OSS_ACCESS_KEY_ID }}" --access-key-secret "${{ secrets.OSS_ACCESS_KEY_SECRET }}"
 
-      - name: Set up rclone and R2 config on Linux and macOS
-        if: ${{ github.event.inputs.upload_latest == 'true' && runner.os != 'Windows' }}
-        shell: bash
-        env:
-          R2_ACCESS_KEY: ${{ secrets.R2_ACCESS_KEY }}
-          R2_SECRET_KEY: ${{ secrets.R2_SECRET_KEY }}
-          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
-          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
-        run: |
-          set -euo pipefail
-          if [ -z "$R2_ACCESS_KEY" ] || [ -z "$R2_SECRET_KEY" ] || [ -z "$R2_ENDPOINT" ] || [ -z "$R2_BUCKET_NAME" ]; then
-            echo "R2 secrets are required when upload_latest is true"
-            exit 1
-          fi
-
-          curl https://rclone.org/install.sh | sudo bash
-          RCLONE_CONFIG_PATH="$RUNNER_TEMP/rclone.conf"
-          printf '%s\n' \
-            '[cf-r2]' \
-            'type = s3' \
-            'provider = Cloudflare' \
-            "access_key_id = ${R2_ACCESS_KEY}" \
-            "secret_access_key = ${R2_SECRET_KEY}" \
-            "endpoint = ${R2_ENDPOINT}" \
-            'acl = private' > "$RCLONE_CONFIG_PATH"
-          echo "RCLONE_CONFIG=$RCLONE_CONFIG_PATH" >> "$GITHUB_ENV"
-          echo "R2_REMOTE=cf-r2:${R2_BUCKET_NAME}" >> "$GITHUB_ENV"
-          rclone version
-
-      - name: Set up rclone and R2 config on Windows
-        if: ${{ github.event.inputs.upload_latest == 'true' && runner.os == 'Windows' }}
-        shell: pwsh
-        env:
-          R2_ACCESS_KEY: ${{ secrets.R2_ACCESS_KEY }}
-          R2_SECRET_KEY: ${{ secrets.R2_SECRET_KEY }}
-          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
-          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
-        run: |
-          if ([string]::IsNullOrWhiteSpace($env:R2_ACCESS_KEY) -or [string]::IsNullOrWhiteSpace($env:R2_SECRET_KEY) -or [string]::IsNullOrWhiteSpace($env:R2_ENDPOINT) -or [string]::IsNullOrWhiteSpace($env:R2_BUCKET_NAME)) {
-            Write-Error "R2 secrets are required when upload_latest is true"
-            exit 1
-          }
-
-          choco install rclone -y --no-progress
-
-          $rcloneCommand = Get-Command rclone -ErrorAction SilentlyContinue
-          $resolvedRclonePath = $null
-          if (-not $rcloneCommand) {
-            $candidates = @(
-              "C:\ProgramData\chocolatey\bin\rclone.exe",
-              "C:\Program Files\rclone\rclone.exe"
-            )
-            $resolvedRclonePath = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
-            if (-not $resolvedRclonePath) {
-              Write-Error "rclone.exe was not found after installation."
-              exit 1
-            }
-
-            $rcloneDir = Split-Path -Path $resolvedRclonePath -Parent
-            $rcloneDir | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-            $env:PATH = "$rcloneDir;$env:PATH"
-          } else {
-            $resolvedRclonePath = $rcloneCommand.Source
-          }
-
-          $configPath = Join-Path $env:RUNNER_TEMP "rclone.conf"
-          @(
-            "[cf-r2]",
-            "type = s3",
-            "provider = Cloudflare",
-            "access_key_id = $env:R2_ACCESS_KEY",
-            "secret_access_key = $env:R2_SECRET_KEY",
-            "endpoint = $env:R2_ENDPOINT",
-            "acl = private"
-          ) | Set-Content -Path $configPath -Encoding utf8
-
-          "RCLONE_CONFIG=$configPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-          "R2_REMOTE=cf-r2:$($env:R2_BUCKET_NAME)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-          & $resolvedRclonePath version
-
-      - name: Set up SSH for download server (Linux/macOS)
-        if: ${{ github.event.inputs.upload_latest == 'true' && runner.os != 'Windows' }}
-        shell: bash
-        env:
-          DOWNLOAD_SERVER_HOST: ${{ secrets.DOWNLOAD_SERVER_HOST }}
-          DOWNLOAD_SERVER_USER: ${{ secrets.DOWNLOAD_SERVER_USER }}
-          DOWNLOAD_SERVER_SSH_KEY: ${{ secrets.DOWNLOAD_SERVER_SSH_KEY }}
-        run: |
-          set -euo pipefail
-          if [ -z "${DOWNLOAD_SERVER_HOST:-}" ] || [ -z "${DOWNLOAD_SERVER_USER:-}" ] || [ -z "${DOWNLOAD_SERVER_SSH_KEY:-}" ]; then
-            echo "::warning::DOWNLOAD_SERVER_* secrets not set, will skip download server upload"
-            echo "DOWNLOAD_SERVER_READY=false" >> "$GITHUB_ENV"
-            exit 0
-          fi
-          mkdir -p ~/.ssh
-          KEY_PATH="$HOME/.ssh/download_server_id"
-          printf '%s\n' "$DOWNLOAD_SERVER_SSH_KEY" > "$KEY_PATH"
-          chmod 600 "$KEY_PATH"
-          ssh-keyscan -H "$DOWNLOAD_SERVER_HOST" >> ~/.ssh/known_hosts 2>/dev/null
-
-          UP_SCRIPT="$RUNNER_TEMP/upload-download-server.sh"
-          cat > "$UP_SCRIPT" <<'BASH'
-          #!/usr/bin/env bash
-          # Atomic upload to download server (won't disrupt active downloads).
-          # Usage: upload-download-server.sh <local-file> <remote-relative-path>
-          set -euo pipefail
-          src="$1"; rel="$2"
-          base="/data/downloads"
-          final="$base/$rel"
-          dir=$(dirname "$final")
-          tmp="$final.uploading.${GITHUB_RUN_ID:-$$}.${GITHUB_RUN_ATTEMPT:-1}.$RANDOM"
-          opts="-i $DOWNLOAD_SERVER_KEY -o StrictHostKeyChecking=accept-new -o BatchMode=yes"
-          target="$DOWNLOAD_SERVER_USER@$DOWNLOAD_SERVER_HOST"
-          echo ">> upload $(basename "$src") -> $target:$final (atomic rename)"
-          ssh $opts "$target" "mkdir -p '$dir'"
-          scp $opts "$src" "$target:$tmp"
-          ssh $opts "$target" "chmod 644 '$tmp' && mv -f '$tmp' '$final'"
-          echo "<< done $final"
-          BASH
-          chmod +x "$UP_SCRIPT"
-
-          {
-            echo "DOWNLOAD_SERVER_READY=true"
-            echo "DOWNLOAD_SERVER_HOST=$DOWNLOAD_SERVER_HOST"
-            echo "DOWNLOAD_SERVER_USER=$DOWNLOAD_SERVER_USER"
-            echo "DOWNLOAD_SERVER_KEY=$KEY_PATH"
-            echo "DOWNLOAD_UPLOAD_SCRIPT=$UP_SCRIPT"
-          } >> "$GITHUB_ENV"
-
-          ssh -i "$KEY_PATH" -o StrictHostKeyChecking=accept-new -o BatchMode=yes "$DOWNLOAD_SERVER_USER@$DOWNLOAD_SERVER_HOST" "echo download server connected"
-
-      - name: Set up SSH for download server (Windows)
-        if: ${{ github.event.inputs.upload_latest == 'true' && runner.os == 'Windows' }}
-        shell: pwsh
-        env:
-          DOWNLOAD_SERVER_HOST: ${{ secrets.DOWNLOAD_SERVER_HOST }}
-          DOWNLOAD_SERVER_USER: ${{ secrets.DOWNLOAD_SERVER_USER }}
-          DOWNLOAD_SERVER_SSH_KEY: ${{ secrets.DOWNLOAD_SERVER_SSH_KEY }}
-        run: |
-          if ([string]::IsNullOrWhiteSpace($env:DOWNLOAD_SERVER_HOST) -or
-              [string]::IsNullOrWhiteSpace($env:DOWNLOAD_SERVER_USER) -or
-              [string]::IsNullOrWhiteSpace($env:DOWNLOAD_SERVER_SSH_KEY)) {
-            Write-Warning "DOWNLOAD_SERVER_* secrets not set, will skip download server upload"
-            "DOWNLOAD_SERVER_READY=false" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-            exit 0
-          }
-          $sshDir = Join-Path $env:USERPROFILE ".ssh"
-          New-Item -ItemType Directory -Force -Path $sshDir | Out-Null
-          $keyPath = Join-Path $sshDir "download_server_id"
-          $key = ($env:DOWNLOAD_SERVER_SSH_KEY -replace "`r`n", "`n").TrimEnd() + "`n"
-          [System.IO.File]::WriteAllText($keyPath, $key)
-          icacls $keyPath /inheritance:r /grant:r "${env:USERNAME}:F" | Out-Null
-
-          $knownHosts = Join-Path $sshDir "known_hosts"
-          ssh-keyscan -H $env:DOWNLOAD_SERVER_HOST 2>$null | Out-File -FilePath $knownHosts -Append -Encoding ascii
-
-          @(
-            "DOWNLOAD_SERVER_READY=true",
-            "DOWNLOAD_SERVER_HOST=$env:DOWNLOAD_SERVER_HOST",
-            "DOWNLOAD_SERVER_USER=$env:DOWNLOAD_SERVER_USER",
-            "DOWNLOAD_SERVER_KEY=$keyPath"
-          ) | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-
-          $target = "$($env:DOWNLOAD_SERVER_USER)@$($env:DOWNLOAD_SERVER_HOST)"
-          ssh -i $keyPath -o StrictHostKeyChecking=accept-new -o BatchMode=yes $target "echo download server connected"
-
       # 打包后端工程
       - name: Build BE Static win
         if: ${{ runner.os == 'Windows' }}
         # 在这个步骤中，临时覆盖 JAVA_HOME，让 Maven 使用 JBR
+        shell: pwsh
         env:
           JAVA_HOME: ${{ env.JBR_BUILD_PATH }}
         run: |
           pwd
           mvn -v 
-          mvn clean install -U -B '-Dmaven.test.skip=true' -f ${{ env.JCEF_POM_PATH }}
+          mvn clean install -U -B '-Dmaven.test.skip=true' `
+            "-P${env:CHAT2DB_MAVEN_PROFILE}" `
+            "-Dchat2db.update.key-id=${env:CHAT2DB_UPDATE_KEY_ID}" `
+            "-Dchat2db.update.public-key=${env:CHAT2DB_UPDATE_PUBLIC_KEY_B64}" `
+            -f "${env:JCEF_POM_PATH}"
           # ossutil cp -rf ${{ secrets.REPO_JAR_PATH }} "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/"
           # cp ${{ secrets.REPO_JAR_PATH }} ${{ secrets.REPO_STATIC_JAR_PATH }} 
 
@@ -907,7 +829,11 @@ jobs:
         run: |
           pwd
           mvn -v 
-          mvn clean install -U -B '-Dmaven.test.skip=true' -f ${{ env.JCEF_POM_PATH }}
+          mvn clean install -U -B '-Dmaven.test.skip=true' \
+            -P"${CHAT2DB_MAVEN_PROFILE}" \
+            -Dchat2db.update.key-id="${CHAT2DB_UPDATE_KEY_ID}" \
+            -Dchat2db.update.public-key="${CHAT2DB_UPDATE_PUBLIC_KEY_B64}" \
+            -f "${JCEF_POM_PATH}"
           # ossutil cp -rf ${{ secrets.REPO_JAR_PATH }} "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/"
           # cp ${{ secrets.REPO_JAR_PATH }} ${{ secrets.REPO_STATIC_JAR_PATH }}
 
@@ -916,7 +842,11 @@ jobs:
         run: |
           pwd
           mvn -v
-          mvn clean install -U -B '-Dmaven.test.skip=true' -f ${{ env.JCEF_POM_PATH }}
+          mvn clean install -U -B '-Dmaven.test.skip=true' \
+            -P"${CHAT2DB_MAVEN_PROFILE}" \
+            -Dchat2db.update.key-id="${CHAT2DB_UPDATE_KEY_ID}" \
+            -Dchat2db.update.public-key="${CHAT2DB_UPDATE_PUBLIC_KEY_B64}" \
+            -f "${JCEF_POM_PATH}"
           # ossutil cp -rf ${{ secrets.REPO_JAR_PATH }} "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/"
           # cp ${{ secrets.REPO_JAR_PATH }} ${{ secrets.REPO_STATIC_JAR_PATH }}
       
@@ -942,27 +872,33 @@ jobs:
           echo "Returned to the original directory. Current path is:"
           pwd
           
-          mkdir -p ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile
-          cp ${{ env.JCEF_FRONT_PATH }}/dist.zip ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile
-          
-          mkdir -p ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/mac
-          mkdir -p ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/win
-          mkdir -p ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/linux
-          cp -r ${{ env.JCEF_FRONT_PATH }}/dist ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/mac
-          cp -r ${{ env.JCEF_FRONT_PATH }}/dist ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/win
-          cp -r ${{ env.JCEF_FRONT_PATH }}/dist ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/linux
+          bash "${JCEF_PACKAGE_SCRIPT_DIR}/prepare_desktop_layout.sh" \
+            "${{ github.event.inputs.version }}" \
+            "${JCEF_FRONT_PATH}/dist" \
+            "${CHAT2DB_RELEASE_EPOCH}" \
+            "${CHAT2DB_DATA_SCHEMA_VERSION}" \
+            "${JCEF_ENTERPRISE_SOURCE_REF}" \
+            "${JCEF_PROJECT_ROOT}"
 
-          echo "start build version file"
-          CHAT2DB_PACKAGE_EDITION="local" \
-          CHAT2DB_PACKAGE_MODE="enterprise-over-community" \
-          CHAT2DB_SOURCE_REF="${JCEF_SOURCE_REF}" \
-          CHAT2DB_ENTERPRISE_SOURCE_REF="${JCEF_ENTERPRISE_SOURCE_REF}" \
-          CHAT2DB_COMMUNITY_SOURCE_REF="${JCEF_COMMUNITY_SOURCE_REF}" \
-            bash ${{ env.JCEF_PACKAGE_SCRIPT_DIR }}/generate_metadata.sh  ${{ github.event.inputs.version }}  ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile  https://cdn.chat2db-ai.com/offline/updates
-          cp ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile/version.json   ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile/local_version.json
-          cp ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile/local_version.json ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/mac
-          cp ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile/local_version.json ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/win
-          cp ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile/local_version.json ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/linux
+          if [ "${CHAT2DB_MAVEN_PROFILE}" = "bridge-fat" ]; then
+            mkdir -p "${JCEF_PROJECT_ROOT}/jpackage/input/sourceFile"
+            cp "${JCEF_FRONT_PATH}/dist.zip" "${JCEF_PROJECT_ROOT}/jpackage/input/sourceFile/dist.zip"
+            CHAT2DB_PACKAGE_EDITION="local" \
+            CHAT2DB_PACKAGE_MODE="enterprise-over-community" \
+            CHAT2DB_SOURCE_REF="${JCEF_SOURCE_REF}" \
+            CHAT2DB_ENTERPRISE_SOURCE_REF="${JCEF_ENTERPRISE_SOURCE_REF}" \
+            CHAT2DB_COMMUNITY_SOURCE_REF="${JCEF_COMMUNITY_SOURCE_REF}" \
+              bash "${JCEF_PACKAGE_SCRIPT_DIR}/generate_metadata.sh" \
+                "${{ github.event.inputs.version }}" \
+                "${JCEF_PROJECT_ROOT}/jpackage/input/sourceFile" \
+                https://cdn.chat2db-ai.com/offline/updates
+            cp "${JCEF_PROJECT_ROOT}/jpackage/input/sourceFile/version.json" \
+              "${JCEF_PROJECT_ROOT}/jpackage/input/sourceFile/local_version.json"
+            for platform in mac win linux; do
+              cp "${JCEF_PROJECT_ROOT}/jpackage/input/sourceFile/local_version.json" \
+                "${JCEF_PROJECT_ROOT}/jpackage/input/${platform}/local_version.json"
+            done
+          fi
       
 
       # Step specifically for Windows
@@ -993,28 +929,33 @@ jobs:
           echo "Returned to the original directory. Current path is:"
           pwd
           
-          # The rest of the script is the same, as the commands are compatible
-          mkdir -p "$PROJECT_ROOT/jpackage/input/sourceFile"
-          cp "$FRONT_PATH/dist.zip" "$PROJECT_ROOT/jpackage/input/sourceFile"
+          bash "$PACKAGE_SCRIPT_DIR/prepare_desktop_layout.sh" \
+            "${{ github.event.inputs.version }}" \
+            "$FRONT_PATH/dist" \
+            "$CHAT2DB_RELEASE_EPOCH" \
+            "$CHAT2DB_DATA_SCHEMA_VERSION" \
+            "$JCEF_ENTERPRISE_SOURCE_REF" \
+            "$PROJECT_ROOT"
 
-          mkdir -p "$PROJECT_ROOT/jpackage/input/mac"
-          mkdir -p "$PROJECT_ROOT/jpackage/input/win"
-          mkdir -p "$PROJECT_ROOT/jpackage/input/linux"
-          cp -r "$FRONT_PATH/dist" "$PROJECT_ROOT/jpackage/input/mac"
-          cp -r "$FRONT_PATH/dist" "$PROJECT_ROOT/jpackage/input/win"
-          cp -r "$FRONT_PATH/dist" "$PROJECT_ROOT/jpackage/input/linux"
-
-          echo "start build version file"
-          CHAT2DB_PACKAGE_EDITION="local" \
-          CHAT2DB_PACKAGE_MODE="enterprise-over-community" \
-          CHAT2DB_SOURCE_REF="${JCEF_SOURCE_REF}" \
-          CHAT2DB_ENTERPRISE_SOURCE_REF="${JCEF_ENTERPRISE_SOURCE_REF}" \
-          CHAT2DB_COMMUNITY_SOURCE_REF="${JCEF_COMMUNITY_SOURCE_REF}" \
-            bash "$PACKAGE_SCRIPT_DIR/generate_metadata.sh" ${{ github.event.inputs.version }} "$PROJECT_ROOT/jpackage/input/sourceFile" https://cdn.chat2db-ai.com/offline/updates
-          cp "$PROJECT_ROOT/jpackage/input/sourceFile/version.json" "$PROJECT_ROOT/jpackage/input/sourceFile/local_version.json"
-          cp "$PROJECT_ROOT/jpackage/input/sourceFile/local_version.json" "$PROJECT_ROOT/jpackage/input/mac"
-          cp "$PROJECT_ROOT/jpackage/input/sourceFile/local_version.json" "$PROJECT_ROOT/jpackage/input/win"
-          cp "$PROJECT_ROOT/jpackage/input/sourceFile/local_version.json" "$PROJECT_ROOT/jpackage/input/linux"
+          if [ "$CHAT2DB_MAVEN_PROFILE" = "bridge-fat" ]; then
+            mkdir -p "$PROJECT_ROOT/jpackage/input/sourceFile"
+            cp "$FRONT_PATH/dist.zip" "$PROJECT_ROOT/jpackage/input/sourceFile/dist.zip"
+            CHAT2DB_PACKAGE_EDITION="local" \
+            CHAT2DB_PACKAGE_MODE="enterprise-over-community" \
+            CHAT2DB_SOURCE_REF="${JCEF_SOURCE_REF}" \
+            CHAT2DB_ENTERPRISE_SOURCE_REF="${JCEF_ENTERPRISE_SOURCE_REF}" \
+            CHAT2DB_COMMUNITY_SOURCE_REF="${JCEF_COMMUNITY_SOURCE_REF}" \
+              bash "$PACKAGE_SCRIPT_DIR/generate_metadata.sh" \
+                "${{ github.event.inputs.version }}" \
+                "$PROJECT_ROOT/jpackage/input/sourceFile" \
+                https://cdn.chat2db-ai.com/offline/updates
+            cp "$PROJECT_ROOT/jpackage/input/sourceFile/version.json" \
+              "$PROJECT_ROOT/jpackage/input/sourceFile/local_version.json"
+            for platform in mac win linux; do
+              cp "$PROJECT_ROOT/jpackage/input/sourceFile/local_version.json" \
+                "$PROJECT_ROOT/jpackage/input/$platform/local_version.json"
+            done
+          fi
 
       - name: Restore Windows runtime image after build clean
         if: runner.os == 'Windows'
@@ -1123,8 +1064,8 @@ jobs:
           fi
 
           # 覆盖 GITHUB_ENV 和 GITHUB_PATH，让后续步骤使用 Temurin
-          echo "JAVA_HOME=$TEMURIN_PATH" >> $GITHUB_ENV
-          echo "$TEMURIN_PATH/bin" >> $GITHUB_PATH
+          echo "JAVA_HOME=$TEMURIN_PATH" >> "$GITHUB_ENV"
+          echo "$TEMURIN_PATH/bin" >> "$GITHUB_PATH"
           echo "Environment switched. Subsequent steps will use Temurin JDK."
           echo "Temurin java path: $TEMURIN_PATH/bin/java"
           "$TEMURIN_PATH/bin/java" -version
@@ -1218,37 +1159,6 @@ jobs:
             python3 "${RUNNER_TEMP}/notify_package.py"
           echo "oss successful"
 
-      - name: Upload arm64 DMG to OSS if requested
-        # 只有当触发工作流时，传入的 upload_latest 参数值为 'true'，此步骤才会执行
-        if: runner.os == 'macOS' && matrix.arch == 'arm64' && github.event.inputs.upload_latest == 'true'
-        run: |
-          echo "检测到需要上传 arm64 DMG，正在执行上传..."
-          ossutil cp -rf ${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg "oss://${{ secrets.BUCKET_NAME }}/offline/latest/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-arm64-latest.dmg"
-          rclone copyto "${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg" "${R2_REMOTE}/offline/latest/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-arm64-latest.dmg"
-
-          if [ "${DOWNLOAD_SERVER_READY:-false}" = "true" ]; then
-            bash "$DOWNLOAD_UPLOAD_SCRIPT" \
-              "${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg" \
-              "offline/latest/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-arm64-latest.dmg" \
-              || echo "::warning::download server upload failed (OSS/R2 succeeded)"
-          fi
-
-
-      - name: Upload x64 DMG to OSS if requested
-        # 只有当触发工作流时，传入的 upload_latest 参数值为 'true'，此步骤才会执行
-        if: runner.os == 'macOS' && matrix.arch == 'x86_64' && github.event.inputs.upload_latest == 'true'
-        run: |
-          echo "检测到需要上传 x64 DMG，正在执行上传..."
-          ossutil cp -rf ${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.dmg "oss://${{ secrets.BUCKET_NAME }}/offline/latest/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-latest.dmg"
-          rclone copyto "${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.dmg" "${R2_REMOTE}/offline/latest/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-latest.dmg"
-
-          if [ "${DOWNLOAD_SERVER_READY:-false}" = "true" ]; then
-            bash "$DOWNLOAD_UPLOAD_SCRIPT" \
-              "${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.dmg" \
-              "offline/latest/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-latest.dmg" \
-              || echo "::warning::download server upload failed (OSS/R2 succeeded)"
-          fi
-
       - name: Upload Linux packages to OSS
         if: ${{ runner.os == 'Linux' }}
         run: |
@@ -1281,89 +1191,6 @@ jobs:
           notify_package "Linux ${{ matrix.arch }} rpm" "$RPM_FILE"
           ossutil cp -rf "${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/${APPIMAGE_FILE}" "oss://${{ secrets.BUCKET_NAME }}/offline/${{ github.event.inputs.version }}/"
           notify_package "Linux ${{ matrix.arch }} AppImage" "$APPIMAGE_FILE"
-
-      - name: Upload Linux packages to latest if requested
-        if: ${{ runner.os == 'Linux' && github.event.inputs.upload_latest == 'true' }}
-        run: |
-          if [ "${{ matrix.arch }}" = "arm64" ]; then
-            ARCH_DIR="arm64"
-            DEB_FILE="${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.deb"
-            RPM_FILE="${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-aarch64.rpm"
-            APPIMAGE_FILE="${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.AppImage"
-            LATEST_DEB="${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-arm64-latest.deb"
-            LATEST_RPM="${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-arm64-latest.rpm"
-            LATEST_APPIMAGE="${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-arm64-latest.AppImage"
-          else
-            ARCH_DIR="x86_64"
-            DEB_FILE="${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-amd64.deb"
-            RPM_FILE="${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x86_64.rpm"
-            APPIMAGE_FILE="${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x86_64.AppImage"
-            LATEST_DEB="${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-latest.deb"
-            LATEST_RPM="${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-latest.rpm"
-            LATEST_APPIMAGE="${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-latest.AppImage"
-          fi
-
-          echo "检测到需要上传 Linux latest 离线产物，正在执行上传..."
-          ossutil cp -rf "${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/${DEB_FILE}" "oss://${{ secrets.BUCKET_NAME }}/offline/latest/${LATEST_DEB}"
-          ossutil cp -rf "${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/${RPM_FILE}" "oss://${{ secrets.BUCKET_NAME }}/offline/latest/${LATEST_RPM}"
-          ossutil cp -rf "${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/${APPIMAGE_FILE}" "oss://${{ secrets.BUCKET_NAME }}/offline/latest/${LATEST_APPIMAGE}"
-
-          ossutil cp -rf "${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/${DEB_FILE}" "oss://${{ secrets.BUCKET_NAME }}/offline/latest/linux/${ARCH_DIR}/${DEB_FILE}"
-          ossutil cp -rf "${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/${RPM_FILE}" "oss://${{ secrets.BUCKET_NAME }}/offline/latest/linux/${ARCH_DIR}/${RPM_FILE}"
-          ossutil cp -rf "${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/${APPIMAGE_FILE}" "oss://${{ secrets.BUCKET_NAME }}/offline/latest/linux/${ARCH_DIR}/${APPIMAGE_FILE}"
-
-          rclone copyto "${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/${DEB_FILE}" "${R2_REMOTE}/offline/latest/${LATEST_DEB}"
-          rclone copyto "${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/${RPM_FILE}" "${R2_REMOTE}/offline/latest/${LATEST_RPM}"
-          rclone copyto "${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/${APPIMAGE_FILE}" "${R2_REMOTE}/offline/latest/${LATEST_APPIMAGE}"
-
-          rclone copyto "${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/${DEB_FILE}" "${R2_REMOTE}/offline/latest/linux/${ARCH_DIR}/${DEB_FILE}"
-          rclone copyto "${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/${RPM_FILE}" "${R2_REMOTE}/offline/latest/linux/${ARCH_DIR}/${RPM_FILE}"
-          rclone copyto "${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/${APPIMAGE_FILE}" "${R2_REMOTE}/offline/latest/linux/${ARCH_DIR}/${APPIMAGE_FILE}"
-
-          if [ "${DOWNLOAD_SERVER_READY:-false}" = "true" ]; then
-            for pair in \
-              "${DEB_FILE}::offline/latest/${LATEST_DEB}" \
-              "${RPM_FILE}::offline/latest/${LATEST_RPM}" \
-              "${APPIMAGE_FILE}::offline/latest/${LATEST_APPIMAGE}" \
-              "${DEB_FILE}::offline/latest/linux/${ARCH_DIR}/${DEB_FILE}" \
-              "${RPM_FILE}::offline/latest/linux/${ARCH_DIR}/${RPM_FILE}" \
-              "${APPIMAGE_FILE}::offline/latest/linux/${ARCH_DIR}/${APPIMAGE_FILE}"; do
-              local_file="${pair%%::*}"
-              remote_rel="${pair##*::}"
-              bash "$DOWNLOAD_UPLOAD_SCRIPT" \
-                "${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/${local_file}" \
-                "${remote_rel}" \
-                || echo "::warning::download server upload failed for ${remote_rel}"
-            done
-          fi
-
-
-      - name: upload jar and web zip to oss (using PowerShell and ossutil filter)
-        if: ${{ runner.os == 'Windows' }}
-        shell: pwsh
-        run: |
-          # 1. 定义变量
-          $SourceDir = "${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile" # PowerShell也能很好地处理正斜杠
-          $DestURL = "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/"
-          
-          # 2. 上传 version.json
-          Write-Host "Uploading version.json..."
-          ossutil cp -f "${SourceDir}/version.json" "${DestURL}"
-
-          $ProvenanceFile = "${SourceDir}/build-provenance.json"
-          if (Test-Path $ProvenanceFile) {
-            Write-Host "Uploading build-provenance.json..."
-            ossutil cp -f $ProvenanceFile "${DestURL}"
-          } else {
-            Write-Warning "build-provenance.json not found; skip provenance upload."
-          }
-
-          # 3. 【推荐】一次性递归上传整个目录，但只包含 .jar 和 .zip 文件
-          #    -r 表示递归, -f 表示强制, --include 是过滤器
-          Write-Host "Uploading *.jar and *.zip files..."
-          ossutil cp -r -f "${SourceDir}" "${DestURL}" --include "*.jar" --include "*.zip"
-          
-          Write-Host "oss upload successful"    
 
       - name: package win x64
         if: ${{ runner.os == 'Windows' }}
@@ -1546,82 +1373,188 @@ jobs:
           $env:PACKAGE_URL = "https://cdn.chat2db-ai.com/offline/${{ github.event.inputs.version }}/$packageFile"
           python "$env:RUNNER_TEMP/notify_package.py"
 
-      - name: Upload x64 exe to OSS if requested
-        # 只有当触发工作流时，传入的 upload_latest 参数值为 'true'，此步骤才会执行
-        if: matrix.os == 'windows-latest' && github.event.inputs.upload_latest == 'true'
-        shell: pwsh
+      - name: Archive updater-v2 full package
+        if: ${{ env.CHAT2DB_MAVEN_PROFILE == 'versioned-thin' && startsWith(matrix.update_target, 'macos-') }}
+        shell: bash
         run: |
-          echo "检测到需要上传 x64 exe，正在执行上传..."
-          ossutil cp -rf ${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe "oss://${{ secrets.BUCKET_NAME }}/offline/latest/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-latest.exe"
-          rclone copyto "${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe" "${env:R2_REMOTE}/offline/latest/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-latest.exe"
+          set -euo pipefail
+          DMG_PATH=$(find "${JCEF_PROJECT_ROOT}/jpackage/output" -maxdepth 1 -type f -name '*.dmg' -print -quit)
+          test -n "${DMG_PATH}"
+          bash "${JCEF_PROJECT_ROOT}/script/package/capture_macos_update_package.sh" \
+            "${DMG_PATH}" \
+            "${JCEF_PROJECT_ROOT}/jpackage/output/update-package" \
+            "${JCEF_PROJECT_ROOT}"
+          test -d "${JCEF_PROJECT_ROOT}/jpackage/output/update-package"
+          PACKAGE_ROOT="${RUNNER_TEMP}/full-package-${{ matrix.update_target }}"
+          rm -rf "${PACKAGE_ROOT}"
+          mkdir -p "${PACKAGE_ROOT}/package"
+          cp -R "${JCEF_PROJECT_ROOT}/jpackage/output/update-package/." "${PACKAGE_ROOT}/package/"
+          tar -C "${PACKAGE_ROOT}" -czf \
+            "${RUNNER_TEMP}/full-package-${{ matrix.update_target }}.tar.gz" \
+            package
 
-          if ($env:DOWNLOAD_SERVER_READY -eq "true") {
-            $src = "${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe"
-            $final = "/data/downloads/offline/latest/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-latest.exe"
-            $dir = $final.Substring(0, $final.LastIndexOf('/'))
-            $tmp = "$final.uploading.$($env:GITHUB_RUN_ID).$($env:GITHUB_RUN_ATTEMPT).$([System.Guid]::NewGuid().ToString('N').Substring(0,8))"
-            $target = "$($env:DOWNLOAD_SERVER_USER)@$($env:DOWNLOAD_SERVER_HOST)"
-            $sshOpts = @("-i", "$env:DOWNLOAD_SERVER_KEY", "-o", "StrictHostKeyChecking=accept-new", "-o", "BatchMode=yes")
-            try {
-              & ssh @sshOpts $target "mkdir -p '$dir'"
-              if ($LASTEXITCODE -ne 0) { throw "ssh mkdir failed" }
-              & scp @sshOpts $src "${target}:$tmp"
-              if ($LASTEXITCODE -ne 0) { throw "scp failed" }
-              & ssh @sshOpts $target "chmod 644 '$tmp' && mv -f '$tmp' '$final'"
-              if ($LASTEXITCODE -ne 0) { throw "ssh rename failed" }
-              Write-Host "<< done download server: $final"
-            } catch {
-              Write-Warning "::warning::download server upload failed (OSS/R2 succeeded): $_"
-            }
-          }
+      - name: Upload updater-v2 full package artifact
+        if: ${{ env.CHAT2DB_MAVEN_PROFILE == 'versioned-thin' && startsWith(matrix.update_target, 'macos-') }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: full-package-local-${{ matrix.update_target }}
+          path: ${{ runner.temp }}/full-package-${{ matrix.update_target }}.tar.gz
+          if-no-files-found: error
+          retention-days: 7
 
-      - name: Generate and upload offline latest_version.json if requested
-        if: matrix.os == 'windows-latest' && github.event.inputs.update_latest_version_json == 'true'
-        shell: pwsh
+      - name: Archive legacy bridge update payload
+        if: ${{ runner.os == 'Windows' && env.CHAT2DB_MAVEN_PROFILE == 'bridge-fat' }}
+        shell: bash
         run: |
-          $metadataUrl = "https://cdn.chat2db-ai.com/offline/updates/${{ github.event.inputs.version }}/version.json"
-          $payload = @{
-            latestVersion = "${{ github.event.inputs.version }}"
-            metadataUrl = $metadataUrl
-            forceUpdate = $false
-          } | ConvertTo-Json -Depth 3
+          set -euo pipefail
+          PROJECT_ROOT="$(cygpath -u "${JCEF_PROJECT_ROOT}")"
+          SOURCE_DIR="${PROJECT_ROOT}/jpackage/input/sourceFile"
+          test -s "${SOURCE_DIR}/version.json"
+          test -s "${SOURCE_DIR}/chat2db-enterprise.jar"
+          test -s "${SOURCE_DIR}/chat2db-updater.jar"
+          test -s "${SOURCE_DIR}/dist.zip"
+          test ! -e "${SOURCE_DIR}/lib.zip"
+          tar -C "${SOURCE_DIR}" -czf "${RUNNER_TEMP}/bridge-update.tar.gz" \
+            version.json build-provenance.json chat2db-enterprise.jar chat2db-updater.jar dist.zip
 
-          $outputDir = "${{ runner.temp }}"
-          $outputFile = Join-Path $outputDir "latest_version.json"
-          Set-Content -Path $outputFile -Value $payload -Encoding utf8
+      - name: Upload legacy bridge update payload artifact
+        if: ${{ runner.os == 'Windows' && env.CHAT2DB_MAVEN_PROFILE == 'bridge-fat' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: bridge-update-local
+          path: ${{ runner.temp }}/bridge-update.tar.gz
+          if-no-files-found: error
+          retention-days: 7
 
-          Write-Host "Generated offline latest_version.json:"
-          Get-Content -Path $outputFile
+  promote:
+    name: Promote Local desktop release
+    runs-on: ubuntu-latest
+    needs:
+      - resolve_source
+      - release
+    steps:
+      - name: Check out Enterprise source commit
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ secrets.REPO_URL }}
+          path: enterprise-source
+          ref: ${{ needs.resolve_source.outputs.enterprise_sha }}
+          token: ${{ secrets.ACCESS_TOKEN }}
+          persist-credentials: false
 
-          ossutil cp -f $outputFile "oss://${{ secrets.BUCKET_NAME }}/offline/updates/latest_version.json"
+      - name: Check out CI promotion helpers
+        uses: actions/checkout@v4
+        with:
+          path: cicd-promotion-source
+          ref: ${{ github.sha }}
+          persist-credentials: false
 
-          if ($env:R2_REMOTE) {
-            rclone copyto $outputFile "${env:R2_REMOTE}/offline/updates/latest_version.json"
-          }
+      - name: Download legacy bridge update payload
+        if: ${{ needs.resolve_source.outputs.release_profile == 'bridge-fat' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: bridge-update-local
+          path: ${{ runner.temp }}/update-artifacts/bridge-update-local
 
-          if ($env:DOWNLOAD_SERVER_READY -eq "true") {
-            $final = "/data/downloads/offline/updates/latest_version.json"
-            $dir = $final.Substring(0, $final.LastIndexOf('/'))
-            $tmp = "$final.uploading.$($env:GITHUB_RUN_ID).$($env:GITHUB_RUN_ATTEMPT).$([System.Guid]::NewGuid().ToString('N').Substring(0,8))"
-            $target = "$($env:DOWNLOAD_SERVER_USER)@$($env:DOWNLOAD_SERVER_HOST)"
-            $sshOpts = @("-i", "$env:DOWNLOAD_SERVER_KEY", "-o", "StrictHostKeyChecking=accept-new", "-o", "BatchMode=yes")
-            try {
-              & ssh @sshOpts $target "mkdir -p '$dir'"
-              if ($LASTEXITCODE -ne 0) { throw "ssh mkdir failed" }
-              & scp @sshOpts $outputFile "${target}:$tmp"
-              if ($LASTEXITCODE -ne 0) { throw "scp failed" }
-              & ssh @sshOpts $target "chmod 644 '$tmp' && mv -f '$tmp' '$final'"
-              if ($LASTEXITCODE -ne 0) { throw "ssh rename failed" }
-              Write-Host "<< done download server: $final"
-            } catch {
-              Write-Warning "::warning::download server upload failed for latest_version.json: $_"
-            }
-          }
+      - name: Download updater-v2 full packages
+        if: ${{ needs.resolve_source.outputs.release_profile == 'versioned-thin' }}
+        uses: actions/download-artifact@v4
+        with:
+          pattern: full-package-local-*
+          path: ${{ runner.temp }}/update-artifacts
+          merge-multiple: false
+
+      - name: Set up OSS client
+        uses: yizhoumo/setup-ossutil@v1
+        with:
+          endpoint: ${{ secrets.OSS_ENDPOINT }}
+          access-key-id: ${{ secrets.OSS_ACCESS_KEY_ID }}
+          access-key-secret: ${{ secrets.OSS_ACCESS_KEY_SECRET }}
+          ossutil-version: '1.7.16'
+
+      - name: Set up R2 client
+        shell: bash
+        env:
+          R2_ACCESS_KEY: ${{ secrets.R2_ACCESS_KEY }}
+          R2_SECRET_KEY: ${{ secrets.R2_SECRET_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+        run: |
+          set -euo pipefail
+          test -n "${R2_ACCESS_KEY}"
+          test -n "${R2_SECRET_KEY}"
+          test -n "${R2_ENDPOINT}"
+          test -n "${R2_BUCKET_NAME}"
+          sudo apt-get update
+          sudo apt-get install -y jq rclone zip
+          RCLONE_CONFIG_PATH="${RUNNER_TEMP}/rclone.conf"
+          printf '%s\n' \
+            '[cf-r2]' \
+            'type = s3' \
+            'provider = Cloudflare' \
+            "access_key_id = ${R2_ACCESS_KEY}" \
+            "secret_access_key = ${R2_SECRET_KEY}" \
+            "endpoint = ${R2_ENDPOINT}" \
+            'acl = private' > "${RCLONE_CONFIG_PATH}"
+          echo "RCLONE_CONFIG=${RCLONE_CONFIG_PATH}" >> "${GITHUB_ENV}"
+          echo "R2_REMOTE=cf-r2:${R2_BUCKET_NAME}" >> "${GITHUB_ENV}"
+
+      - name: Set up atomic download-server upload
+        shell: bash
+        env:
+          DOWNLOAD_SERVER_HOST: ${{ secrets.DOWNLOAD_SERVER_HOST }}
+          DOWNLOAD_SERVER_USER: ${{ secrets.DOWNLOAD_SERVER_USER }}
+          DOWNLOAD_SERVER_SSH_KEY: ${{ secrets.DOWNLOAD_SERVER_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "${DOWNLOAD_SERVER_HOST}"
+          test -n "${DOWNLOAD_SERVER_USER}"
+          test -n "${DOWNLOAD_SERVER_SSH_KEY}"
+          mkdir -p "${HOME}/.ssh"
+          KEY_PATH="${HOME}/.ssh/download_server_id"
+          printf '%s\n' "${DOWNLOAD_SERVER_SSH_KEY}" > "${KEY_PATH}"
+          chmod 600 "${KEY_PATH}"
+          ssh-keyscan -H "${DOWNLOAD_SERVER_HOST}" >> "${HOME}/.ssh/known_hosts" 2>/dev/null
+          ssh -i "${KEY_PATH}" -o StrictHostKeyChecking=accept-new -o BatchMode=yes \
+            "${DOWNLOAD_SERVER_USER}@${DOWNLOAD_SERVER_HOST}" "echo download server connected"
+          {
+            echo "DOWNLOAD_SERVER_HOST=${DOWNLOAD_SERVER_HOST}"
+            echo "DOWNLOAD_SERVER_USER=${DOWNLOAD_SERVER_USER}"
+            echo "DOWNLOAD_SERVER_KEY=${KEY_PATH}"
+          } >> "${GITHUB_ENV}"
+
+      - name: Promote immutable resources and mutable pointers
+        shell: bash
+        env:
+          CHAT2DB_PRODUCT: LOCAL
+          CHAT2DB_RELEASE_ROOT: offline
+          CHAT2DB_PRODUCT_APP_NAME: ${{ secrets.OFFLINE_PRODUCT_APP_NAME }}
+          CHAT2DB_RELEASE_VERSION: ${{ github.event.inputs.version }}
+          CHAT2DB_RELEASE_PROFILE: ${{ needs.resolve_source.outputs.release_profile }}
+          CHAT2DB_RELEASE_CHANNEL: ${{ needs.resolve_source.outputs.release_channel_upper }}
+          CHAT2DB_RELEASE_EPOCH: ${{ github.event.inputs.release_epoch }}
+          CHAT2DB_DATA_SCHEMA_VERSION: ${{ github.event.inputs.data_schema_version }}
+          CHAT2DB_ROLLBACK_COMPATIBLE_FROM: ${{ github.event.inputs.rollback_compatible_from }}
+          CHAT2DB_ENTERPRISE_SHA: ${{ needs.resolve_source.outputs.enterprise_sha }}
+          CHAT2DB_RELEASE_NOTES_URL: ${{ github.event.inputs.release_notes_url }}
+          CHAT2DB_ENTERPRISE_ROOT: ${{ github.workspace }}/enterprise-source
+          CHAT2DB_UPDATE_ARTIFACT_ROOT: ${{ runner.temp }}/update-artifacts
+          CHAT2DB_PROMOTE_WORK_DIR: ${{ runner.temp }}
+          CHAT2DB_UPLOAD_LATEST: ${{ github.event.inputs.upload_latest }}
+          CHAT2DB_UPDATE_LATEST_VERSION_JSON: ${{ github.event.inputs.update_latest_version_json }}
+          CHAT2DB_UPDATE_KEY_ID: ${{ secrets.CHAT2DB_UPDATE_KEY_ID }}
+          CHAT2DB_UPDATE_PUBLIC_KEY_B64: ${{ secrets.CHAT2DB_UPDATE_PUBLIC_KEY_B64 }}
+          CHAT2DB_UPDATE_SIGNING_PRIVATE_KEY_B64: ${{ secrets.CHAT2DB_UPDATE_SIGNING_PRIVATE_KEY_B64 }}
+          BUCKET_NAME: ${{ secrets.BUCKET_NAME }}
+        run: |
+          bash "${GITHUB_WORKSPACE}/cicd-promotion-source/.github/scripts/promote-desktop-release.sh"
 
   notify_summary:
     name: Notify Feishu release summary
     runs-on: ubuntu-latest
-    needs: release
+    needs:
+      - release
+      - promote
     if: ${{ always() }}
     steps:
       - name: Send Feishu package summary
@@ -1629,6 +1562,7 @@ jobs:
           FEISHU_WEBHOOK_URL: ${{ secrets.FEISHU_RELEASE_NOTIFY_WEBHOOK }}
           RELEASE_VERSION: ${{ github.event.inputs.version }}
           RELEASE_RESULT: ${{ needs.release.result }}
+          PROMOTION_RESULT: ${{ needs.promote.result }}
           RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
           GITHUB_TOKEN: ${{ github.token }}
         run: |
@@ -1645,6 +1579,7 @@ jobs:
 
           version = os.environ["RELEASE_VERSION"]
           result = os.environ["RELEASE_RESULT"]
+          promotion_result = os.environ["PROMOTION_RESULT"]
           run_url = os.environ["RUN_URL"]
           base = f"https://cdn.chat2db-ai.com/offline/{version}"
           files = [
@@ -1679,14 +1614,14 @@ jobs:
               failed = []
               for job in jobs:
                   name = job.get("name", "")
-                  if not name.startswith("release "):
+                  if not (name.startswith("release ") or name.startswith("Promote ")):
                       continue
                   conclusion = job.get("conclusion") or job.get("status") or "unknown"
                   if conclusion != "success":
                       failed.append(f"- {name}: {conclusion}")
               return failed or ["- 未获取到失败 job，请查看运行链接"]
 
-          if result == "success":
+          if result == "success" and promotion_result == "success":
               lines = [
                   "Chat2DB Local 灰度包全部上传成功",
                   f"版本：{version}",
@@ -1699,6 +1634,7 @@ jobs:
                   "Chat2DB Local 灰度打包未全部成功",
                   f"版本：{version}",
                   f"结果：{result}",
+                  f"发布结果：{promotion_result}",
                   "失败/未成功 job：",
                   *failed_release_jobs(),
                   f"运行链接：{run_url}",
