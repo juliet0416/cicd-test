@@ -48,6 +48,18 @@ class ResolveDesktopReleaseTest(unittest.TestCase):
             ),
         )
 
+    def test_resolves_533_beta_thin_release_from_530_bridge_test_baseline(self):
+        self.assertEqual(
+            ("versioned-thin", "BETA"),
+            MODULE.resolve(
+                arguments(
+                    version="5.3.3-beta.1",
+                    channel="beta",
+                    rollback_compatible_from="5.3.0",
+                )
+            ),
+        )
+
     def test_rejects_prerelease_on_stable_channel(self):
         with self.assertRaisesRegex(ValueError, "must use the beta channel"):
             MODULE.resolve(arguments(version="5.3.4-beta.1"))
@@ -63,7 +75,7 @@ class ResolveDesktopReleaseTest(unittest.TestCase):
             )
 
     def test_rejects_release_before_bridge(self):
-        with self.assertRaisesRegex(ValueError, "starting at 5.3.3"):
+        with self.assertRaisesRegex(ValueError, "starting at 5.3.3-beta.1"):
             MODULE.resolve(arguments(version="5.3.2"))
 
     def test_rejects_newer_rollback_floor(self):
