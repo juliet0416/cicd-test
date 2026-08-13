@@ -46,10 +46,16 @@ class ResolveDesktopReleaseTest(unittest.TestCase):
         self.assertEqual("bridge-fat", profile)
         self.assertEqual("BETA", channel)
 
-    def test_resolves_stable_thin_release(self):
+    def test_resolves_534_stable_as_fat_release(self):
+        self.assertEqual(
+            ("bridge-fat", "STABLE"),
+            MODULE.resolve(arguments()),
+        )
+
+    def test_resolves_later_stable_thin_release(self):
         self.assertEqual(
             ("versioned-thin", "STABLE"),
-            MODULE.resolve(arguments()),
+            MODULE.resolve(arguments(version="5.3.5", release_epoch="2")),
         )
 
     def test_resolves_beta_thin_release(self):
@@ -73,6 +79,10 @@ class ResolveDesktopReleaseTest(unittest.TestCase):
                     data_schema_version="1",
                 )
             )
+
+    def test_rejects_534_fat_release_with_wrong_epoch(self):
+        with self.assertRaisesRegex(ValueError, "release_epoch=1"):
+            MODULE.resolve(arguments(release_epoch="2"))
 
     def test_rejects_release_before_bridge(self):
         with self.assertRaisesRegex(ValueError, "starting at 5.3.3"):
