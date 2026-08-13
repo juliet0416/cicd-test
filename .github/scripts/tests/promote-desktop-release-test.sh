@@ -181,6 +181,22 @@ grep -Fq 'event=phase_complete phase=updates-v2 objects=20/20' "${PROMOTION_OUTP
 grep -Fq 'event=promotion_complete product=PRO version=5.3.4-beta.1' "${PROMOTION_OUTPUT_LOG}"
 
 : > "${LOG_FILE}"
+export CHAT2DB_RELEASE_VERSION=5.3.4
+export CHAT2DB_RELEASE_PROFILE=bridge-fat
+export CHAT2DB_RELEASE_CHANNEL=STABLE
+export CHAT2DB_RELEASE_EPOCH=1
+export CHAT2DB_ROLLBACK_COMPATIBLE_FROM=5.3.3
+export CHAT2DB_UPDATE_LATEST_VERSION_JSON=false
+rm -rf "${CHAT2DB_PROMOTE_WORK_DIR}"
+bash "${SCRIPT_DIR}/promote-desktop-release.sh" >/dev/null
+grep -Fq 'download/updates-v2/stable/5.3.4/package-pro-macos-arm64-macos-app-archive.tar.gz' "${LOG_FILE}"
+grep -Fq 'download/updates-v2/stable/5.3.4/manifest-pro-windows-x64-windows-exe.json' "${LOG_FILE}"
+if grep -Fq 'download/updates/5.3.4/version.json' "${LOG_FILE}"; then
+    echo '5.3.4 fat release must use updater-v2 full-package distribution' >&2
+    exit 1
+fi
+
+: > "${LOG_FILE}"
 unset PROMOTE_TEST_SLOW_SCP_ONCE_FILE
 export CHAT2DB_DOWNLOAD_SERVER_PULL_FROM_OSS=true
 export CHAT2DB_RELEASE_VERSION=5.3.3

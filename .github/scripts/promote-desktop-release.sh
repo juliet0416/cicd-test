@@ -673,7 +673,8 @@ promotion_log download_server_capacity \
     "available_and_usage=${download_server_capacity:-unknown}"
 
 if [ "${CHAT2DB_RELEASE_PROFILE}" = "bridge-fat" ] \
-        && [ "${CHAT2DB_RELEASE_CHANNEL}" = "STABLE" ]; then
+        && [ "${CHAT2DB_RELEASE_CHANNEL}" = "STABLE" ] \
+        && [ "${CHAT2DB_RELEASE_VERSION}" = "5.3.3" ]; then
     publish_bridge_update
 else
     publish_v2_update
