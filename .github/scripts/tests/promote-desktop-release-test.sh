@@ -93,19 +93,34 @@ tar -C "${BRIDGE_DIR}" -czf "${BRIDGE_ARTIFACT_DIR}/bridge-update.tar.gz" .
 bash "${SCRIPT_DIR}/promote-desktop-release.sh" > "${BRIDGE_OUTPUT_LOG}"
 grep -Fq 'download/updates/5.3.3/chat2db-updater.jar' "${LOG_FILE}"
 grep -Fq 'download/updates/latest_version.json' "${LOG_FILE}"
-tail -n 1 "${LOG_FILE}" | grep -Fq 'oss://test-bucket/download/updates/latest_version.json'
+grep -E '^(ossutil|rclone|scp)' "${LOG_FILE}" | tail -n 1 \
+    | grep -Fq 'oss://test-bucket/download/updates/latest_version.json'
 grep -Fq 'provider=download-server strategy=oss-pull' "${BRIDGE_OUTPUT_LOG}"
 grep -Fq 'event=transfer_start phase=bridge-update object=6/6 provider=download-server stage=scp' "${BRIDGE_OUTPUT_LOG}"
 grep -Fq 'event=download_server_capacity target=release@download.example.com' "${BRIDGE_OUTPUT_LOG}"
+if grep -Fq 'event=download_server_retention_start' "${BRIDGE_OUTPUT_LOG}"; then
+    echo 'non-latest promotion must not remove latest installer history' >&2
+    exit 1
+fi
+grep -Fq 'event=download_server_cleanup_start target=release@download.example.com release_root=/data/downloads/download scope=temporary-files' "${BRIDGE_OUTPUT_LOG}"
+grep -Fq 'event=download_server_cleanup_complete target=release@download.example.com release_root=/data/downloads/download scope=temporary-files' "${BRIDGE_OUTPUT_LOG}"
 
 : > "${LOG_FILE}"
 export CHAT2DB_UPLOAD_LATEST=true
 export CHAT2DB_UPDATE_LATEST_VERSION_JSON=false
 rm -rf "${CHAT2DB_PROMOTE_WORK_DIR}"
-bash "${SCRIPT_DIR}/promote-desktop-release.sh"
+LATEST_OUTPUT_LOG="${WORK_DIR}/latest-output.log"
+bash "${SCRIPT_DIR}/promote-desktop-release.sh" > "${LATEST_OUTPUT_LOG}"
 grep -Fq 'download/latest/Chat2DB-Pro-arm64-latest.dmg' "${LOG_FILE}"
 grep -Fq 'download/latest/linux/x86_64/Chat2DB-Pro-5.3.3-x86_64.AppImage' "${LOG_FILE}"
 grep -Fq 'download/latest/linux/arm64/Chat2DB-Pro-5.3.3-aarch64.rpm' "${LOG_FILE}"
+grep -Fq 'event=phase_complete phase=latest-installers objects=15/15' "${LATEST_OUTPUT_LOG}"
+grep -Fq 'event=download_server_retention_start' "${LATEST_OUTPUT_LOG}"
+latest_complete_line=$(grep -n 'event=phase_complete phase=latest-installers objects=15/15' "${LATEST_OUTPUT_LOG}" \
+    | tail -n 1 | cut -d: -f1)
+retention_line=$(grep -n 'event=download_server_retention_start' "${LATEST_OUTPUT_LOG}" \
+    | tail -n 1 | cut -d: -f1)
+test "${retention_line}" -gt "${latest_complete_line}"
 
 FAKE_ENTERPRISE_SCRIPTS="${CHAT2DB_ENTERPRISE_ROOT}/script/package"
 mkdir -p "${FAKE_ENTERPRISE_SCRIPTS}"
@@ -169,7 +184,8 @@ grep -Fq 'download/updates-v2/beta/latest_version.json' "${LOG_FILE}"
 test "$(grep -Ec '^ossutil cp -f .*/manifest-pro-.* oss://test-bucket/download/updates-v2/beta/5\.3\.4-beta\.1/manifest-pro-' "${LOG_FILE}")" -eq 9
 test "$(grep -Ec '^ossutil cp -f .*/package-pro-.* oss://test-bucket/download/updates-v2/beta/5\.3\.4-beta\.1/package-pro-' "${LOG_FILE}")" -eq 9
 test "$(grep -Ec '^ossutil cp -f .*/release-index\.json oss://test-bucket/download/updates-v2/beta/5\.3\.4-beta\.1/release-index\.json$' "${LOG_FILE}")" -eq 1
-tail -n 1 "${LOG_FILE}" | grep -Fq 'oss://test-bucket/download/updates-v2/beta/latest_version.json'
+grep -E '^(ossutil|rclone|scp)' "${LOG_FILE}" | tail -n 1 \
+    | grep -Fq 'oss://test-bucket/download/updates-v2/beta/latest_version.json'
 grep -Fq 'event=promotion_start product=PRO version=5.3.4-beta.1 profile=versioned-thin channel=BETA' "${PROMOTION_OUTPUT_LOG}"
 grep -Fq 'event=phase_start phase=updates-v2 objects=20' "${PROMOTION_OUTPUT_LOG}"
 grep -Fq 'event=transfer_start phase=updates-v2 object=1/20 provider=aliyun-oss stage=upload' "${PROMOTION_OUTPUT_LOG}"
@@ -179,6 +195,10 @@ grep -Fq 'event=transfer_progress phase=updates-v2 object=1/20 provider=download
 grep -Fq 'uploaded_bytes=0 size_bytes=' "${PROMOTION_OUTPUT_LOG}"
 grep -Fq 'event=phase_complete phase=updates-v2 objects=20/20' "${PROMOTION_OUTPUT_LOG}"
 grep -Fq 'event=promotion_complete product=PRO version=5.3.4-beta.1' "${PROMOTION_OUTPUT_LOG}"
+if grep -Fq 'event=download_server_retention_start' "${PROMOTION_OUTPUT_LOG}"; then
+    echo 'beta promotion must not remove stable latest installers' >&2
+    exit 1
+fi
 
 : > "${LOG_FILE}"
 export CHAT2DB_RELEASE_VERSION=5.3.4

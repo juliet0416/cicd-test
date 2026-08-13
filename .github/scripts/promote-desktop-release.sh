@@ -275,7 +275,7 @@ pull_download_server_from_oss() {
     # shellcheck disable=SC2029
     run_transfer download-server oss-pull "${source_url}" "${DOWNLOAD_TARGET}:${temporary_path}" \
         ssh "${SSH_OPTIONS[@]}" "${DOWNLOAD_TARGET}" \
-            "set -e; curl --fail --location --silent --show-error --retry 5 --retry-all-errors --connect-timeout 15 --output '${temporary_path}' '${source_url}'; actual=\$(sha256sum '${temporary_path}' | awk '{print \$1}'); test \"\${actual}\" = '${expected_sha256}'" \
+            "set -e; curl --fail --location --silent --show-error --retry 5 --connect-timeout 15 --output '${temporary_path}' '${source_url}'; actual=\$(sha256sum '${temporary_path}' | awk '{print \$1}'); test \"\${actual}\" = '${expected_sha256}'" \
             </dev/null
 }
 
@@ -296,6 +296,81 @@ cleanup_download_server_temp() {
     # The temporary path is generated uniquely for this workflow run.
     # shellcheck disable=SC2029
     ssh "${SSH_OPTIONS[@]}" "${DOWNLOAD_TARGET}" "rm -f '${temporary_path}'" \
+        </dev/null 2>/dev/null || true
+}
+
+cleanup_download_server_temp_files() {
+    local release_root="/data/downloads/${CHAT2DB_RELEASE_ROOT}"
+
+    case "${release_root}" in
+        /data/downloads/download|/data/downloads/offline) ;;
+        *)
+            echo "Error: refusing to clean unexpected download-server root: ${release_root}" >&2
+            exit 1
+            ;;
+    esac
+
+    promotion_log download_server_cleanup_start \
+        "target=${DOWNLOAD_TARGET}" \
+        "release_root=${release_root}" \
+        "scope=temporary-files"
+    # All paths are selected from the validated release-root allowlist above.
+    # shellcheck disable=SC2029
+    run_transfer download-server cleanup "${release_root}" "${DOWNLOAD_TARGET}:${release_root}" \
+        ssh "${SSH_OPTIONS[@]}" "${DOWNLOAD_TARGET}" \
+            "find '${release_root}' -type f -name '*.uploading.*' -mmin +1440 -delete" </dev/null
+    promotion_log download_server_cleanup_complete \
+        "target=${DOWNLOAD_TARGET}" \
+        "release_root=${release_root}" \
+        "scope=temporary-files"
+}
+
+prune_download_server_latest_history() {
+    local release_root="/data/downloads/${CHAT2DB_RELEASE_ROOT}"
+    local latest_linux_root="${release_root}/latest/linux"
+    local current_package_pattern="${CHAT2DB_PRODUCT_APP_NAME}-${CHAT2DB_RELEASE_VERSION}-*"
+
+    case "${release_root}" in
+        /data/downloads/download|/data/downloads/offline) ;;
+        *)
+            echo "Error: refusing to prune unexpected download-server root: ${release_root}" >&2
+            exit 1
+            ;;
+    esac
+    case "${CHAT2DB_PRODUCT_APP_NAME}:${CHAT2DB_RELEASE_VERSION}" in
+        *[!A-Za-z0-9._:-]*)
+            echo "Error: unsafe product name or release version for retention cleanup" >&2
+            exit 1
+            ;;
+    esac
+
+    promotion_log download_server_retention_start \
+        "target=${DOWNLOAD_TARGET}" \
+        "latest_root=${latest_linux_root}" \
+        "keep=${current_package_pattern}"
+    # This runs only after every current latest installer has been published successfully.
+    # shellcheck disable=SC2029
+    run_transfer download-server retention "${latest_linux_root}" "${DOWNLOAD_TARGET}:${latest_linux_root}" \
+        ssh "${SSH_OPTIONS[@]}" "${DOWNLOAD_TARGET}" \
+            "if [ -d '${latest_linux_root}' ]; then find '${latest_linux_root}' -type f -name '${CHAT2DB_PRODUCT_APP_NAME}-*' ! -name '${current_package_pattern}' -delete; fi" \
+            </dev/null
+    promotion_log download_server_retention_complete \
+        "target=${DOWNLOAD_TARGET}" \
+        "latest_root=${latest_linux_root}" \
+        "keep=${current_package_pattern}"
+}
+
+cleanup_download_server_failed_uploads() {
+    local release_root="/data/downloads/${CHAT2DB_RELEASE_ROOT}"
+    local current_upload_pattern="*.uploading.${GITHUB_RUN_ID:-local}.${GITHUB_RUN_ATTEMPT:-1}.*"
+    case "${release_root}" in
+        /data/downloads/download|/data/downloads/offline) ;;
+        *) return 0 ;;
+    esac
+    # All paths are selected from the validated release-root allowlist above.
+    # shellcheck disable=SC2029
+    ssh "${SSH_OPTIONS[@]}" "${DOWNLOAD_TARGET}" \
+        "find '${release_root}' -type f -name '${current_upload_pattern}' -delete" \
         </dev/null 2>/dev/null || true
 }
 
@@ -665,6 +740,8 @@ promotion_log promotion_start \
     "channel=${CHAT2DB_RELEASE_CHANNEL}" \
     "upload_latest=${CHAT2DB_UPLOAD_LATEST}" \
     "update_pointer=${CHAT2DB_UPDATE_LATEST_VERSION_JSON}"
+trap cleanup_download_server_failed_uploads EXIT
+cleanup_download_server_temp_files
 download_server_capacity=$(ssh "${SSH_OPTIONS[@]}" "${DOWNLOAD_TARGET}" \
     "df -B1 --output=avail,pcent /data/downloads | tail -n 1 | tr -s ' '" \
     </dev/null 2>/dev/null || true)
@@ -682,6 +759,7 @@ fi
 
 if [ "${CHAT2DB_UPLOAD_LATEST}" = "true" ]; then
     publish_latest_installers
+    prune_download_server_latest_history
 fi
 
 promotion_log promotion_complete \
