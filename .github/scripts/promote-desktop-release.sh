@@ -52,6 +52,9 @@ done
 PROMOTE_ROOT="${CHAT2DB_PROMOTE_WORK_DIR}/desktop-promote"
 PUBLISH_ROOT="${PROMOTE_ROOT}/publish"
 INSTALLER_ROOT="${PROMOTE_ROOT}/installers"
+VERSIONED_REPLICAS_READY=()
+DEFERRED_UPDATE_POINTER_SOURCE=""
+DEFERRED_UPDATE_POINTER_DESTINATION=""
 PRODUCT_LOWER=$(printf '%s' "${CHAT2DB_PRODUCT}" | tr '[:upper:]' '[:lower:]')
 CHANNEL_LOWER=$(printf '%s' "${CHAT2DB_RELEASE_CHANNEL}" | tr '[:upper:]' '[:lower:]')
 mkdir -p "${PUBLISH_ROOT}" "${INSTALLER_ROOT}"
@@ -73,12 +76,14 @@ esac
 
 promotion_log() {
     local event="$1"
+    local message
     shift
-    printf '[PROMOTE] time=%s event=%s' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "${event}"
-    if [ "$#" -gt 0 ]; then
-        printf ' %s' "$@"
-    fi
-    printf '\n'
+    printf -v message '[PROMOTE] time=%s event=%s' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "${event}"
+    while [ "$#" -gt 0 ]; do
+        message="${message} $1"
+        shift
+    done
+    printf '%s\n' "${message}"
 }
 
 begin_upload_phase() {
@@ -260,9 +265,9 @@ run_scp_transfer() {
 
 pull_download_server_from_oss() {
     local source_file="$1"
-    local remote_relative_path="$2"
+    local source_relative_path="$2"
     local temporary_path="$3"
-    local source_url="${OSS_PUBLIC_BASE_URL}/${remote_relative_path}"
+    local source_url="${OSS_PUBLIC_BASE_URL}/${source_relative_path}"
     local expected_sha256
     expected_sha256=$(sha256sum "${source_file}" | awk '{print $1}')
     promotion_log transfer_strategy \
@@ -277,6 +282,17 @@ pull_download_server_from_oss() {
         ssh "${SSH_OPTIONS[@]}" "${DOWNLOAD_TARGET}" \
             "set -e; curl --fail --location --silent --show-error --retry 5 --connect-timeout 15 --output '${temporary_path}' '${source_url}'; actual=\$(sha256sum '${temporary_path}' | awk '{print \$1}'); test \"\${actual}\" = '${expected_sha256}'" \
             </dev/null
+}
+
+wait_for_parallel_transfers() {
+    local transfer_pid
+    local status=0
+    for transfer_pid in "$@"; do
+        if ! wait "${transfer_pid}"; then
+            status=1
+        fi
+    done
+    return "${status}"
 }
 
 download_server_file_matches() {
@@ -378,6 +394,7 @@ upload_download_server() {
     local source_file="$1"
     local remote_relative_path="$2"
     local allow_oss_pull="${3:-false}"
+    local oss_source_relative_path="${4:-${remote_relative_path}}"
     local final_path="/data/downloads/${remote_relative_path}"
     local remote_dir
     local temporary_path
@@ -399,7 +416,7 @@ upload_download_server() {
         ssh "${SSH_OPTIONS[@]}" "${DOWNLOAD_TARGET}" "mkdir -p '${remote_dir}'" </dev/null
     if [ "${allow_oss_pull}" = "true" ]; then
         if [ "${CHAT2DB_DOWNLOAD_SERVER_PULL_FROM_OSS:-true}" = "true" ] \
-                && pull_download_server_from_oss "${source_file}" "${remote_relative_path}" "${temporary_path}"; then
+                && pull_download_server_from_oss "${source_file}" "${oss_source_relative_path}" "${temporary_path}"; then
             :
         else
             promotion_log transfer_fallback \
@@ -427,6 +444,117 @@ upload_download_server() {
             "chmod 644 '${temporary_path}' && mv -f '${temporary_path}' '${final_path}'" </dev/null
 }
 
+copy_download_server_file() {
+    local source_file="$1"
+    local source_relative_path="$2"
+    local destination_relative_path="$3"
+    local source_path="/data/downloads/${source_relative_path}"
+    local destination_path="/data/downloads/${destination_relative_path}"
+    local destination_dir temporary_path expected_sha256
+    destination_dir=$(dirname "${destination_path}")
+    temporary_path="${destination_path}.uploading.${GITHUB_RUN_ID:-local}.${GITHUB_RUN_ATTEMPT:-1}.${RANDOM}"
+    expected_sha256=$(sha256sum "${source_file}" | awk '{print $1}')
+    run_transfer download-server provider-copy "${source_path}" "${DOWNLOAD_TARGET}:${destination_path}" \
+        ssh "${SSH_OPTIONS[@]}" "${DOWNLOAD_TARGET}" \
+            "set -e; mkdir -p '${destination_dir}'; rm -f '${temporary_path}'; ln '${source_path}' '${temporary_path}'; actual=\$(sha256sum '${temporary_path}' | awk '{print \$1}'); test \"\${actual}\" = '${expected_sha256}'; chmod 644 '${temporary_path}'; mv -f '${temporary_path}' '${destination_path}'" \
+            </dev/null
+}
+
+ensure_versioned_replicas() {
+    local source_file="$1"
+    local source_relative_path="$2"
+    local ready_path r2_pid download_pid
+    for ready_path in "${VERSIONED_REPLICAS_READY[@]-}"; do
+        if [ "${ready_path}" = "${source_relative_path}" ]; then
+            promotion_log replica_source_skipped \
+                "phase=${PROMOTION_PHASE}" \
+                "object=${PROMOTION_OBJECT_CURRENT}/${PROMOTION_OBJECT_TOTAL}" \
+                "reason=already-ready" \
+                "path=${source_relative_path}"
+            return 0
+        fi
+    done
+    promotion_log replica_source_start \
+        "phase=${PROMOTION_PHASE}" \
+        "object=${PROMOTION_OBJECT_CURRENT}/${PROMOTION_OBJECT_TOTAL}" \
+        "path=${source_relative_path}"
+    run_transfer cloudflare-r2 replica-source "${source_file}" "${R2_REMOTE}/${source_relative_path}" \
+        rclone copyto "${source_file}" "${R2_REMOTE}/${source_relative_path}" </dev/null &
+    r2_pid=$!
+    upload_download_server "${source_file}" "${source_relative_path}" true "${source_relative_path}" &
+    download_pid=$!
+    wait_for_parallel_transfers "${r2_pid}" "${download_pid}"
+    VERSIONED_REPLICAS_READY+=("${source_relative_path}")
+    promotion_log replica_source_complete \
+        "phase=${PROMOTION_PHASE}" \
+        "object=${PROMOTION_OBJECT_CURRENT}/${PROMOTION_OBJECT_TOTAL}" \
+        "path=${source_relative_path}"
+}
+
+copy_provider_replicas() {
+    local source_file="$1"
+    local source_relative_path="$2"
+    local destination_relative_path="$3"
+    local publish_oss_last="${4:-false}"
+    local oss_pid r2_pid download_pid
+    if [ "${publish_oss_last}" != "true" ]; then
+        run_transfer aliyun-oss provider-copy \
+            "oss://${BUCKET_NAME}/${source_relative_path}" \
+            "oss://${BUCKET_NAME}/${destination_relative_path}" \
+            ossutil cp -f \
+                "oss://${BUCKET_NAME}/${source_relative_path}" \
+                "oss://${BUCKET_NAME}/${destination_relative_path}" </dev/null &
+        oss_pid=$!
+    fi
+    run_transfer cloudflare-r2 provider-copy \
+        "${R2_REMOTE}/${source_relative_path}" \
+        "${R2_REMOTE}/${destination_relative_path}" \
+        rclone copyto \
+            "${R2_REMOTE}/${source_relative_path}" \
+            "${R2_REMOTE}/${destination_relative_path}" </dev/null &
+    r2_pid=$!
+    copy_download_server_file \
+        "${source_file}" "${source_relative_path}" "${destination_relative_path}" &
+    download_pid=$!
+    if [ "${publish_oss_last}" = "true" ]; then
+        wait_for_parallel_transfers "${r2_pid}" "${download_pid}"
+    else
+        wait_for_parallel_transfers "${oss_pid}" "${r2_pid}" "${download_pid}"
+    fi
+    if [ "${publish_oss_last}" = "true" ]; then
+        run_transfer aliyun-oss provider-copy \
+            "oss://${BUCKET_NAME}/${source_relative_path}" \
+            "oss://${BUCKET_NAME}/${destination_relative_path}" \
+            ossutil cp -f \
+                "oss://${BUCKET_NAME}/${source_relative_path}" \
+                "oss://${BUCKET_NAME}/${destination_relative_path}" </dev/null
+    fi
+}
+
+upload_immutable_from_versioned() {
+    local source_file="$1"
+    local source_relative_path="$2"
+    local destination_relative_path="$3"
+    test -s "${source_file}"
+    begin_upload_object immutable "${source_file}" "${destination_relative_path}"
+    ensure_versioned_replicas "${source_file}" "${source_relative_path}"
+    copy_provider_replicas \
+        "${source_file}" "${source_relative_path}" "${destination_relative_path}" false
+    complete_upload_object immutable "${destination_relative_path}"
+}
+
+upload_mutable_from_versioned() {
+    local source_file="$1"
+    local source_relative_path="$2"
+    local destination_relative_path="$3"
+    test -s "${source_file}"
+    begin_upload_object mutable "${source_file}" "${destination_relative_path}"
+    ensure_versioned_replicas "${source_file}" "${source_relative_path}"
+    copy_provider_replicas \
+        "${source_file}" "${source_relative_path}" "${destination_relative_path}" true
+    complete_upload_object mutable "${destination_relative_path}"
+}
+
 upload_immutable() {
     local source_file="$1"
     local remote_relative_path="$2"
@@ -434,9 +562,13 @@ upload_immutable() {
     begin_upload_object immutable "${source_file}" "${remote_relative_path}"
     run_transfer aliyun-oss upload "${source_file}" "oss://${BUCKET_NAME}/${remote_relative_path}" \
         ossutil cp -f "${source_file}" "oss://${BUCKET_NAME}/${remote_relative_path}" </dev/null
+    local r2_pid download_pid
     run_transfer cloudflare-r2 upload "${source_file}" "${R2_REMOTE}/${remote_relative_path}" \
-        rclone copyto "${source_file}" "${R2_REMOTE}/${remote_relative_path}" </dev/null
-    upload_download_server "${source_file}" "${remote_relative_path}" true
+        rclone copyto "${source_file}" "${R2_REMOTE}/${remote_relative_path}" </dev/null &
+    r2_pid=$!
+    upload_download_server "${source_file}" "${remote_relative_path}" true &
+    download_pid=$!
+    wait_for_parallel_transfers "${r2_pid}" "${download_pid}"
     complete_upload_object immutable "${remote_relative_path}"
 }
 
@@ -529,6 +661,7 @@ publish_v2_update() {
     local product_display current_file rollback_file package_type arch launcher manifest upload_total
     local current_path rollback_path rollback_url target
     local manifests=()
+    local reusable_package_sources=()
     local current_files=()
     local rollback_files=()
     local previous_index_environment=()
@@ -584,6 +717,9 @@ publish_v2_update() {
     manifest="${generated}/manifest-${PRODUCT_LOWER}-windows-x64-windows-exe.json"
     test -s "${manifest}"
     manifests+=("${manifest}")
+    reusable_package_sources+=(
+        "package-${PRODUCT_LOWER}-windows-x64-windows-exe.exe::${CHAT2DB_RELEASE_ROOT}/${CHAT2DB_RELEASE_VERSION}/${current_file}"
+    )
 
     for target in linux-x64 linux-arm64; do
         if [ "${target}" = "linux-x64" ]; then
@@ -642,6 +778,9 @@ publish_v2_update() {
             manifest="${generated}/manifest-${PRODUCT_LOWER}-linux-$(printf '%s' "${arch}" | tr '[:upper:]' '[:lower:]')-$(printf '%s' "${package_type}" | tr '[:upper:]' '[:lower:]' | tr '_' '-').json"
             test -s "${manifest}"
             manifests+=("${manifest}")
+            reusable_package_sources+=(
+                "$(basename "$(jq -r '.packageUrl' "${manifest}")")::${CHAT2DB_RELEASE_ROOT}/${CHAT2DB_RELEASE_VERSION}/${current_file}"
+            )
         done
     done
 
@@ -657,24 +796,54 @@ publish_v2_update() {
             "${generated}/release-index.json" "${manifests[@]}"
 
     upload_total=$(find "${generated}" -maxdepth 1 -type f -print | wc -l | tr -d '[:space:]')
-    if [ "${CHAT2DB_UPDATE_LATEST_VERSION_JSON}" = "true" ]; then
-        upload_total=$((upload_total + 1))
-    fi
     begin_upload_phase updates-v2 "${upload_total}"
 
     while IFS= read -r file; do
-        upload_immutable "${file}" "${update_root}/$(basename "${file}")"
+        local reusable_source=""
+        local reusable_mapping reusable_name
+        for reusable_mapping in "${reusable_package_sources[@]}"; do
+            reusable_name="${reusable_mapping%%::*}"
+            if [ "${reusable_name}" = "$(basename "${file}")" ]; then
+                reusable_source="${reusable_mapping##*::}"
+                break
+            fi
+        done
+        if [ -n "${reusable_source}" ]; then
+            upload_immutable_from_versioned \
+                "${file}" "${reusable_source}" "${update_root}/$(basename "${file}")"
+        else
+            upload_immutable "${file}" "${update_root}/$(basename "${file}")"
+        fi
     done < <(find "${generated}" -maxdepth 1 -type f -print | LC_ALL=C sort)
 
     if [ "${CHAT2DB_UPDATE_LATEST_VERSION_JSON}" = "true" ]; then
-        upload_mutable "${generated}/release-index.json" \
-            "${CHAT2DB_RELEASE_ROOT}/updates-v2/${CHANNEL_LOWER}/latest_version.json"
+        DEFERRED_UPDATE_POINTER_SOURCE="${generated}/release-index.json"
+        DEFERRED_UPDATE_POINTER_DESTINATION="${CHAT2DB_RELEASE_ROOT}/updates-v2/${CHANNEL_LOWER}/latest_version.json"
     fi
+}
+
+publish_deferred_update_pointer() {
+    if [ -z "${DEFERRED_UPDATE_POINTER_SOURCE}" ]; then
+        return 0
+    fi
+    begin_upload_phase update-pointer 1
+    upload_mutable \
+        "${DEFERRED_UPDATE_POINTER_SOURCE}" \
+        "${DEFERRED_UPDATE_POINTER_DESTINATION}"
 }
 
 download_installer() {
     local file_name="$1"
     local destination="${INSTALLER_ROOT}/${file_name}"
+    if [ -s "${destination}" ]; then
+        promotion_log transfer_skipped \
+            "phase=${PROMOTION_PHASE}" \
+            "object=${PROMOTION_OBJECT_CURRENT}/${PROMOTION_OBJECT_TOTAL}" \
+            "provider=local-cache" \
+            "reason=installer-ready" \
+            "destination=${destination}"
+        return 0
+    fi
     download_release_artifact "${CHAT2DB_RELEASE_VERSION}" "${file_name}" "${destination}"
 }
 
@@ -720,15 +889,17 @@ publish_latest_installers() {
     for mapping in "${mappings[@]}"; do
         source_file="${mapping%%::*}"
         destination="${mapping##*::}"
-        upload_mutable \
+        upload_mutable_from_versioned \
             "${INSTALLER_ROOT}/${source_file}" \
+            "${CHAT2DB_RELEASE_ROOT}/${version}/${source_file}" \
             "${CHAT2DB_RELEASE_ROOT}/latest/${destination}"
     done
     for mapping in "${linux_mappings[@]}"; do
         source_file="${mapping%%::*}"
         destination="${mapping##*::}"
-        upload_mutable \
+        upload_mutable_from_versioned \
             "${INSTALLER_ROOT}/${source_file}" \
+            "${CHAT2DB_RELEASE_ROOT}/${version}/${source_file}" \
             "${CHAT2DB_RELEASE_ROOT}/latest/linux/${destination}/${source_file}"
     done
 }
@@ -759,6 +930,11 @@ fi
 
 if [ "${CHAT2DB_UPLOAD_LATEST}" = "true" ]; then
     publish_latest_installers
+fi
+
+publish_deferred_update_pointer
+
+if [ "${CHAT2DB_UPLOAD_LATEST}" = "true" ]; then
     prune_download_server_latest_history
 fi
 

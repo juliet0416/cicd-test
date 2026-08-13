@@ -37,6 +37,12 @@ printf '\n' >> "${PROMOTE_TEST_LOG}"
 if [ "$(basename "$0")" = "ssh" ] && printf '%s\n' "$*" | grep -Fq 'test -f '; then
     exit 1
 fi
+if [ "$(basename "$0")" = "ssh" ] \
+        && [ "${PROMOTE_TEST_FAIL_LATEST_COPY:-false}" = "true" ] \
+        && printf '%s\n' "$*" | grep -Fq '/latest/' \
+        && printf '%s\n' "$*" | grep -Fq 'ln '; then
+    exit 1
+fi
 if [ "$(basename "$0")" = "scp" ] \
         && [ -n "${PROMOTE_TEST_SLOW_SCP_ONCE_FILE:-}" ] \
         && [ ! -e "${PROMOTE_TEST_SLOW_SCP_ONCE_FILE}" ]; then
@@ -114,6 +120,12 @@ bash "${SCRIPT_DIR}/promote-desktop-release.sh" > "${LATEST_OUTPUT_LOG}"
 grep -Fq 'download/latest/Chat2DB-Pro-arm64-latest.dmg' "${LOG_FILE}"
 grep -Fq 'download/latest/linux/x86_64/Chat2DB-Pro-5.3.3-x86_64.AppImage' "${LOG_FILE}"
 grep -Fq 'download/latest/linux/arm64/Chat2DB-Pro-5.3.3-aarch64.rpm' "${LOG_FILE}"
+grep -Fq 'event=transfer_start phase=latest-installers object=1/15 provider=aliyun-oss stage=provider-copy source=oss://test-bucket/download/5.3.3/Chat2DB-Pro-5.3.3.exe' "${LATEST_OUTPUT_LOG}"
+grep -Fq 'event=transfer_start phase=latest-installers object=1/15 provider=download-server stage=provider-copy source=/data/downloads/download/5.3.3/Chat2DB-Pro-5.3.3.exe' "${LATEST_OUTPUT_LOG}"
+if grep -Eq '^ossutil cp -f /.*Chat2DB-Pro-5\.3\.3[^ ]* oss://test-bucket/download/latest/' "${LOG_FILE}"; then
+    echo 'latest installers must use provider-side copies from the versioned release' >&2
+    exit 1
+fi
 grep -Fq 'event=phase_complete phase=latest-installers objects=15/15' "${LATEST_OUTPUT_LOG}"
 grep -Fq 'event=download_server_retention_start' "${LATEST_OUTPUT_LOG}"
 latest_complete_line=$(grep -n 'event=phase_complete phase=latest-installers objects=15/15' "${LATEST_OUTPUT_LOG}" \
@@ -139,7 +151,7 @@ case "$6" in
     LINUX_DEB) extension=deb ;;
     LINUX_RPM) extension=rpm ;;
 esac
-printf 'full-package\n' > "$9/package-${product_lower}-${platform_lower}-${arch_lower}-${package_type_lower}.${extension}"
+cp "$7" "$9/package-${product_lower}-${platform_lower}-${arch_lower}-${package_type_lower}.${extension}"
 printf '{"schemaVersion":2,"releaseEpoch":%s,"status":"ACTIVE","product":"%s","channel":"%s","version":"%s","platform":"%s","arch":"%s","updateScope":"FULL_PACKAGE","packageType":"%s","signature":"test"}\n' \
     "${11}" "$2" "$3" "$1" "$4" "$5" "$6" \
     > "$9/manifest-${product_lower}-${platform_lower}-${arch_lower}-${package_type_lower}.json"
@@ -182,18 +194,22 @@ grep -Fq 'download/updates-v2/beta/5.3.4-beta.1/package-pro-linux-arm64-linux-ap
 grep -Fq 'download/updates-v2/beta/5.3.4-beta.1/release-index.json' "${LOG_FILE}"
 grep -Fq 'download/updates-v2/beta/latest_version.json' "${LOG_FILE}"
 test "$(grep -Ec '^ossutil cp -f .*/manifest-pro-.* oss://test-bucket/download/updates-v2/beta/5\.3\.4-beta\.1/manifest-pro-' "${LOG_FILE}")" -eq 9
-test "$(grep -Ec '^ossutil cp -f .*/package-pro-.* oss://test-bucket/download/updates-v2/beta/5\.3\.4-beta\.1/package-pro-' "${LOG_FILE}")" -eq 9
+test "$(grep -Ec '^ossutil cp -f .*/package-pro-.* oss://test-bucket/download/updates-v2/beta/5\.3\.4-beta\.1/package-pro-' "${LOG_FILE}")" -eq 2
+test "$(grep -Ec '^ossutil cp -f oss://test-bucket/download/5\.3\.4-beta\.1/Chat2DB-Pro-.* oss://test-bucket/download/updates-v2/beta/5\.3\.4-beta\.1/package-pro-' "${LOG_FILE}")" -eq 7
 test "$(grep -Ec '^ossutil cp -f .*/release-index\.json oss://test-bucket/download/updates-v2/beta/5\.3\.4-beta\.1/release-index\.json$' "${LOG_FILE}")" -eq 1
 grep -E '^(ossutil|rclone|scp)' "${LOG_FILE}" | tail -n 1 \
     | grep -Fq 'oss://test-bucket/download/updates-v2/beta/latest_version.json'
 grep -Fq 'event=promotion_start product=PRO version=5.3.4-beta.1 profile=versioned-thin channel=BETA' "${PROMOTION_OUTPUT_LOG}"
-grep -Fq 'event=phase_start phase=updates-v2 objects=20' "${PROMOTION_OUTPUT_LOG}"
-grep -Fq 'event=transfer_start phase=updates-v2 object=1/20 provider=aliyun-oss stage=upload' "${PROMOTION_OUTPUT_LOG}"
+grep -Fq 'event=phase_start phase=updates-v2 objects=19' "${PROMOTION_OUTPUT_LOG}"
+grep -Fq 'event=transfer_start phase=updates-v2 object=1/19 provider=aliyun-oss stage=upload' "${PROMOTION_OUTPUT_LOG}"
 grep -Fq 'provider=cloudflare-r2 stage=upload' "${PROMOTION_OUTPUT_LOG}"
+grep -Fq 'provider=cloudflare-r2 stage=provider-copy' "${PROMOTION_OUTPUT_LOG}"
+grep -Fq 'provider=download-server stage=provider-copy' "${PROMOTION_OUTPUT_LOG}"
 grep -Fq 'provider=download-server stage=scp' "${PROMOTION_OUTPUT_LOG}"
-grep -Fq 'event=transfer_progress phase=updates-v2 object=1/20 provider=download-server stage=scp' "${PROMOTION_OUTPUT_LOG}"
+grep -Fq 'event=transfer_progress phase=updates-v2 object=1/19 provider=download-server stage=scp' "${PROMOTION_OUTPUT_LOG}"
 grep -Fq 'uploaded_bytes=0 size_bytes=' "${PROMOTION_OUTPUT_LOG}"
-grep -Fq 'event=phase_complete phase=updates-v2 objects=20/20' "${PROMOTION_OUTPUT_LOG}"
+grep -Fq 'event=phase_complete phase=updates-v2 objects=19/19' "${PROMOTION_OUTPUT_LOG}"
+grep -Fq 'event=phase_complete phase=update-pointer objects=1/1' "${PROMOTION_OUTPUT_LOG}"
 grep -Fq 'event=promotion_complete product=PRO version=5.3.4-beta.1' "${PROMOTION_OUTPUT_LOG}"
 if grep -Fq 'event=download_server_retention_start' "${PROMOTION_OUTPUT_LOG}"; then
     echo 'beta promotion must not remove stable latest installers' >&2
@@ -206,15 +222,46 @@ export CHAT2DB_RELEASE_PROFILE=bridge-fat
 export CHAT2DB_RELEASE_CHANNEL=STABLE
 export CHAT2DB_RELEASE_EPOCH=1
 export CHAT2DB_ROLLBACK_COMPATIBLE_FROM=5.3.3
-export CHAT2DB_UPDATE_LATEST_VERSION_JSON=false
+export CHAT2DB_UPLOAD_LATEST=true
+export CHAT2DB_UPDATE_LATEST_VERSION_JSON=true
 rm -rf "${CHAT2DB_PROMOTE_WORK_DIR}"
-bash "${SCRIPT_DIR}/promote-desktop-release.sh" >/dev/null
+STABLE_OUTPUT_LOG="${WORK_DIR}/stable-output.log"
+bash "${SCRIPT_DIR}/promote-desktop-release.sh" > "${STABLE_OUTPUT_LOG}"
 grep -Fq 'download/updates-v2/stable/5.3.4/package-pro-macos-arm64-macos-app-archive.tar.gz' "${LOG_FILE}"
 grep -Fq 'download/updates-v2/stable/5.3.4/manifest-pro-windows-x64-windows-exe.json' "${LOG_FILE}"
+grep -Fq 'event=phase_complete phase=updates-v2 objects=19/19' "${STABLE_OUTPUT_LOG}"
+grep -Fq 'event=phase_complete phase=latest-installers objects=15/15' "${STABLE_OUTPUT_LOG}"
+grep -Fq 'event=phase_complete phase=update-pointer objects=1/1' "${STABLE_OUTPUT_LOG}"
+grep -Fq 'event=download_server_retention_start' "${STABLE_OUTPUT_LOG}"
+stable_updates_line=$(grep -n 'event=phase_complete phase=updates-v2 objects=19/19' "${STABLE_OUTPUT_LOG}" | cut -d: -f1)
+stable_latest_line=$(grep -n 'event=phase_complete phase=latest-installers objects=15/15' "${STABLE_OUTPUT_LOG}" | cut -d: -f1)
+stable_pointer_line=$(grep -n 'event=phase_complete phase=update-pointer objects=1/1' "${STABLE_OUTPUT_LOG}" | cut -d: -f1)
+stable_retention_line=$(grep -n 'event=download_server_retention_start' "${STABLE_OUTPUT_LOG}" | cut -d: -f1)
+test "${stable_updates_line}" -lt "${stable_latest_line}"
+test "${stable_latest_line}" -lt "${stable_pointer_line}"
+test "${stable_pointer_line}" -lt "${stable_retention_line}"
 if grep -Fq 'download/updates/5.3.4/version.json' "${LOG_FILE}"; then
     echo '5.3.4 fat release must use updater-v2 full-package distribution' >&2
     exit 1
 fi
+
+: > "${LOG_FILE}"
+export PROMOTE_TEST_FAIL_LATEST_COPY=true
+rm -rf "${CHAT2DB_PROMOTE_WORK_DIR}"
+FAILED_STABLE_OUTPUT_LOG="${WORK_DIR}/failed-stable-output.log"
+if bash "${SCRIPT_DIR}/promote-desktop-release.sh" > "${FAILED_STABLE_OUTPUT_LOG}" 2>&1; then
+    echo 'stable promotion must fail when a latest replica copy fails' >&2
+    exit 1
+fi
+if grep -Fq 'event=phase_start phase=update-pointer' "${FAILED_STABLE_OUTPUT_LOG}"; then
+    echo 'failed stable promotion must not publish the update pointer' >&2
+    exit 1
+fi
+if grep -Fq 'event=download_server_retention_start' "${FAILED_STABLE_OUTPUT_LOG}"; then
+    echo 'failed stable promotion must not prune installer history' >&2
+    exit 1
+fi
+unset PROMOTE_TEST_FAIL_LATEST_COPY
 
 : > "${LOG_FILE}"
 unset PROMOTE_TEST_SLOW_SCP_ONCE_FILE
