@@ -42,7 +42,7 @@ case "${CHAT2DB_RELEASE_CHANNEL}" in STABLE|BETA) ;; *) echo "Error: invalid rel
 case "${CHAT2DB_UPLOAD_LATEST}" in true|false) ;; *) echo "Error: invalid upload_latest flag" >&2; exit 1 ;; esac
 case "${CHAT2DB_UPDATE_LATEST_VERSION_JSON}" in true|false) ;; *) echo "Error: invalid pointer flag" >&2; exit 1 ;; esac
 
-for command in jq openssl ossutil rclone scp ssh tar; do
+for command in jq openssl ossutil rclone scp sha256sum ssh tar; do
     command -v "${command}" >/dev/null 2>&1 || {
         echo "Error: required command not found: ${command}" >&2
         exit 1
@@ -58,42 +58,325 @@ mkdir -p "${PUBLISH_ROOT}" "${INSTALLER_ROOT}"
 
 DOWNLOAD_TARGET="${DOWNLOAD_SERVER_USER}@${DOWNLOAD_SERVER_HOST}"
 SSH_OPTIONS=(-i "${DOWNLOAD_SERVER_KEY}" -o StrictHostKeyChecking=accept-new -o BatchMode=yes)
+PROMOTION_STARTED_SECONDS=${SECONDS}
+PROMOTION_PHASE="initialization"
+PROMOTION_OBJECT_CURRENT=0
+PROMOTION_OBJECT_TOTAL=0
+PROMOTION_LOG_INTERVAL_SECONDS=${CHAT2DB_PROMOTION_LOG_INTERVAL_SECONDS:-30}
+OSS_PUBLIC_BASE_URL=${CHAT2DB_OSS_PUBLIC_BASE_URL:-https://chat2db-cdn.oss-us-west-1.aliyuncs.com}
+case "${PROMOTION_LOG_INTERVAL_SECONDS}" in
+    ''|*[!0-9]*|0)
+        echo "Error: CHAT2DB_PROMOTION_LOG_INTERVAL_SECONDS must be a positive integer" >&2
+        exit 1
+        ;;
+esac
+
+promotion_log() {
+    local event="$1"
+    shift
+    printf '[PROMOTE] time=%s event=%s' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "${event}"
+    if [ "$#" -gt 0 ]; then
+        printf ' %s' "$@"
+    fi
+    printf '\n'
+}
+
+begin_upload_phase() {
+    PROMOTION_PHASE="$1"
+    PROMOTION_OBJECT_TOTAL="$2"
+    PROMOTION_OBJECT_CURRENT=0
+    promotion_log phase_start \
+        "phase=${PROMOTION_PHASE}" \
+        "objects=${PROMOTION_OBJECT_TOTAL}"
+}
+
+begin_upload_object() {
+    local mode="$1"
+    local source_file="$2"
+    local remote_relative_path="$3"
+    local size_bytes
+    PROMOTION_OBJECT_CURRENT=$((PROMOTION_OBJECT_CURRENT + 1))
+    size_bytes=$(wc -c < "${source_file}" | tr -d '[:space:]')
+    promotion_log object_start \
+        "phase=${PROMOTION_PHASE}" \
+        "object=${PROMOTION_OBJECT_CURRENT}/${PROMOTION_OBJECT_TOTAL}" \
+        "mode=${mode}" \
+        "size_bytes=${size_bytes}" \
+        "path=${remote_relative_path}"
+}
+
+complete_upload_object() {
+    local mode="$1"
+    local remote_relative_path="$2"
+    promotion_log object_complete \
+        "phase=${PROMOTION_PHASE}" \
+        "object=${PROMOTION_OBJECT_CURRENT}/${PROMOTION_OBJECT_TOTAL}" \
+        "mode=${mode}" \
+        "path=${remote_relative_path}"
+    if [ "${PROMOTION_OBJECT_CURRENT}" -eq "${PROMOTION_OBJECT_TOTAL}" ]; then
+        promotion_log phase_complete \
+            "phase=${PROMOTION_PHASE}" \
+            "objects=${PROMOTION_OBJECT_CURRENT}/${PROMOTION_OBJECT_TOTAL}"
+    fi
+}
+
+run_transfer() {
+    local provider="$1"
+    local stage="$2"
+    local source="$3"
+    local destination="$4"
+    shift 4
+    local started_seconds=${SECONDS}
+    local transfer_pid monitor_pid
+    local status
+    promotion_log transfer_start \
+        "phase=${PROMOTION_PHASE}" \
+        "object=${PROMOTION_OBJECT_CURRENT}/${PROMOTION_OBJECT_TOTAL}" \
+        "provider=${provider}" \
+        "stage=${stage}" \
+        "source=${source}" \
+        "destination=${destination}"
+    "$@" &
+    transfer_pid=$!
+    (
+        while sleep "${PROMOTION_LOG_INTERVAL_SECONDS}"; do
+            kill -0 "${transfer_pid}" 2>/dev/null || exit 0
+            promotion_log transfer_progress \
+                "phase=${PROMOTION_PHASE}" \
+                "object=${PROMOTION_OBJECT_CURRENT}/${PROMOTION_OBJECT_TOTAL}" \
+                "provider=${provider}" \
+                "stage=${stage}" \
+                "elapsed_seconds=$((SECONDS - started_seconds))" \
+                "destination=${destination}"
+        done
+    ) &
+    monitor_pid=$!
+    if wait "${transfer_pid}"; then
+        status=0
+    else
+        status=$?
+    fi
+    kill "${monitor_pid}" 2>/dev/null || true
+    wait "${monitor_pid}" 2>/dev/null || true
+    if [ "${status}" -eq 0 ]; then
+        promotion_log transfer_complete \
+            "phase=${PROMOTION_PHASE}" \
+            "object=${PROMOTION_OBJECT_CURRENT}/${PROMOTION_OBJECT_TOTAL}" \
+            "provider=${provider}" \
+            "stage=${stage}" \
+            "elapsed_seconds=$((SECONDS - started_seconds))" \
+            "destination=${destination}"
+        return 0
+    else
+        promotion_log transfer_failed \
+            "phase=${PROMOTION_PHASE}" \
+            "object=${PROMOTION_OBJECT_CURRENT}/${PROMOTION_OBJECT_TOTAL}" \
+            "provider=${provider}" \
+            "stage=${stage}" \
+            "elapsed_seconds=$((SECONDS - started_seconds))" \
+            "exit_code=${status}" \
+            "destination=${destination}"
+        return "${status}"
+    fi
+}
+
+run_scp_transfer() {
+    local source_file="$1"
+    local temporary_path="$2"
+    local destination="${DOWNLOAD_TARGET}:${temporary_path}"
+    local source_size started_seconds transfer_pid monitor_pid status elapsed_seconds
+    source_size=$(wc -c < "${source_file}" | tr -d '[:space:]')
+    started_seconds=${SECONDS}
+    promotion_log transfer_start \
+        "phase=${PROMOTION_PHASE}" \
+        "object=${PROMOTION_OBJECT_CURRENT}/${PROMOTION_OBJECT_TOTAL}" \
+        "provider=download-server" \
+        "stage=scp" \
+        "size_bytes=${source_size}" \
+        "source=${source_file}" \
+        "destination=${destination}"
+    scp "${SSH_OPTIONS[@]}" "${source_file}" "${destination}" </dev/null &
+    transfer_pid=$!
+    (
+        local uploaded_size percent
+        while sleep "${PROMOTION_LOG_INTERVAL_SECONDS}"; do
+            kill -0 "${transfer_pid}" 2>/dev/null || exit 0
+            # The remote command intentionally uses the locally resolved temporary path.
+            # shellcheck disable=SC2029
+            uploaded_size=$(ssh "${SSH_OPTIONS[@]}" "${DOWNLOAD_TARGET}" \
+                "if [ -f '${temporary_path}' ]; then wc -c < '${temporary_path}'; else echo 0; fi" \
+                </dev/null 2>/dev/null || true)
+            case "${uploaded_size}" in
+                ''|*[!0-9]*) uploaded_size=0 ;;
+            esac
+            if [ "${source_size}" -gt 0 ]; then
+                percent=$((uploaded_size * 100 / source_size))
+            else
+                percent=0
+            fi
+            promotion_log transfer_progress \
+                "phase=${PROMOTION_PHASE}" \
+                "object=${PROMOTION_OBJECT_CURRENT}/${PROMOTION_OBJECT_TOTAL}" \
+                "provider=download-server" \
+                "stage=scp" \
+                "elapsed_seconds=$((SECONDS - started_seconds))" \
+                "uploaded_bytes=${uploaded_size}" \
+                "size_bytes=${source_size}" \
+                "percent=${percent}" \
+                "destination=${destination}"
+        done
+    ) &
+    monitor_pid=$!
+    if wait "${transfer_pid}"; then
+        status=0
+    else
+        status=$?
+    fi
+    kill "${monitor_pid}" 2>/dev/null || true
+    wait "${monitor_pid}" 2>/dev/null || true
+    elapsed_seconds=$((SECONDS - started_seconds))
+    if [ "${status}" -eq 0 ]; then
+        promotion_log transfer_complete \
+            "phase=${PROMOTION_PHASE}" \
+            "object=${PROMOTION_OBJECT_CURRENT}/${PROMOTION_OBJECT_TOTAL}" \
+            "provider=download-server" \
+            "stage=scp" \
+            "elapsed_seconds=${elapsed_seconds}" \
+            "size_bytes=${source_size}" \
+            "destination=${destination}"
+        return 0
+    fi
+    promotion_log transfer_failed \
+        "phase=${PROMOTION_PHASE}" \
+        "object=${PROMOTION_OBJECT_CURRENT}/${PROMOTION_OBJECT_TOTAL}" \
+        "provider=download-server" \
+        "stage=scp" \
+        "elapsed_seconds=${elapsed_seconds}" \
+        "size_bytes=${source_size}" \
+        "exit_code=${status}" \
+        "destination=${destination}"
+    return "${status}"
+}
+
+pull_download_server_from_oss() {
+    local source_file="$1"
+    local remote_relative_path="$2"
+    local temporary_path="$3"
+    local source_url="${OSS_PUBLIC_BASE_URL}/${remote_relative_path}"
+    local expected_sha256
+    expected_sha256=$(sha256sum "${source_file}" | awk '{print $1}')
+    promotion_log transfer_strategy \
+        "phase=${PROMOTION_PHASE}" \
+        "object=${PROMOTION_OBJECT_CURRENT}/${PROMOTION_OBJECT_TOTAL}" \
+        "provider=download-server" \
+        "strategy=oss-pull" \
+        "source=${source_url}"
+    # Source URL, digest, and destination are generated from release-owned values.
+    # shellcheck disable=SC2029
+    run_transfer download-server oss-pull "${source_url}" "${DOWNLOAD_TARGET}:${temporary_path}" \
+        ssh "${SSH_OPTIONS[@]}" "${DOWNLOAD_TARGET}" \
+            "set -e; curl --fail --location --silent --show-error --retry 5 --retry-all-errors --connect-timeout 15 --output '${temporary_path}' '${source_url}'; actual=\$(sha256sum '${temporary_path}' | awk '{print \$1}'); test \"\${actual}\" = '${expected_sha256}'" \
+            </dev/null
+}
+
+download_server_file_matches() {
+    local source_file="$1"
+    local final_path="$2"
+    local expected_sha256
+    expected_sha256=$(sha256sum "${source_file}" | awk '{print $1}')
+    # The final path and digest are generated from release-owned values.
+    # shellcheck disable=SC2029
+    ssh "${SSH_OPTIONS[@]}" "${DOWNLOAD_TARGET}" \
+        "test -f '${final_path}' && actual=\$(sha256sum '${final_path}' | awk '{print \$1}') && test \"\${actual}\" = '${expected_sha256}'" \
+        </dev/null 2>/dev/null
+}
+
+cleanup_download_server_temp() {
+    local temporary_path="$1"
+    # The temporary path is generated uniquely for this workflow run.
+    # shellcheck disable=SC2029
+    ssh "${SSH_OPTIONS[@]}" "${DOWNLOAD_TARGET}" "rm -f '${temporary_path}'" \
+        </dev/null 2>/dev/null || true
+}
 
 upload_download_server() {
     local source_file="$1"
     local remote_relative_path="$2"
+    local allow_oss_pull="${3:-false}"
     local final_path="/data/downloads/${remote_relative_path}"
     local remote_dir
     local temporary_path
     remote_dir=$(dirname "${final_path}")
     temporary_path="${final_path}.uploading.${GITHUB_RUN_ID:-local}.${GITHUB_RUN_ATTEMPT:-1}.${RANDOM}"
+    if [ "${allow_oss_pull}" = "true" ] \
+            && download_server_file_matches "${source_file}" "${final_path}"; then
+        promotion_log transfer_skipped \
+            "phase=${PROMOTION_PHASE}" \
+            "object=${PROMOTION_OBJECT_CURRENT}/${PROMOTION_OBJECT_TOTAL}" \
+            "provider=download-server" \
+            "reason=sha256-match" \
+            "destination=${DOWNLOAD_TARGET}:${final_path}"
+        return 0
+    fi
     # The path is intentionally quoted for the remote shell.
     # shellcheck disable=SC2029
-    ssh "${SSH_OPTIONS[@]}" "${DOWNLOAD_TARGET}" "mkdir -p '${remote_dir}'" </dev/null
-    scp "${SSH_OPTIONS[@]}" "${source_file}" "${DOWNLOAD_TARGET}:${temporary_path}" </dev/null
+    run_transfer download-server prepare "${source_file}" "${DOWNLOAD_TARGET}:${remote_dir}" \
+        ssh "${SSH_OPTIONS[@]}" "${DOWNLOAD_TARGET}" "mkdir -p '${remote_dir}'" </dev/null
+    if [ "${allow_oss_pull}" = "true" ]; then
+        if [ "${CHAT2DB_DOWNLOAD_SERVER_PULL_FROM_OSS:-true}" = "true" ] \
+                && pull_download_server_from_oss "${source_file}" "${remote_relative_path}" "${temporary_path}"; then
+            :
+        else
+            promotion_log transfer_fallback \
+                "phase=${PROMOTION_PHASE}" \
+                "object=${PROMOTION_OBJECT_CURRENT}/${PROMOTION_OBJECT_TOTAL}" \
+                "provider=download-server" \
+                "from=oss-pull" \
+                "to=scp" \
+                "destination=${DOWNLOAD_TARGET}:${temporary_path}"
+            if ! run_scp_transfer "${source_file}" "${temporary_path}"; then
+                cleanup_download_server_temp "${temporary_path}"
+                return 1
+            fi
+        fi
+    else
+        if ! run_scp_transfer "${source_file}" "${temporary_path}"; then
+            cleanup_download_server_temp "${temporary_path}"
+            return 1
+        fi
+    fi
     # All three paths are intentionally expanded locally.
     # shellcheck disable=SC2029
-    ssh "${SSH_OPTIONS[@]}" "${DOWNLOAD_TARGET}" \
-        "chmod 644 '${temporary_path}' && mv -f '${temporary_path}' '${final_path}'" </dev/null
+    run_transfer download-server atomic-rename "${temporary_path}" "${DOWNLOAD_TARGET}:${final_path}" \
+        ssh "${SSH_OPTIONS[@]}" "${DOWNLOAD_TARGET}" \
+            "chmod 644 '${temporary_path}' && mv -f '${temporary_path}' '${final_path}'" </dev/null
 }
 
 upload_immutable() {
     local source_file="$1"
     local remote_relative_path="$2"
     test -s "${source_file}"
-    ossutil cp -f "${source_file}" "oss://${BUCKET_NAME}/${remote_relative_path}" </dev/null
-    rclone copyto "${source_file}" "${R2_REMOTE}/${remote_relative_path}" </dev/null
-    upload_download_server "${source_file}" "${remote_relative_path}" </dev/null
+    begin_upload_object immutable "${source_file}" "${remote_relative_path}"
+    run_transfer aliyun-oss upload "${source_file}" "oss://${BUCKET_NAME}/${remote_relative_path}" \
+        ossutil cp -f "${source_file}" "oss://${BUCKET_NAME}/${remote_relative_path}" </dev/null
+    run_transfer cloudflare-r2 upload "${source_file}" "${R2_REMOTE}/${remote_relative_path}" \
+        rclone copyto "${source_file}" "${R2_REMOTE}/${remote_relative_path}" </dev/null
+    upload_download_server "${source_file}" "${remote_relative_path}" true
+    complete_upload_object immutable "${remote_relative_path}"
 }
 
 upload_mutable() {
     local source_file="$1"
     local remote_relative_path="$2"
     test -s "${source_file}"
+    begin_upload_object mutable "${source_file}" "${remote_relative_path}"
     # Publish the public OSS object last after both replicas are complete.
-    upload_download_server "${source_file}" "${remote_relative_path}" </dev/null
-    rclone copyto "${source_file}" "${R2_REMOTE}/${remote_relative_path}" </dev/null
-    ossutil cp -f "${source_file}" "oss://${BUCKET_NAME}/${remote_relative_path}" </dev/null
+    upload_download_server "${source_file}" "${remote_relative_path}" false
+    run_transfer cloudflare-r2 upload "${source_file}" "${R2_REMOTE}/${remote_relative_path}" \
+        rclone copyto "${source_file}" "${R2_REMOTE}/${remote_relative_path}" </dev/null
+    run_transfer aliyun-oss upload "${source_file}" "oss://${BUCKET_NAME}/${remote_relative_path}" \
+        ossutil cp -f "${source_file}" "oss://${BUCKET_NAME}/${remote_relative_path}" </dev/null
+    complete_upload_object mutable "${remote_relative_path}"
 }
 
 publish_bridge_update() {
@@ -102,7 +385,7 @@ publish_bridge_update() {
     local extracted="${PROMOTE_ROOT}/bridge"
     local update_root="${CHAT2DB_RELEASE_ROOT}/updates/${CHAT2DB_RELEASE_VERSION}"
     local pointer="${PROMOTE_ROOT}/latest_version.json"
-    local required
+    local required upload_total=1
 
     test -s "${archive}"
     mkdir -p "${extracted}"
@@ -118,6 +401,17 @@ publish_bridge_update() {
         echo "Error: the 5.3.3 bridge must not publish lib.zip" >&2
         exit 1
     fi
+
+    for required in "${extracted}"/*.jar "${extracted}"/*.zip; do
+        upload_total=$((upload_total + 1))
+    done
+    if [ -s "${extracted}/build-provenance.json" ]; then
+        upload_total=$((upload_total + 1))
+    fi
+    if [ "${CHAT2DB_UPDATE_LATEST_VERSION_JSON}" = "true" ]; then
+        upload_total=$((upload_total + 1))
+    fi
+    begin_upload_phase bridge-update "${upload_total}"
 
     upload_immutable "${extracted}/version.json" "${update_root}/version.json"
     for required in "${extracted}"/*.jar "${extracted}"/*.zip; do
@@ -142,9 +436,12 @@ download_release_artifact() {
     local file_name="$2"
     local destination="$3"
     mkdir -p "$(dirname "${destination}")"
-    ossutil cp -f \
+    run_transfer aliyun-oss download \
         "oss://${BUCKET_NAME}/${CHAT2DB_RELEASE_ROOT}/${version}/${file_name}" \
-        "${destination}"
+        "${destination}" \
+        ossutil cp -f \
+            "oss://${BUCKET_NAME}/${CHAT2DB_RELEASE_ROOT}/${version}/${file_name}" \
+            "${destination}"
     test -s "${destination}"
 }
 
@@ -154,7 +451,7 @@ publish_v2_update() {
     local generated="${PUBLISH_ROOT}/updates-v2"
     local rollback_root="${PROMOTE_ROOT}/rollback-installers"
     local previous_index="${PROMOTE_ROOT}/previous-release-index.json"
-    local product_display current_file rollback_file package_type arch launcher manifest
+    local product_display current_file rollback_file package_type arch launcher manifest upload_total
     local current_path rollback_path rollback_url target
     local manifests=()
     local current_files=()
@@ -284,6 +581,12 @@ publish_v2_update() {
             "${CHAT2DB_RELEASE_CHANNEL}" "${CHAT2DB_RELEASE_EPOCH}" "${base_url}" \
             "${generated}/release-index.json" "${manifests[@]}"
 
+    upload_total=$(find "${generated}" -maxdepth 1 -type f -print | wc -l | tr -d '[:space:]')
+    if [ "${CHAT2DB_UPDATE_LATEST_VERSION_JSON}" = "true" ]; then
+        upload_total=$((upload_total + 1))
+    fi
+    begin_upload_phase updates-v2 "${upload_total}"
+
     while IFS= read -r file; do
         upload_immutable "${file}" "${update_root}/$(basename "${file}")"
     done < <(find "${generated}" -maxdepth 1 -type f -print | LC_ALL=C sort)
@@ -337,6 +640,8 @@ publish_latest_installers() {
         download_installer "${source_file}"
     done
 
+    begin_upload_phase latest-installers "$(( ${#mappings[@]} + ${#linux_mappings[@]} ))"
+
     for mapping in "${mappings[@]}"; do
         source_file="${mapping%%::*}"
         destination="${mapping##*::}"
@@ -353,6 +658,20 @@ publish_latest_installers() {
     done
 }
 
+promotion_log promotion_start \
+    "product=${CHAT2DB_PRODUCT}" \
+    "version=${CHAT2DB_RELEASE_VERSION}" \
+    "profile=${CHAT2DB_RELEASE_PROFILE}" \
+    "channel=${CHAT2DB_RELEASE_CHANNEL}" \
+    "upload_latest=${CHAT2DB_UPLOAD_LATEST}" \
+    "update_pointer=${CHAT2DB_UPDATE_LATEST_VERSION_JSON}"
+download_server_capacity=$(ssh "${SSH_OPTIONS[@]}" "${DOWNLOAD_TARGET}" \
+    "df -B1 --output=avail,pcent /data/downloads | tail -n 1 | tr -s ' '" \
+    </dev/null 2>/dev/null || true)
+promotion_log download_server_capacity \
+    "target=${DOWNLOAD_TARGET}" \
+    "available_and_usage=${download_server_capacity:-unknown}"
+
 if [ "${CHAT2DB_RELEASE_PROFILE}" = "bridge-fat" ] \
         && [ "${CHAT2DB_RELEASE_CHANNEL}" = "STABLE" ]; then
     publish_bridge_update
@@ -364,4 +683,7 @@ if [ "${CHAT2DB_UPLOAD_LATEST}" = "true" ]; then
     publish_latest_installers
 fi
 
-echo "Desktop release promotion completed."
+promotion_log promotion_complete \
+    "product=${CHAT2DB_PRODUCT}" \
+    "version=${CHAT2DB_RELEASE_VERSION}" \
+    "elapsed_seconds=$((SECONDS - PROMOTION_STARTED_SECONDS))"

@@ -34,6 +34,15 @@ set -euo pipefail
 printf '%s' "$(basename "$0")" >> "${PROMOTE_TEST_LOG}"
 printf ' %q' "$@" >> "${PROMOTE_TEST_LOG}"
 printf '\n' >> "${PROMOTE_TEST_LOG}"
+if [ "$(basename "$0")" = "ssh" ] && printf '%s\n' "$*" | grep -Fq 'test -f '; then
+    exit 1
+fi
+if [ "$(basename "$0")" = "scp" ] \
+        && [ -n "${PROMOTE_TEST_SLOW_SCP_ONCE_FILE:-}" ] \
+        && [ ! -e "${PROMOTE_TEST_SLOW_SCP_ONCE_FILE}" ]; then
+    touch "${PROMOTE_TEST_SLOW_SCP_ONCE_FILE}"
+    sleep 2
+fi
 if [ "${PROMOTE_TEST_DRAIN_STDIN:-false}" = "true" ]; then
     cat >/dev/null
 fi
@@ -68,20 +77,26 @@ export DOWNLOAD_SERVER_USER=release
 export DOWNLOAD_SERVER_KEY="${WORK_DIR}/download-key"
 export GITHUB_RUN_ID=123
 export GITHUB_RUN_ATTEMPT=1
+export CHAT2DB_PROMOTION_LOG_INTERVAL_SECONDS=1
+export CHAT2DB_DOWNLOAD_SERVER_PULL_FROM_OSS=true
 touch "${DOWNLOAD_SERVER_KEY}"
 
 BRIDGE_DIR="${WORK_DIR}/bridge"
 BRIDGE_ARTIFACT_DIR="${CHAT2DB_UPDATE_ARTIFACT_ROOT}/bridge-update-pro"
+BRIDGE_OUTPUT_LOG="${WORK_DIR}/bridge-output.log"
 mkdir -p "${BRIDGE_DIR}" "${BRIDGE_ARTIFACT_DIR}"
 for file in version.json build-provenance.json chat2db-enterprise.jar chat2db-updater.jar dist.zip; do
     printf '%s\n' "${file}" > "${BRIDGE_DIR}/${file}"
 done
 tar -C "${BRIDGE_DIR}" -czf "${BRIDGE_ARTIFACT_DIR}/bridge-update.tar.gz" .
 
-bash "${SCRIPT_DIR}/promote-desktop-release.sh"
+bash "${SCRIPT_DIR}/promote-desktop-release.sh" > "${BRIDGE_OUTPUT_LOG}"
 grep -Fq 'download/updates/5.3.3/chat2db-updater.jar' "${LOG_FILE}"
 grep -Fq 'download/updates/latest_version.json' "${LOG_FILE}"
 tail -n 1 "${LOG_FILE}" | grep -Fq 'oss://test-bucket/download/updates/latest_version.json'
+grep -Fq 'provider=download-server strategy=oss-pull' "${BRIDGE_OUTPUT_LOG}"
+grep -Fq 'event=transfer_start phase=bridge-update object=6/6 provider=download-server stage=scp' "${BRIDGE_OUTPUT_LOG}"
+grep -Fq 'event=download_server_capacity target=release@download.example.com' "${BRIDGE_OUTPUT_LOG}"
 
 : > "${LOG_FILE}"
 export CHAT2DB_UPLOAD_LATEST=true
@@ -134,6 +149,9 @@ for target in macos-x64 macos-arm64 windows-x64 linux-x64 linux-arm64; do
 done
 
 : > "${LOG_FILE}"
+PROMOTION_OUTPUT_LOG="${WORK_DIR}/promotion-output.log"
+export PROMOTE_TEST_SLOW_SCP_ONCE_FILE="${WORK_DIR}/slow-scp-once"
+export CHAT2DB_DOWNLOAD_SERVER_PULL_FROM_OSS=false
 export CHAT2DB_RELEASE_VERSION=5.3.4-beta.1
 export CHAT2DB_RELEASE_PROFILE=versioned-thin
 export CHAT2DB_RELEASE_CHANNEL=BETA
@@ -143,7 +161,7 @@ export CHAT2DB_UPDATE_LATEST_VERSION_JSON=true
 export CHAT2DB_UPDATE_SIGNING_PRIVATE_KEY_B64=test-private-key
 export PROMOTE_TEST_DRAIN_STDIN=true
 rm -rf "${CHAT2DB_PROMOTE_WORK_DIR}"
-bash "${SCRIPT_DIR}/promote-desktop-release.sh"
+bash "${SCRIPT_DIR}/promote-desktop-release.sh" > "${PROMOTION_OUTPUT_LOG}"
 grep -Fq 'download/updates-v2/beta/5.3.4-beta.1/package-pro-macos-arm64-macos-app-archive.tar.gz' "${LOG_FILE}"
 grep -Fq 'download/updates-v2/beta/5.3.4-beta.1/package-pro-linux-arm64-linux-appimage.AppImage' "${LOG_FILE}"
 grep -Fq 'download/updates-v2/beta/5.3.4-beta.1/release-index.json' "${LOG_FILE}"
@@ -152,8 +170,19 @@ test "$(grep -Ec '^ossutil cp -f .*/manifest-pro-.* oss://test-bucket/download/u
 test "$(grep -Ec '^ossutil cp -f .*/package-pro-.* oss://test-bucket/download/updates-v2/beta/5\.3\.4-beta\.1/package-pro-' "${LOG_FILE}")" -eq 9
 test "$(grep -Ec '^ossutil cp -f .*/release-index\.json oss://test-bucket/download/updates-v2/beta/5\.3\.4-beta\.1/release-index\.json$' "${LOG_FILE}")" -eq 1
 tail -n 1 "${LOG_FILE}" | grep -Fq 'oss://test-bucket/download/updates-v2/beta/latest_version.json'
+grep -Fq 'event=promotion_start product=PRO version=5.3.4-beta.1 profile=versioned-thin channel=BETA' "${PROMOTION_OUTPUT_LOG}"
+grep -Fq 'event=phase_start phase=updates-v2 objects=20' "${PROMOTION_OUTPUT_LOG}"
+grep -Fq 'event=transfer_start phase=updates-v2 object=1/20 provider=aliyun-oss stage=upload' "${PROMOTION_OUTPUT_LOG}"
+grep -Fq 'provider=cloudflare-r2 stage=upload' "${PROMOTION_OUTPUT_LOG}"
+grep -Fq 'provider=download-server stage=scp' "${PROMOTION_OUTPUT_LOG}"
+grep -Fq 'event=transfer_progress phase=updates-v2 object=1/20 provider=download-server stage=scp' "${PROMOTION_OUTPUT_LOG}"
+grep -Fq 'uploaded_bytes=0 size_bytes=' "${PROMOTION_OUTPUT_LOG}"
+grep -Fq 'event=phase_complete phase=updates-v2 objects=20/20' "${PROMOTION_OUTPUT_LOG}"
+grep -Fq 'event=promotion_complete product=PRO version=5.3.4-beta.1' "${PROMOTION_OUTPUT_LOG}"
 
 : > "${LOG_FILE}"
+unset PROMOTE_TEST_SLOW_SCP_ONCE_FILE
+export CHAT2DB_DOWNLOAD_SERVER_PULL_FROM_OSS=true
 export CHAT2DB_RELEASE_VERSION=5.3.3
 export CHAT2DB_RELEASE_PROFILE=bridge-fat
 export CHAT2DB_RELEASE_CHANNEL=BETA
