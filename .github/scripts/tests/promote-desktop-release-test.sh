@@ -152,8 +152,9 @@ case "$6" in
     LINUX_RPM) extension=rpm ;;
 esac
 cp "$7" "$9/package-${product_lower}-${platform_lower}-${arch_lower}-${package_type_lower}.${extension}"
-printf '{"schemaVersion":2,"releaseEpoch":%s,"status":"ACTIVE","product":"%s","channel":"%s","version":"%s","platform":"%s","arch":"%s","updateScope":"FULL_PACKAGE","packageType":"%s","signature":"test"}\n' \
+printf '{"schemaVersion":2,"releaseEpoch":%s,"status":"ACTIVE","product":"%s","channel":"%s","version":"%s","platform":"%s","arch":"%s","updateScope":"FULL_PACKAGE","packageType":"%s","packageUrl":"%s/package-%s-%s-%s-%s.%s","signature":"test"}\n' \
     "${11}" "$2" "$3" "$1" "$4" "$5" "$6" \
+    "${10}" "${product_lower}" "${platform_lower}" "${arch_lower}" "${package_type_lower}" "${extension}" \
     > "$9/manifest-${product_lower}-${platform_lower}-${arch_lower}-${package_type_lower}.json"
 BASH
 cat > "${FAKE_ENTERPRISE_SCRIPTS}/generate_update_index_v2.sh" <<'BASH'
