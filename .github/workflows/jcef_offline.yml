@@ -1075,12 +1075,12 @@ jobs:
       - name: package mac arm64
         if: ${{ runner.os == 'macOS' && matrix.arch == 'arm64' }}
         run: |
-          bash ${{ env.JCEF_PACKAGE_SCRIPT_DIR }}/package_macos_offline.sh  ${{ github.event.inputs.version }} "${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg"
+          bash ${{ env.JCEF_PACKAGE_SCRIPT_DIR }}/package_macos_offline.sh  ${{ github.event.inputs.version }} "" "${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg"
 
       - name: package mac x86_64
         if: ${{ runner.os == 'macOS' && matrix.arch == 'x86_64' }}
         run: |
-          bash ${{ env.JCEF_PACKAGE_SCRIPT_DIR }}/package_macos_offline.sh  ${{ github.event.inputs.version }} ${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.dmg
+          bash ${{ env.JCEF_PACKAGE_SCRIPT_DIR }}/package_macos_offline.sh  ${{ github.event.inputs.version }} "" "${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.dmg"
 
       - name: package linux
         if: ${{ runner.os == 'Linux' }}
