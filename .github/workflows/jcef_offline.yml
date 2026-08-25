@@ -1545,6 +1545,7 @@ jobs:
           CHAT2DB_PRODUCT_APP_NAME: ${{ secrets.OFFLINE_PRODUCT_APP_NAME }}
           CHAT2DB_RELEASE_VERSION: ${{ github.event.inputs.version }}
           CHAT2DB_RELEASE_PROFILE: ${{ needs.resolve_source.outputs.release_profile }}
+          CHAT2DB_PUBLISH_MODE: ${{ github.event.inputs.publish_mode }}
           CHAT2DB_RELEASE_CHANNEL: ${{ needs.resolve_source.outputs.release_channel_upper }}
           CHAT2DB_RELEASE_EPOCH: ${{ github.event.inputs.release_epoch }}
           CHAT2DB_DATA_SCHEMA_VERSION: ${{ github.event.inputs.data_schema_version }}

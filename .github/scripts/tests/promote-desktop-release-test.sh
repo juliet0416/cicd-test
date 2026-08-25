@@ -61,8 +61,9 @@ export PROMOTE_TEST_LOG="${LOG_FILE}"
 export CHAT2DB_PRODUCT=PRO
 export CHAT2DB_RELEASE_ROOT=download
 export CHAT2DB_PRODUCT_APP_NAME=Chat2DB-Pro
-export CHAT2DB_RELEASE_VERSION=5.3.3
+export CHAT2DB_RELEASE_VERSION=5.3.5
 export CHAT2DB_RELEASE_PROFILE=bridge-fat
+export CHAT2DB_PUBLISH_MODE=v1
 export CHAT2DB_RELEASE_CHANNEL=STABLE
 export CHAT2DB_RELEASE_EPOCH=0
 export CHAT2DB_DATA_SCHEMA_VERSION=0
@@ -97,7 +98,7 @@ done
 tar -C "${BRIDGE_DIR}" -czf "${BRIDGE_ARTIFACT_DIR}/bridge-update.tar.gz" .
 
 bash "${SCRIPT_DIR}/promote-desktop-release.sh" > "${BRIDGE_OUTPUT_LOG}"
-grep -Fq 'download/updates/5.3.3/chat2db-updater.jar' "${LOG_FILE}"
+grep -Fq 'download/updates/5.3.5/chat2db-updater.jar' "${LOG_FILE}"
 grep -Fq 'download/updates/latest_version.json' "${LOG_FILE}"
 grep -E '^(ossutil|rclone|scp)' "${LOG_FILE}" | tail -n 1 \
     | grep -Fq 'oss://test-bucket/download/updates/latest_version.json'
@@ -118,11 +119,11 @@ rm -rf "${CHAT2DB_PROMOTE_WORK_DIR}"
 LATEST_OUTPUT_LOG="${WORK_DIR}/latest-output.log"
 bash "${SCRIPT_DIR}/promote-desktop-release.sh" > "${LATEST_OUTPUT_LOG}"
 grep -Fq 'download/latest/Chat2DB-Pro-arm64-latest.dmg' "${LOG_FILE}"
-grep -Fq 'download/latest/linux/x86_64/Chat2DB-Pro-5.3.3-x86_64.AppImage' "${LOG_FILE}"
-grep -Fq 'download/latest/linux/arm64/Chat2DB-Pro-5.3.3-aarch64.rpm' "${LOG_FILE}"
-grep -Fq 'event=transfer_start phase=latest-installers object=1/15 provider=aliyun-oss stage=provider-copy source=oss://test-bucket/download/5.3.3/Chat2DB-Pro-5.3.3.exe' "${LATEST_OUTPUT_LOG}"
-grep -Fq 'event=transfer_start phase=latest-installers object=1/15 provider=download-server stage=provider-copy source=/data/downloads/download/5.3.3/Chat2DB-Pro-5.3.3.exe' "${LATEST_OUTPUT_LOG}"
-if grep -Eq '^ossutil cp -f /.*Chat2DB-Pro-5\.3\.3[^ ]* oss://test-bucket/download/latest/' "${LOG_FILE}"; then
+grep -Fq 'download/latest/linux/x86_64/Chat2DB-Pro-5.3.5-x86_64.AppImage' "${LOG_FILE}"
+grep -Fq 'download/latest/linux/arm64/Chat2DB-Pro-5.3.5-aarch64.rpm' "${LOG_FILE}"
+grep -Fq 'event=transfer_start phase=latest-installers object=1/15 provider=aliyun-oss stage=provider-copy source=oss://test-bucket/download/5.3.5/Chat2DB-Pro-5.3.5.exe' "${LATEST_OUTPUT_LOG}"
+grep -Fq 'event=transfer_start phase=latest-installers object=1/15 provider=download-server stage=provider-copy source=/data/downloads/download/5.3.5/Chat2DB-Pro-5.3.5.exe' "${LATEST_OUTPUT_LOG}"
+if grep -Eq '^ossutil cp -f /.*Chat2DB-Pro-5\.3\.5[^ ]* oss://test-bucket/download/latest/' "${LOG_FILE}"; then
     echo 'latest installers must use provider-side copies from the versioned release' >&2
     exit 1
 fi
@@ -182,6 +183,7 @@ export PROMOTE_TEST_SLOW_SCP_ONCE_FILE="${WORK_DIR}/slow-scp-once"
 export CHAT2DB_DOWNLOAD_SERVER_PULL_FROM_OSS=false
 export CHAT2DB_RELEASE_VERSION=5.3.4-beta.1
 export CHAT2DB_RELEASE_PROFILE=versioned-thin
+export CHAT2DB_PUBLISH_MODE=v2
 export CHAT2DB_RELEASE_CHANNEL=BETA
 export CHAT2DB_RELEASE_EPOCH=1
 export CHAT2DB_UPLOAD_LATEST=false
@@ -200,7 +202,7 @@ test "$(grep -Ec '^ossutil cp -f oss://test-bucket/download/5\.3\.4-beta\.1/Chat
 test "$(grep -Ec '^ossutil cp -f .*/release-index\.json oss://test-bucket/download/updates-v2/beta/5\.3\.4-beta\.1/release-index\.json$' "${LOG_FILE}")" -eq 1
 grep -E '^(ossutil|rclone|scp)' "${LOG_FILE}" | tail -n 1 \
     | grep -Fq 'oss://test-bucket/download/updates-v2/beta/latest_version.json'
-grep -Fq 'event=promotion_start product=PRO version=5.3.4-beta.1 profile=versioned-thin channel=BETA' "${PROMOTION_OUTPUT_LOG}"
+grep -Fq 'event=promotion_start product=PRO version=5.3.4-beta.1 profile=versioned-thin publish_mode=v2 channel=BETA' "${PROMOTION_OUTPUT_LOG}"
 grep -Fq 'event=phase_start phase=updates-v2 objects=19' "${PROMOTION_OUTPUT_LOG}"
 grep -Fq 'event=transfer_start phase=updates-v2 object=1/19 provider=aliyun-oss stage=upload' "${PROMOTION_OUTPUT_LOG}"
 grep -Fq 'provider=cloudflare-r2 stage=upload' "${PROMOTION_OUTPUT_LOG}"

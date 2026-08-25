@@ -8,6 +8,7 @@ required_variables=(
     CHAT2DB_PRODUCT_APP_NAME
     CHAT2DB_RELEASE_VERSION
     CHAT2DB_RELEASE_PROFILE
+    CHAT2DB_PUBLISH_MODE
     CHAT2DB_RELEASE_CHANNEL
     CHAT2DB_RELEASE_EPOCH
     CHAT2DB_DATA_SCHEMA_VERSION
@@ -38,9 +39,17 @@ done
 case "${CHAT2DB_PRODUCT}" in PRO|LOCAL) ;; *) echo "Error: invalid product" >&2; exit 1 ;; esac
 case "${CHAT2DB_RELEASE_ROOT}" in download|offline) ;; *) echo "Error: invalid release root" >&2; exit 1 ;; esac
 case "${CHAT2DB_RELEASE_PROFILE}" in bridge-fat|versioned-thin) ;; *) echo "Error: invalid release profile" >&2; exit 1 ;; esac
+case "${CHAT2DB_PUBLISH_MODE}" in v1|v2|both) ;; *) echo "Error: invalid publish mode" >&2; exit 1 ;; esac
 case "${CHAT2DB_RELEASE_CHANNEL}" in STABLE|BETA) ;; *) echo "Error: invalid release channel" >&2; exit 1 ;; esac
 case "${CHAT2DB_UPLOAD_LATEST}" in true|false) ;; *) echo "Error: invalid upload_latest flag" >&2; exit 1 ;; esac
 case "${CHAT2DB_UPDATE_LATEST_VERSION_JSON}" in true|false) ;; *) echo "Error: invalid pointer flag" >&2; exit 1 ;; esac
+
+if [ "${CHAT2DB_PUBLISH_MODE}" != "v2" ] \
+        && { [ "${CHAT2DB_RELEASE_PROFILE}" != "bridge-fat" ] \
+            || [ "${CHAT2DB_RELEASE_CHANNEL}" != "STABLE" ]; }; then
+    echo "Error: v1 publication requires a stable bridge-fat release" >&2
+    exit 1
+fi
 
 for command in jq openssl ossutil rclone scp sha256sum ssh tar; do
     command -v "${command}" >/dev/null 2>&1 || {
@@ -605,7 +614,7 @@ publish_bridge_update() {
         test -s "${extracted}/${required}"
     done
     if [ -e "${extracted}/lib.zip" ]; then
-        echo "Error: the 5.3.3 bridge must not publish lib.zip" >&2
+        echo "Error: a bridge-fat release must not publish lib.zip" >&2
         exit 1
     fi
 
@@ -908,6 +917,7 @@ promotion_log promotion_start \
     "product=${CHAT2DB_PRODUCT}" \
     "version=${CHAT2DB_RELEASE_VERSION}" \
     "profile=${CHAT2DB_RELEASE_PROFILE}" \
+    "publish_mode=${CHAT2DB_PUBLISH_MODE}" \
     "channel=${CHAT2DB_RELEASE_CHANNEL}" \
     "upload_latest=${CHAT2DB_UPLOAD_LATEST}" \
     "update_pointer=${CHAT2DB_UPDATE_LATEST_VERSION_JSON}"
@@ -920,13 +930,18 @@ promotion_log download_server_capacity \
     "target=${DOWNLOAD_TARGET}" \
     "available_and_usage=${download_server_capacity:-unknown}"
 
-if [ "${CHAT2DB_RELEASE_PROFILE}" = "bridge-fat" ] \
-        && [ "${CHAT2DB_RELEASE_CHANNEL}" = "STABLE" ] \
-        && [ "${CHAT2DB_RELEASE_VERSION}" = "5.3.3" ]; then
-    publish_bridge_update
-else
-    publish_v2_update
-fi
+case "${CHAT2DB_PUBLISH_MODE}" in
+    v1)
+        publish_bridge_update
+        ;;
+    v2)
+        publish_v2_update
+        ;;
+    both)
+        publish_bridge_update
+        publish_v2_update
+        ;;
+esac
 
 if [ "${CHAT2DB_UPLOAD_LATEST}" = "true" ]; then
     publish_latest_installers
