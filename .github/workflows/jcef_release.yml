@@ -262,15 +262,15 @@ jobs:
       JCEF_COMMUNITY_ROOT: ${{ github.workspace }}/chat2db-community-source
       JCEF_COMMUNITY_CLIENT_ROOT: ${{ github.workspace }}/chat2db-community-source/chat2db-community-client
       JCEF_COMMUNITY_POM_PATH: ${{ github.workspace }}/chat2db-community-source/chat2db-community-server/pom.xml
-      JCEF_FRONT_PATH: ${{ github.workspace }}/${{ secrets.REPO_PATH }}/chat2db-enterprise-client
+      JCEF_FRONT_PATH: ${{ github.workspace }}/${{ secrets.REPO_PATH }}/chat2db-studio-client
       JCEF_FRONTEND_SRC_ROOT: ${{ github.workspace }}/chat2db-community-source/chat2db-community-client/src
-      JCEF_PRODUCT_CONFIG: ${{ github.workspace }}/${{ secrets.REPO_PATH }}/chat2db-enterprise-client/product.enterprise.ts
-      JCEF_YARN_LOCK_PATH: ${{ github.workspace }}/${{ secrets.REPO_PATH }}/chat2db-enterprise-client/yarn.lock
-      JCEF_POM_PATH: ${{ github.workspace }}/${{ secrets.REPO_PATH }}/chat2db-enterprise-server/pom.xml
-      JCEF_STATIC_PATH: ${{ github.workspace }}/${{ secrets.REPO_PATH }}/chat2db-enterprise-client/static
-      JCEF_JRE_PATH: ${{ github.workspace }}/${{ secrets.REPO_PATH }}/chat2db-enterprise-client/static/jre
+      JCEF_PRODUCT_CONFIG: ${{ github.workspace }}/${{ secrets.REPO_PATH }}/chat2db-studio-client/product.studio.ts
+      JCEF_YARN_LOCK_PATH: ${{ github.workspace }}/${{ secrets.REPO_PATH }}/chat2db-studio-client/yarn.lock
+      JCEF_POM_PATH: ${{ github.workspace }}/${{ secrets.REPO_PATH }}/chat2db-studio-server/pom.xml
+      JCEF_STATIC_PATH: ${{ github.workspace }}/${{ secrets.REPO_PATH }}/chat2db-studio-client/static
+      JCEF_JRE_PATH: ${{ github.workspace }}/${{ secrets.REPO_PATH }}/chat2db-studio-client/static/jre
       CHAT2DB_FRONTEND_SRC_ROOT: ${{ github.workspace }}/chat2db-community-source/chat2db-community-client/src
-      CHAT2DB_PRODUCT_CONFIG: ${{ github.workspace }}/${{ secrets.REPO_PATH }}/chat2db-enterprise-client/product.enterprise.ts
+      CHAT2DB_PRODUCT_CONFIG: ${{ github.workspace }}/${{ secrets.REPO_PATH }}/chat2db-studio-client/product.studio.ts
       CHAT2DB_RELEASE_EPOCH: ${{ github.event.inputs.release_epoch }}
       CHAT2DB_DATA_SCHEMA_VERSION: ${{ github.event.inputs.data_schema_version }}
       CHAT2DB_ROLLBACK_COMPATIBLE_FROM: ${{ github.event.inputs.rollback_compatible_from }}
@@ -339,7 +339,7 @@ jobs:
           if [ -L "${JCEF_FRONT_PATH}/src" ]; then
             rm "${JCEF_FRONT_PATH}/src"
           elif [ -e "${JCEF_FRONT_PATH}/src" ]; then
-            echo "::error::chat2db-enterprise-client/src must not be a real directory"
+            echo "::error::chat2db-studio-client/src must not be a real directory"
             exit 1
           fi
 
