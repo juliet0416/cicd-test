@@ -1412,7 +1412,7 @@ jobs:
           retention-days: 7
 
       - name: Archive legacy bridge update payload
-        if: ${{ runner.os == 'Windows' && env.CHAT2DB_MAVEN_PROFILE == 'bridge-fat' && env.CHAT2DB_RELEASE_CHANNEL == 'STABLE' && github.event.inputs.version == '5.3.3' }}
+        if: ${{ runner.os == 'Windows' && github.event.inputs.publish_mode != 'v2' && env.CHAT2DB_MAVEN_PROFILE == 'bridge-fat' && env.CHAT2DB_RELEASE_CHANNEL == 'STABLE' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -1428,7 +1428,7 @@ jobs:
             version.json build-provenance.json chat2db-enterprise.jar chat2db-updater.jar dist.zip
 
       - name: Upload legacy bridge update payload artifact
-        if: ${{ runner.os == 'Windows' && env.CHAT2DB_MAVEN_PROFILE == 'bridge-fat' && env.CHAT2DB_RELEASE_CHANNEL == 'STABLE' && github.event.inputs.version == '5.3.3' }}
+        if: ${{ runner.os == 'Windows' && github.event.inputs.publish_mode != 'v2' && env.CHAT2DB_MAVEN_PROFILE == 'bridge-fat' && env.CHAT2DB_RELEASE_CHANNEL == 'STABLE' }}
         uses: actions/upload-artifact@v4
         with:
           name: bridge-update-local
@@ -1438,7 +1438,6 @@ jobs:
 
   promote:
     name: Promote Local desktop release
-    if: ${{ github.event.inputs.publish_mode != 'v1' }}
     runs-on: ubuntu-latest
     needs:
       - resolve_source
@@ -1461,14 +1460,14 @@ jobs:
           persist-credentials: false
 
       - name: Download legacy bridge update payload
-        if: ${{ needs.resolve_source.outputs.release_profile == 'bridge-fat' && needs.resolve_source.outputs.release_channel_upper == 'STABLE' && github.event.inputs.version == '5.3.3' }}
+        if: ${{ github.event.inputs.publish_mode != 'v2' && needs.resolve_source.outputs.release_profile == 'bridge-fat' && needs.resolve_source.outputs.release_channel_upper == 'STABLE' }}
         uses: actions/download-artifact@v4
         with:
           name: bridge-update-local
           path: ${{ runner.temp }}/update-artifacts/bridge-update-local
 
       - name: Download updater-v2 full packages
-        if: ${{ needs.resolve_source.outputs.release_profile == 'versioned-thin' || needs.resolve_source.outputs.release_channel_upper == 'BETA' || github.event.inputs.version != '5.3.3' }}
+        if: ${{ github.event.inputs.publish_mode != 'v1' && (needs.resolve_source.outputs.release_profile == 'versioned-thin' || needs.resolve_source.outputs.release_channel_upper == 'BETA' || github.event.inputs.version != '5.3.3') }}
         uses: actions/download-artifact@v4
         with:
           pattern: full-package-local-*

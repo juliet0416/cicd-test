@@ -52,10 +52,16 @@ class ResolveDesktopReleaseTest(unittest.TestCase):
             MODULE.resolve(arguments()),
         )
 
+    def test_resolves_535_stable_as_transition_fat_release(self):
+        self.assertEqual(
+            ("bridge-fat", "STABLE"),
+            MODULE.resolve(arguments(version="5.3.5", data_schema_version="1")),
+        )
+
     def test_resolves_later_stable_thin_release(self):
         self.assertEqual(
             ("versioned-thin", "STABLE"),
-            MODULE.resolve(arguments(version="5.3.5", release_epoch="2")),
+            MODULE.resolve(arguments(version="5.3.6", release_epoch="2")),
         )
 
     def test_resolves_beta_thin_release(self):

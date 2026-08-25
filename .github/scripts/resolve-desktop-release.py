@@ -77,6 +77,7 @@ def resolve(args: argparse.Namespace) -> tuple[str, str]:
 
     bridge = SemVer.parse("5.3.3")
     fat_release = SemVer.parse("5.3.4")
+    transition_fat_release = SemVer.parse("5.3.5")
     comparison = version.compare(bridge)
     if comparison < 0:
         raise ValueError("desktop updates only support releases starting at 5.3.3")
@@ -88,13 +89,14 @@ def resolve(args: argparse.Namespace) -> tuple[str, str]:
                 f"release_epoch={expected_epoch} and data_schema_version=0"
             )
         profile = "bridge-fat"
-    elif version.compare(fat_release) == 0 and not version.prerelease:
+    elif version in (fat_release, transition_fat_release) and not version.prerelease:
         if channel != "stable":
             raise ValueError("the 5.3.4 fat release must use the stable channel")
-        if release_epoch != 1 or data_schema_version != 0:
+        expected_schema_version = 1 if version == transition_fat_release else 0
+        if release_epoch != 1 or data_schema_version != expected_schema_version:
             raise ValueError(
-                "the 5.3.4 fat release requires "
-                "release_epoch=1 and data_schema_version=0"
+                f"the {args.version} fat release requires "
+                f"release_epoch=1 and data_schema_version={expected_schema_version}"
             )
         profile = "bridge-fat"
     else:
