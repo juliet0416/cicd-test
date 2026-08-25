@@ -11,6 +11,15 @@ on:
         description: 'Version number'
         required: true
         default: '1.0.0'
+      publish_mode:
+        description: 'Release metadata to publish'
+        required: false
+        default: 'both'
+        type: choice
+        options:
+          - v1
+          - v2
+          - both
       source_ref:
         description: 'Chat2DB source branch/ref; empty uses REPO_BRANCH secret'
         required: false
@@ -1225,7 +1234,7 @@ jobs:
           python "$env:RUNNER_TEMP/notify_package.py"
 
       - name: Archive updater-v2 full package
-        if: ${{ (env.CHAT2DB_MAVEN_PROFILE == 'versioned-thin' || env.CHAT2DB_RELEASE_CHANNEL == 'BETA' || github.event.inputs.version != '5.3.3') && startsWith(matrix.update_target, 'macos-') }}
+        if: ${{ github.event.inputs.publish_mode != 'v1' && (env.CHAT2DB_MAVEN_PROFILE == 'versioned-thin' || env.CHAT2DB_RELEASE_CHANNEL == 'BETA' || github.event.inputs.version != '5.3.3') && startsWith(matrix.update_target, 'macos-') }}
         shell: bash
         run: |
           set -euo pipefail
@@ -1245,7 +1254,7 @@ jobs:
             package
 
       - name: Upload updater-v2 full package artifact
-        if: ${{ (env.CHAT2DB_MAVEN_PROFILE == 'versioned-thin' || env.CHAT2DB_RELEASE_CHANNEL == 'BETA' || github.event.inputs.version != '5.3.3') && startsWith(matrix.update_target, 'macos-') }}
+        if: ${{ github.event.inputs.publish_mode != 'v1' && (env.CHAT2DB_MAVEN_PROFILE == 'versioned-thin' || env.CHAT2DB_RELEASE_CHANNEL == 'BETA' || github.event.inputs.version != '5.3.3') && startsWith(matrix.update_target, 'macos-') }}
         uses: actions/upload-artifact@v4
         with:
           name: full-package-pro-${{ matrix.update_target }}
@@ -1280,6 +1289,7 @@ jobs:
 
   promote:
     name: Promote Pro desktop release
+    if: ${{ github.event.inputs.publish_mode != 'v1' }}
     runs-on: ubuntu-latest
     needs:
       - resolve_source
