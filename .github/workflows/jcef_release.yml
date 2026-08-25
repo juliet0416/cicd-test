@@ -731,6 +731,8 @@ jobs:
           if [ "${CHAT2DB_MAVEN_PROFILE}" = "bridge-fat" ]; then
             mkdir -p "${JCEF_PROJECT_ROOT}/jpackage/input/sourceFile"
             cp "${JCEF_FRONT_PATH}/dist.zip" "${JCEF_PROJECT_ROOT}/jpackage/input/sourceFile/dist.zip"
+            cp "${JCEF_PROJECT_ROOT}/jpackage/input/sourceFile/chat2db-studio.jar" \
+              "${JCEF_PROJECT_ROOT}/jpackage/input/sourceFile/chat2db-enterprise.jar"
             CHAT2DB_PACKAGE_EDITION="pro" \
             CHAT2DB_PACKAGE_MODE="enterprise-over-community" \
             CHAT2DB_SOURCE_REF="${JCEF_SOURCE_REF}" \
@@ -788,6 +790,8 @@ jobs:
           if [ "$CHAT2DB_MAVEN_PROFILE" = "bridge-fat" ]; then
             mkdir -p "$PROJECT_ROOT/jpackage/input/sourceFile"
             cp "$FRONT_PATH/dist.zip" "$PROJECT_ROOT/jpackage/input/sourceFile/dist.zip"
+            cp "$PROJECT_ROOT/jpackage/input/sourceFile/chat2db-studio.jar" \
+              "$PROJECT_ROOT/jpackage/input/sourceFile/chat2db-enterprise.jar"
             CHAT2DB_PACKAGE_EDITION="pro" \
             CHAT2DB_PACKAGE_MODE="enterprise-over-community" \
             CHAT2DB_SOURCE_REF="${JCEF_SOURCE_REF}" \
