@@ -407,29 +407,24 @@ jobs:
           echo "JBR_BUILD_PATH=$jbrPath" >> $env:GITHUB_ENV
           Write-Host "JBR for compilation is ready at: $jbrPath"
 
-      - name: Setup Custom OpenJDK and Set Unique Environment Variable
+      - name: Setup Temurin JDK for Windows packaging
+        if: runner.os == 'Windows'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Capture Windows packaging JDK
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          Write-Host "Downloading and extracting custom OpenJDK..."
-
-          # 1. 定义下载地址和目标文件名
-          $url = "https://download.java.net/java/GA/jdk17.0.2/dfd4a8d0985749f896bed50d7138ee7f/8/GPL/openjdk-17.0.2_windows-x64_bin.zip"
-          $outputFile = "openjdk.zip"
-          $extractDir = "openjdk-custom"
-
-          # 2. 下载并解压
-          curl.exe -L -o $outputFile "$url"
-          New-Item -Path $extractDir -ItemType Directory -Force
-          7z.exe x $outputFile -o"$extractDir" -y
-
-          # 3. 动态获取解压后的 JDK 主目录路径
-          $jdkHome = Get-ChildItem -Path $extractDir | Select-Object -First 1 | ForEach-Object { $_.FullName }
-          Write-Host "Resolved OpenJDK home path: $jdkHome"
-
-          # 4. 【已修改】将路径保存到一个唯一的环境变量中，而不是直接设置 JAVA_HOME
-          echo "OPENJDK_PATH=$jdkHome" >> $env:GITHUB_ENV
-          Write-Host "Custom OpenJDK path saved to OPENJDK_PATH for subsequent steps."
+          $jpackage = Join-Path $env:JAVA_HOME 'bin\jpackage.exe'
+          if (-not (Test-Path -LiteralPath $jpackage)) {
+            Write-Error "Temurin JDK does not contain jpackage.exe: $jpackage"
+            exit 1
+          }
+          "OPENJDK_PATH=$env:JAVA_HOME" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          Write-Host "Windows packaging JDK is ready at: $env:JAVA_HOME"
 
 
       # =================================================================
@@ -1136,15 +1131,20 @@ jobs:
           SIGN_MSI_SHA1: '${{ secrets.REMOTE_SIGN_SCRIPT }} --alg SHA-1 ${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.msi'
           SIGN_MSI_SHA256: '${{ secrets.REMOTE_SIGN_SCRIPT }} --alg SHA-256 ${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.msi'
         run: |
-          & "${env:WINSCP_PATH}" /log=winscp-msi.log /command `
-            "option batch abort" `
-            "option confirm off" `
-            "open scp://${{ env.REMOTE_USER }}:${{ env.SCP_PASSWORD }}@${{ env.REMOTE_HOST }} -hostkey=*" `
-            "call ${{ env.REMOTE_OSS }} oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/temp-msi/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.msi ${env:REMOTE_MSI_PATH}" `
-            "call ${env:SIGN_MSI_SHA1}" `
-            "call ${env:SIGN_MSI_SHA256}" `
-            "call ${{ env.REMOTE_OSS }} ${env:REMOTE_MSI_PATH} oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/signed-msi/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.msi " `
+          $commands = @(
+            "option batch abort"
+            "option confirm off"
+            "open scp://${{ env.REMOTE_USER }}:${{ env.SCP_PASSWORD }}@${{ env.REMOTE_HOST }} -hostkey=* -rawsettings SendBuf=0"
+            "call ${{ env.REMOTE_OSS }} oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/temp-msi/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.msi ${env:REMOTE_MSI_PATH}"
+            "call ${env:SIGN_MSI_SHA1}"
+            "call ${env:SIGN_MSI_SHA256}"
+            "call ${{ env.REMOTE_OSS }} ${env:REMOTE_MSI_PATH} oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/signed-msi/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.msi "
             "exit"
+          )
+          & "$env:GITHUB_WORKSPACE\.github\scripts\invoke-winscp-with-retry.ps1" `
+            -WinScpPath $env:WINSCP_PATH `
+            -LogPath "winscp-msi" `
+            -Commands $commands
 
       - name: Download signed MSI from OSS
         if: ${{ runner.os == 'Windows' }}
@@ -1207,15 +1207,20 @@ jobs:
           REMOTE_SCRIPT_PATH_2: '${{ secrets.REMOTE_SIGN_SCRIPT }} --alg SHA-256 ${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe'
           LOCAL_DOWNLOAD_PATH: '${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe'
         run: |
-          & "${env:WINSCP_PATH}" /log=winscp.log /command `
-            "option batch abort" `
-            "option confirm off" `
-            "open scp://${{ env.REMOTE_USER }}:${{ env.SCP_PASSWORD }}@${{ env.REMOTE_HOST }} -hostkey=*" `
-            "call ${{ env.REMOTE_OSS }} oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/temp/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe ${env:REMOTE_PATH}" `
-            "call ${env:REMOTE_SCRIPT_PATH_1}" `
-            "call ${env:REMOTE_SCRIPT_PATH_2}" `
-            "call ${{ env.REMOTE_OSS }} ${env:REMOTE_PATH} oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe " `
+          $commands = @(
+            "option batch abort"
+            "option confirm off"
+            "open scp://${{ env.REMOTE_USER }}:${{ env.SCP_PASSWORD }}@${{ env.REMOTE_HOST }} -hostkey=* -rawsettings SendBuf=0"
+            "call ${{ env.REMOTE_OSS }} oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/temp/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe ${env:REMOTE_PATH}"
+            "call ${env:REMOTE_SCRIPT_PATH_1}"
+            "call ${env:REMOTE_SCRIPT_PATH_2}"
+            "call ${{ env.REMOTE_OSS }} ${env:REMOTE_PATH} oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe "
             "exit"
+          )
+          & "$env:GITHUB_WORKSPACE\.github\scripts\invoke-winscp-with-retry.ps1" `
+            -WinScpPath $env:WINSCP_PATH `
+            -LogPath "winscp-exe" `
+            -Commands $commands
 
       # 拉取OSS文件
       - name: Prepare upload for OSS on windows
