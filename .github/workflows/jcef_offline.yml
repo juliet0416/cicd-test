@@ -249,6 +249,10 @@ jobs:
 
     runs-on: ${{ matrix.os }}
 
+    concurrency:
+      group: ${{ matrix.update_platform == 'WINDOWS' && 'chat2db-desktop-windows-signing' || format('chat2db-desktop-{0}-{1}', github.run_id, matrix.update_target) }}
+      cancel-in-progress: false
+
     env:
       JCEF_PROJECT_ROOT: ${{ github.workspace }}/${{ secrets.REPO_PATH }}
       JCEF_PACKAGE_SCRIPT_DIR: ${{ github.workspace }}/${{ secrets.REPO_PATH }}/script/package
