@@ -295,7 +295,7 @@ jobs:
           persist-credentials: false
 
       - name: Check out CI packaging helpers
-        if: runner.os == 'macOS'
+        if: runner.os == 'macOS' || runner.os == 'Windows'
         uses: actions/checkout@v4
         with:
           path: cicd-packaging-source
@@ -1141,7 +1141,7 @@ jobs:
             "call ${{ env.REMOTE_OSS }} ${env:REMOTE_MSI_PATH} oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/signed-msi/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.msi "
             "exit"
           )
-          & "$env:GITHUB_WORKSPACE\.github\scripts\invoke-winscp-with-retry.ps1" `
+          & "$env:GITHUB_WORKSPACE\cicd-packaging-source\.github\scripts\invoke-winscp-with-retry.ps1" `
             -WinScpPath $env:WINSCP_PATH `
             -LogPath "winscp-msi" `
             -Commands $commands
@@ -1217,7 +1217,7 @@ jobs:
             "call ${{ env.REMOTE_OSS }} ${env:REMOTE_PATH} oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe "
             "exit"
           )
-          & "$env:GITHUB_WORKSPACE\.github\scripts\invoke-winscp-with-retry.ps1" `
+          & "$env:GITHUB_WORKSPACE\cicd-packaging-source\.github\scripts\invoke-winscp-with-retry.ps1" `
             -WinScpPath $env:WINSCP_PATH `
             -LogPath "winscp-exe" `
             -Commands $commands
