@@ -11,7 +11,6 @@ required_variables=(
     CHAT2DB_PUBLISH_MODE
     CHAT2DB_RELEASE_CHANNEL
     CHAT2DB_RELEASE_EPOCH
-    CHAT2DB_DATA_SCHEMA_VERSION
     CHAT2DB_ROLLBACK_COMPATIBLE_FROM
     CHAT2DB_ENTERPRISE_SHA
     CHAT2DB_RELEASE_NOTES_URL
@@ -697,7 +696,7 @@ publish_v2_update() {
                 "${CHAT2DB_RELEASE_VERSION}" "${CHAT2DB_PRODUCT}" "${CHAT2DB_RELEASE_CHANNEL}" \
                 MACOS "${arch}" MACOS_APP_ARCHIVE "${current_path}" \
                 "Contents/MacOS/${product_display}" "${generated}" "${base_url}" \
-                "${CHAT2DB_RELEASE_EPOCH}" "${CHAT2DB_DATA_SCHEMA_VERSION}" \
+                "${CHAT2DB_RELEASE_EPOCH}" \
                 "${CHAT2DB_ROLLBACK_COMPATIBLE_FROM}" "${CHAT2DB_ENTERPRISE_SHA}" \
                 "${CHAT2DB_RELEASE_NOTES_URL}"
         manifest="${generated}/manifest-${PRODUCT_LOWER}-macos-$(printf '%s' "${arch}" | tr '[:upper:]' '[:lower:]')-macos-app-archive.json"
@@ -720,7 +719,7 @@ publish_v2_update() {
         bash "${CHAT2DB_ENTERPRISE_ROOT}/script/package/generate_update_v2.sh" \
             "${CHAT2DB_RELEASE_VERSION}" "${CHAT2DB_PRODUCT}" "${CHAT2DB_RELEASE_CHANNEL}" \
             WINDOWS X64 WINDOWS_EXE "${current_path}" "${product_display}.exe" \
-            "${generated}" "${base_url}" "${CHAT2DB_RELEASE_EPOCH}" "${CHAT2DB_DATA_SCHEMA_VERSION}" \
+            "${generated}" "${base_url}" "${CHAT2DB_RELEASE_EPOCH}" \
             "${CHAT2DB_ROLLBACK_COMPATIBLE_FROM}" "${CHAT2DB_ENTERPRISE_SHA}" \
             "${CHAT2DB_RELEASE_NOTES_URL}"
     manifest="${generated}/manifest-${PRODUCT_LOWER}-windows-x64-windows-exe.json"
@@ -782,7 +781,7 @@ publish_v2_update() {
                     "${CHAT2DB_RELEASE_VERSION}" "${CHAT2DB_PRODUCT}" "${CHAT2DB_RELEASE_CHANNEL}" \
                     LINUX "${arch}" "${package_type}" "${current_path}" "${launcher}" \
                     "${generated}" "${base_url}" "${CHAT2DB_RELEASE_EPOCH}" \
-                    "${CHAT2DB_DATA_SCHEMA_VERSION}" "${CHAT2DB_ROLLBACK_COMPATIBLE_FROM}" \
+                    "${CHAT2DB_ROLLBACK_COMPATIBLE_FROM}" \
                     "${CHAT2DB_ENTERPRISE_SHA}" "${CHAT2DB_RELEASE_NOTES_URL}"
             manifest="${generated}/manifest-${PRODUCT_LOWER}-linux-$(printf '%s' "${arch}" | tr '[:upper:]' '[:lower:]')-$(printf '%s' "${package_type}" | tr '[:upper:]' '[:lower:]' | tr '_' '-').json"
             test -s "${manifest}"

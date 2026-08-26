@@ -66,7 +66,6 @@ def resolve(args: argparse.Namespace) -> tuple[str, str]:
     version = SemVer.parse(args.version)
     rollback_from = SemVer.parse(args.rollback_compatible_from)
     release_epoch = non_negative_integer(args.release_epoch, "release_epoch")
-    data_schema_version = non_negative_integer(args.data_schema_version, "data_schema_version")
     channel = args.channel.lower()
     if channel not in {"stable", "beta"}:
         raise ValueError("channel must be stable or beta")
@@ -83,21 +82,16 @@ def resolve(args: argparse.Namespace) -> tuple[str, str]:
         raise ValueError("desktop updates only support releases starting at 5.3.3")
     if args.version == "5.3.3":
         expected_epoch = 0 if channel == "stable" else 1
-        if release_epoch != expected_epoch or data_schema_version != 0:
+        if release_epoch != expected_epoch:
             raise ValueError(
-                f"the 5.3.3 {channel} bridge requires "
-                f"release_epoch={expected_epoch} and data_schema_version=0"
+                f"the 5.3.3 {channel} bridge requires release_epoch={expected_epoch}"
             )
         profile = "bridge-fat"
     elif version in (fat_release, transition_fat_release) and not version.prerelease:
         if channel != "stable":
             raise ValueError("the 5.3.4 fat release must use the stable channel")
-        expected_schema_version = 1 if version == transition_fat_release else 0
-        if release_epoch != 1 or data_schema_version != expected_schema_version:
-            raise ValueError(
-                f"the {args.version} fat release requires "
-                f"release_epoch=1 and data_schema_version={expected_schema_version}"
-            )
+        if release_epoch != 1:
+            raise ValueError(f"the {args.version} fat release requires release_epoch=1")
         profile = "bridge-fat"
     else:
         if release_epoch == 0:
@@ -120,7 +114,6 @@ def main() -> None:
     parser.add_argument("--version", required=True)
     parser.add_argument("--channel", required=True)
     parser.add_argument("--release-epoch", required=True)
-    parser.add_argument("--data-schema-version", required=True)
     parser.add_argument("--rollback-compatible-from", required=True)
     parser.add_argument("--release-notes-url", required=True)
     args = parser.parse_args()

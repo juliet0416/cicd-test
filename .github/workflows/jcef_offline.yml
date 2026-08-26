@@ -47,11 +47,6 @@ on:
         required: true
         default: '0'
         type: string
-      data_schema_version:
-        description: '本地 SQLite schema 版本'
-        required: true
-        default: '0'
-        type: string
       rollback_compatible_from:
         description: '允许自动回滚到的最低版本'
         required: true
@@ -136,7 +131,6 @@ jobs:
             --version "${{ github.event.inputs.version }}" \
             --channel "${{ github.event.inputs.channel }}" \
             --release-epoch "${{ github.event.inputs.release_epoch }}" \
-            --data-schema-version "${{ github.event.inputs.data_schema_version }}" \
             --rollback-compatible-from "${{ github.event.inputs.rollback_compatible_from }}" \
             --release-notes-url "${{ github.event.inputs.release_notes_url }}" \
             >> "${GITHUB_OUTPUT}"
@@ -281,7 +275,6 @@ jobs:
       CHAT2DB_FRONTEND_SRC_ROOT: ${{ github.workspace }}/chat2db-community-source/chat2db-community-client/src
       CHAT2DB_PRODUCT_CONFIG: ${{ github.workspace }}/${{ secrets.REPO_PATH }}/chat2db-studio-client/product.studio.ts
       CHAT2DB_RELEASE_EPOCH: ${{ github.event.inputs.release_epoch }}
-      CHAT2DB_DATA_SCHEMA_VERSION: ${{ github.event.inputs.data_schema_version }}
       CHAT2DB_ROLLBACK_COMPATIBLE_FROM: ${{ github.event.inputs.rollback_compatible_from }}
       CHAT2DB_RELEASE_NOTES_URL: ${{ github.event.inputs.release_notes_url }}
       CHAT2DB_UPDATE_KEY_ID: ${{ secrets.CHAT2DB_UPDATE_KEY_ID }}
@@ -885,7 +878,6 @@ jobs:
             "${{ github.event.inputs.version }}" \
             "${JCEF_FRONT_PATH}/dist" \
             "${CHAT2DB_RELEASE_EPOCH}" \
-            "${CHAT2DB_DATA_SCHEMA_VERSION}" \
             "${JCEF_ENTERPRISE_SOURCE_REF}" \
             "${JCEF_PROJECT_ROOT}"
 
@@ -944,7 +936,6 @@ jobs:
             "${{ github.event.inputs.version }}" \
             "$FRONT_PATH/dist" \
             "$CHAT2DB_RELEASE_EPOCH" \
-            "$CHAT2DB_DATA_SCHEMA_VERSION" \
             "$JCEF_ENTERPRISE_SOURCE_REF" \
             "$PROJECT_ROOT"
 
@@ -1548,7 +1539,6 @@ jobs:
           CHAT2DB_PUBLISH_MODE: ${{ github.event.inputs.publish_mode }}
           CHAT2DB_RELEASE_CHANNEL: ${{ needs.resolve_source.outputs.release_channel_upper }}
           CHAT2DB_RELEASE_EPOCH: ${{ github.event.inputs.release_epoch }}
-          CHAT2DB_DATA_SCHEMA_VERSION: ${{ github.event.inputs.data_schema_version }}
           CHAT2DB_ROLLBACK_COMPATIBLE_FROM: ${{ github.event.inputs.rollback_compatible_from }}
           CHAT2DB_ENTERPRISE_SHA: ${{ needs.resolve_source.outputs.enterprise_sha }}
           CHAT2DB_RELEASE_NOTES_URL: ${{ github.event.inputs.release_notes_url }}

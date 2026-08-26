@@ -18,7 +18,6 @@ def arguments(**overrides):
         "version": "5.3.4",
         "channel": "stable",
         "release_epoch": "1",
-        "data_schema_version": "0",
         "rollback_compatible_from": "5.3.3",
         "release_notes_url": "https://chat2db.ai/release-notes",
     }
@@ -55,7 +54,7 @@ class ResolveDesktopReleaseTest(unittest.TestCase):
     def test_resolves_535_stable_as_transition_fat_release(self):
         self.assertEqual(
             ("bridge-fat", "STABLE"),
-            MODULE.resolve(arguments(version="5.3.5", data_schema_version="1")),
+            MODULE.resolve(arguments(version="5.3.5")),
         )
 
     def test_resolves_later_stable_thin_release(self):
@@ -75,16 +74,6 @@ class ResolveDesktopReleaseTest(unittest.TestCase):
     def test_rejects_prerelease_on_stable_channel(self):
         with self.assertRaisesRegex(ValueError, "must use the beta channel"):
             MODULE.resolve(arguments(version="5.3.4-beta.1"))
-
-    def test_rejects_bridge_with_nonzero_schema(self):
-        with self.assertRaisesRegex(ValueError, "data_schema_version=0"):
-            MODULE.resolve(
-                arguments(
-                    version="5.3.3",
-                    release_epoch="0",
-                    data_schema_version="1",
-                )
-            )
 
     def test_rejects_534_fat_release_with_wrong_epoch(self):
         with self.assertRaisesRegex(ValueError, "release_epoch=1"):
