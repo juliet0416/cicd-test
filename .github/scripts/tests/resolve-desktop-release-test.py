@@ -18,7 +18,6 @@ def arguments(**overrides):
         "version": "5.3.4",
         "channel": "stable",
         "release_epoch": "1",
-        "rollback_compatible_from": "5.3.3",
         "release_notes_url": "https://chat2db.ai/release-notes",
     }
     values.update(overrides)
@@ -39,7 +38,6 @@ class ResolveDesktopReleaseTest(unittest.TestCase):
                 version="5.3.3",
                 channel="beta",
                 release_epoch="1",
-                rollback_compatible_from="5.3.0",
             )
         )
         self.assertEqual("bridge-fat", profile)
@@ -82,10 +80,6 @@ class ResolveDesktopReleaseTest(unittest.TestCase):
     def test_rejects_release_before_bridge(self):
         with self.assertRaisesRegex(ValueError, "starting at 5.3.3"):
             MODULE.resolve(arguments(version="5.3.2"))
-
-    def test_rejects_newer_rollback_floor(self):
-        with self.assertRaisesRegex(ValueError, "must not be newer"):
-            MODULE.resolve(arguments(rollback_compatible_from="5.3.5"))
 
     def test_rejects_non_https_release_notes(self):
         with self.assertRaisesRegex(ValueError, "absolute HTTPS URL"):

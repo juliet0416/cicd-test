@@ -64,7 +64,6 @@ def non_negative_integer(value: str, name: str) -> int:
 
 def resolve(args: argparse.Namespace) -> tuple[str, str]:
     version = SemVer.parse(args.version)
-    rollback_from = SemVer.parse(args.rollback_compatible_from)
     release_epoch = non_negative_integer(args.release_epoch, "release_epoch")
     channel = args.channel.lower()
     if channel not in {"stable", "beta"}:
@@ -103,9 +102,6 @@ def resolve(args: argparse.Namespace) -> tuple[str, str]:
             )
         profile = "versioned-thin"
 
-    if rollback_from.compare(version) > 0:
-        raise ValueError("rollback_compatible_from must not be newer than version")
-
     return profile, channel.upper()
 
 
@@ -114,7 +110,6 @@ def main() -> None:
     parser.add_argument("--version", required=True)
     parser.add_argument("--channel", required=True)
     parser.add_argument("--release-epoch", required=True)
-    parser.add_argument("--rollback-compatible-from", required=True)
     parser.add_argument("--release-notes-url", required=True)
     args = parser.parse_args()
 

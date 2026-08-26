@@ -11,7 +11,6 @@ required_variables=(
     CHAT2DB_PUBLISH_MODE
     CHAT2DB_RELEASE_CHANNEL
     CHAT2DB_RELEASE_EPOCH
-    CHAT2DB_ROLLBACK_COMPATIBLE_FROM
     CHAT2DB_ENTERPRISE_SHA
     CHAT2DB_RELEASE_NOTES_URL
     CHAT2DB_ENTERPRISE_ROOT
@@ -664,21 +663,22 @@ publish_v2_update() {
     local update_root="${CHAT2DB_RELEASE_ROOT}/updates-v2/${CHANNEL_LOWER}/${CHAT2DB_RELEASE_VERSION}"
     local base_url="https://cdn.chat2db-ai.com/${update_root}"
     local generated="${PUBLISH_ROOT}/updates-v2"
-    local rollback_root="${PROMOTE_ROOT}/rollback-installers"
     local previous_index="${PROMOTE_ROOT}/previous-release-index.json"
-    local product_display current_file rollback_file package_type arch launcher manifest upload_total
-    local current_path rollback_path rollback_url target
+    local product_display current_file package_type arch launcher manifest native_version upload_total
+    local current_path target
     local manifests=()
     local reusable_package_sources=()
     local current_files=()
-    local rollback_files=()
     local previous_index_environment=()
 
     if [ -z "${CHAT2DB_UPDATE_SIGNING_PRIVATE_KEY_B64:-}" ]; then
         echo "Error: CHAT2DB_UPDATE_SIGNING_PRIVATE_KEY_B64 is required for versioned-thin" >&2
         exit 1
     fi
-    mkdir -p "${generated}" "${rollback_root}"
+    mkdir -p "${generated}"
+    # shellcheck source=script/package/desktop_layout.sh
+    source "${CHAT2DB_ENTERPRISE_ROOT}/script/package/desktop_layout.sh"
+    native_version=$(chat2db_jpackage_version "${CHAT2DB_RELEASE_VERSION}")
     if [ "${CHAT2DB_PRODUCT}" = "PRO" ]; then
         product_display="Chat2DB Pro"
     else
@@ -693,11 +693,10 @@ publish_v2_update() {
         CHAT2DB_UPDATE_KEY_ID="${CHAT2DB_UPDATE_KEY_ID}" \
         CHAT2DB_UPDATE_PUBLIC_KEY_B64="${CHAT2DB_UPDATE_PUBLIC_KEY_B64}" \
             bash "${CHAT2DB_ENTERPRISE_ROOT}/script/package/generate_update_v2.sh" \
-                "${CHAT2DB_RELEASE_VERSION}" "${CHAT2DB_PRODUCT}" "${CHAT2DB_RELEASE_CHANNEL}" \
+                "${CHAT2DB_RELEASE_VERSION}" "${native_version}" "${CHAT2DB_PRODUCT}" "${CHAT2DB_RELEASE_CHANNEL}" \
                 MACOS "${arch}" MACOS_APP_ARCHIVE "${current_path}" \
                 "Contents/MacOS/${product_display}" "${generated}" "${base_url}" \
-                "${CHAT2DB_RELEASE_EPOCH}" \
-                "${CHAT2DB_ROLLBACK_COMPATIBLE_FROM}" "${CHAT2DB_ENTERPRISE_SHA}" \
+                "${CHAT2DB_RELEASE_EPOCH}" "${CHAT2DB_ENTERPRISE_SHA}" \
                 "${CHAT2DB_RELEASE_NOTES_URL}"
         manifest="${generated}/manifest-${PRODUCT_LOWER}-macos-$(printf '%s' "${arch}" | tr '[:upper:]' '[:lower:]')-macos-app-archive.json"
         test -s "${manifest}"
@@ -705,22 +704,15 @@ publish_v2_update() {
     done
 
     current_file="${CHAT2DB_PRODUCT_APP_NAME}-${CHAT2DB_RELEASE_VERSION}.exe"
-    rollback_file="${CHAT2DB_PRODUCT_APP_NAME}-${CHAT2DB_ROLLBACK_COMPATIBLE_FROM}.exe"
     current_path="${INSTALLER_ROOT}/${current_file}"
-    rollback_path="${rollback_root}/${rollback_file}"
     download_release_artifact "${CHAT2DB_RELEASE_VERSION}" "${current_file}" "${current_path}"
-    download_release_artifact "${CHAT2DB_ROLLBACK_COMPATIBLE_FROM}" "${rollback_file}" "${rollback_path}"
-    rollback_url="https://cdn.chat2db-ai.com/${CHAT2DB_RELEASE_ROOT}/${CHAT2DB_ROLLBACK_COMPATIBLE_FROM}/${rollback_file}"
-    CHAT2DB_UPDATE_ROLLBACK_PACKAGE_FILE="${rollback_path}" \
-    CHAT2DB_UPDATE_ROLLBACK_PACKAGE_URL="${rollback_url}" \
     CHAT2DB_UPDATE_SIGNING_PRIVATE_KEY_B64="${CHAT2DB_UPDATE_SIGNING_PRIVATE_KEY_B64}" \
     CHAT2DB_UPDATE_KEY_ID="${CHAT2DB_UPDATE_KEY_ID}" \
     CHAT2DB_UPDATE_PUBLIC_KEY_B64="${CHAT2DB_UPDATE_PUBLIC_KEY_B64}" \
         bash "${CHAT2DB_ENTERPRISE_ROOT}/script/package/generate_update_v2.sh" \
-            "${CHAT2DB_RELEASE_VERSION}" "${CHAT2DB_PRODUCT}" "${CHAT2DB_RELEASE_CHANNEL}" \
+            "${CHAT2DB_RELEASE_VERSION}" "${native_version}" "${CHAT2DB_PRODUCT}" "${CHAT2DB_RELEASE_CHANNEL}" \
             WINDOWS X64 WINDOWS_EXE "${current_path}" "${product_display}.exe" \
-            "${generated}" "${base_url}" "${CHAT2DB_RELEASE_EPOCH}" \
-            "${CHAT2DB_ROLLBACK_COMPATIBLE_FROM}" "${CHAT2DB_ENTERPRISE_SHA}" \
+            "${generated}" "${base_url}" "${CHAT2DB_RELEASE_EPOCH}" "${CHAT2DB_ENTERPRISE_SHA}" \
             "${CHAT2DB_RELEASE_NOTES_URL}"
     manifest="${generated}/manifest-${PRODUCT_LOWER}-windows-x64-windows-exe.json"
     test -s "${manifest}"
@@ -737,11 +729,6 @@ publish_v2_update() {
                 "${CHAT2DB_PRODUCT_APP_NAME}-${CHAT2DB_RELEASE_VERSION}-amd64.deb:LINUX_DEB"
                 "${CHAT2DB_PRODUCT_APP_NAME}-${CHAT2DB_RELEASE_VERSION}-x86_64.rpm:LINUX_RPM"
             )
-            rollback_files=(
-                "${CHAT2DB_PRODUCT_APP_NAME}-${CHAT2DB_ROLLBACK_COMPATIBLE_FROM}-x86_64.AppImage"
-                "${CHAT2DB_PRODUCT_APP_NAME}-${CHAT2DB_ROLLBACK_COMPATIBLE_FROM}-amd64.deb"
-                "${CHAT2DB_PRODUCT_APP_NAME}-${CHAT2DB_ROLLBACK_COMPATIBLE_FROM}-x86_64.rpm"
-            )
         else
             arch=ARM64
             current_files=(
@@ -749,39 +736,23 @@ publish_v2_update() {
                 "${CHAT2DB_PRODUCT_APP_NAME}-${CHAT2DB_RELEASE_VERSION}-arm64.deb:LINUX_DEB"
                 "${CHAT2DB_PRODUCT_APP_NAME}-${CHAT2DB_RELEASE_VERSION}-aarch64.rpm:LINUX_RPM"
             )
-            rollback_files=(
-                "${CHAT2DB_PRODUCT_APP_NAME}-${CHAT2DB_ROLLBACK_COMPATIBLE_FROM}-arm64.AppImage"
-                "${CHAT2DB_PRODUCT_APP_NAME}-${CHAT2DB_ROLLBACK_COMPATIBLE_FROM}-arm64.deb"
-                "${CHAT2DB_PRODUCT_APP_NAME}-${CHAT2DB_ROLLBACK_COMPATIBLE_FROM}-aarch64.rpm"
-            )
         fi
         for index in 0 1 2; do
             current_file="${current_files[$index]%%:*}"
             package_type="${current_files[$index]##*:}"
-            rollback_file="${rollback_files[$index]}"
             current_path="${INSTALLER_ROOT}/${current_file}"
             download_release_artifact "${CHAT2DB_RELEASE_VERSION}" "${current_file}" "${current_path}"
-            rollback_path=""
-            rollback_url=""
             launcher="bin/${product_display}"
             if [ "${package_type}" = "LINUX_APPIMAGE" ]; then
                 launcher="."
-            else
-                rollback_path="${rollback_root}/${rollback_file}"
-                download_release_artifact \
-                    "${CHAT2DB_ROLLBACK_COMPATIBLE_FROM}" "${rollback_file}" "${rollback_path}"
-                rollback_url="https://cdn.chat2db-ai.com/${CHAT2DB_RELEASE_ROOT}/${CHAT2DB_ROLLBACK_COMPATIBLE_FROM}/${rollback_file}"
             fi
-            CHAT2DB_UPDATE_ROLLBACK_PACKAGE_FILE="${rollback_path}" \
-            CHAT2DB_UPDATE_ROLLBACK_PACKAGE_URL="${rollback_url}" \
             CHAT2DB_UPDATE_SIGNING_PRIVATE_KEY_B64="${CHAT2DB_UPDATE_SIGNING_PRIVATE_KEY_B64}" \
             CHAT2DB_UPDATE_KEY_ID="${CHAT2DB_UPDATE_KEY_ID}" \
             CHAT2DB_UPDATE_PUBLIC_KEY_B64="${CHAT2DB_UPDATE_PUBLIC_KEY_B64}" \
                 bash "${CHAT2DB_ENTERPRISE_ROOT}/script/package/generate_update_v2.sh" \
-                    "${CHAT2DB_RELEASE_VERSION}" "${CHAT2DB_PRODUCT}" "${CHAT2DB_RELEASE_CHANNEL}" \
+                    "${CHAT2DB_RELEASE_VERSION}" "${native_version}" "${CHAT2DB_PRODUCT}" "${CHAT2DB_RELEASE_CHANNEL}" \
                     LINUX "${arch}" "${package_type}" "${current_path}" "${launcher}" \
                     "${generated}" "${base_url}" "${CHAT2DB_RELEASE_EPOCH}" \
-                    "${CHAT2DB_ROLLBACK_COMPATIBLE_FROM}" \
                     "${CHAT2DB_ENTERPRISE_SHA}" "${CHAT2DB_RELEASE_NOTES_URL}"
             manifest="${generated}/manifest-${PRODUCT_LOWER}-linux-$(printf '%s' "${arch}" | tr '[:upper:]' '[:lower:]')-$(printf '%s' "${package_type}" | tr '[:upper:]' '[:lower:]' | tr '_' '-').json"
             test -s "${manifest}"

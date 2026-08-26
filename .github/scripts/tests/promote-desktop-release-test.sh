@@ -66,7 +66,6 @@ export CHAT2DB_RELEASE_PROFILE=bridge-fat
 export CHAT2DB_PUBLISH_MODE=v1
 export CHAT2DB_RELEASE_CHANNEL=STABLE
 export CHAT2DB_RELEASE_EPOCH=0
-export CHAT2DB_ROLLBACK_COMPATIBLE_FROM=5.3.3
 export CHAT2DB_ENTERPRISE_SHA=0123456789012345678901234567890123456789
 export CHAT2DB_RELEASE_NOTES_URL=https://chat2db.ai/release-notes
 export CHAT2DB_ENTERPRISE_ROOT="${WORK_DIR}/enterprise"
@@ -139,23 +138,31 @@ mkdir -p "${FAKE_ENTERPRISE_SCRIPTS}"
 cat > "${FAKE_ENTERPRISE_SCRIPTS}/generate_update_v2.sh" <<'BASH'
 #!/usr/bin/env bash
 set -euo pipefail
-product_lower=$(printf '%s' "$2" | tr '[:upper:]' '[:lower:]')
-platform_lower=$(printf '%s' "$4" | tr '[:upper:]' '[:lower:]')
-arch_lower=$(printf '%s' "$5" | tr '[:upper:]' '[:lower:]')
-package_type_lower=$(printf '%s' "$6" | tr '[:upper:]' '[:lower:]' | tr '_' '-')
-mkdir -p "$9"
-case "$6" in
+test "$#" -eq 14
+test "$2" = "5.3.401"
+product_lower=$(printf '%s' "$3" | tr '[:upper:]' '[:lower:]')
+platform_lower=$(printf '%s' "$5" | tr '[:upper:]' '[:lower:]')
+arch_lower=$(printf '%s' "$6" | tr '[:upper:]' '[:lower:]')
+package_type_lower=$(printf '%s' "$7" | tr '[:upper:]' '[:lower:]' | tr '_' '-')
+mkdir -p "${10}"
+case "$7" in
     MACOS_APP_ARCHIVE) extension=tar.gz ;;
     WINDOWS_EXE) extension=exe ;;
     LINUX_APPIMAGE) extension=AppImage ;;
     LINUX_DEB) extension=deb ;;
     LINUX_RPM) extension=rpm ;;
 esac
-cp "$7" "$9/package-${product_lower}-${platform_lower}-${arch_lower}-${package_type_lower}.${extension}"
-printf '{"schemaVersion":2,"releaseEpoch":%s,"status":"ACTIVE","product":"%s","channel":"%s","version":"%s","platform":"%s","arch":"%s","updateScope":"FULL_PACKAGE","packageType":"%s","packageUrl":"%s/package-%s-%s-%s-%s.%s","signature":"test"}\n' \
-    "${11}" "$2" "$3" "$1" "$4" "$5" "$6" \
-    "${10}" "${product_lower}" "${platform_lower}" "${arch_lower}" "${package_type_lower}" "${extension}" \
-    > "$9/manifest-${product_lower}-${platform_lower}-${arch_lower}-${package_type_lower}.json"
+cp "$8" "${10}/package-${product_lower}-${platform_lower}-${arch_lower}-${package_type_lower}.${extension}"
+printf '{"schemaVersion":2,"releaseEpoch":%s,"status":"ACTIVE","product":"%s","channel":"%s","version":"%s","nativeVersion":"%s","platform":"%s","arch":"%s","updateScope":"FULL_PACKAGE","packageType":"%s","packageUrl":"%s/package-%s-%s-%s-%s.%s","signature":"test"}\n' \
+    "${12}" "$3" "$4" "$1" "$2" "$5" "$6" "$7" \
+    "${11}" "${product_lower}" "${platform_lower}" "${arch_lower}" "${package_type_lower}" "${extension}" \
+    > "${10}/manifest-${product_lower}-${platform_lower}-${arch_lower}-${package_type_lower}.json"
+BASH
+cat > "${FAKE_ENTERPRISE_SCRIPTS}/desktop_layout.sh" <<'BASH'
+#!/usr/bin/env bash
+chat2db_jpackage_version() {
+    printf '5.3.401\n'
+}
 BASH
 cat > "${FAKE_ENTERPRISE_SCRIPTS}/generate_update_index_v2.sh" <<'BASH'
 #!/usr/bin/env bash
@@ -223,7 +230,6 @@ export CHAT2DB_RELEASE_VERSION=5.3.4
 export CHAT2DB_RELEASE_PROFILE=bridge-fat
 export CHAT2DB_RELEASE_CHANNEL=STABLE
 export CHAT2DB_RELEASE_EPOCH=1
-export CHAT2DB_ROLLBACK_COMPATIBLE_FROM=5.3.3
 export CHAT2DB_UPLOAD_LATEST=true
 export CHAT2DB_UPDATE_LATEST_VERSION_JSON=true
 rm -rf "${CHAT2DB_PROMOTE_WORK_DIR}"
@@ -272,7 +278,6 @@ export CHAT2DB_RELEASE_VERSION=5.3.3
 export CHAT2DB_RELEASE_PROFILE=bridge-fat
 export CHAT2DB_RELEASE_CHANNEL=BETA
 export CHAT2DB_RELEASE_EPOCH=1
-export CHAT2DB_ROLLBACK_COMPATIBLE_FROM=5.3.0
 rm -rf "${CHAT2DB_PROMOTE_WORK_DIR}"
 bash "${SCRIPT_DIR}/promote-desktop-release.sh"
 grep -Fq 'download/updates-v2/beta/5.3.3/package-pro-macos-arm64-macos-app-archive.tar.gz' "${LOG_FILE}"
