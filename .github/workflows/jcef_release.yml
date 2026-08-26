@@ -57,6 +57,10 @@ permissions:
   contents: read
   actions: read
 
+concurrency:
+  group: chat2db-desktop-release
+  cancel-in-progress: false
+
 jobs:
   resolve_source:
     name: Resolve Enterprise and Community source commits
@@ -248,10 +252,6 @@ jobs:
             build_arg: '--linux --arm64'
 
     runs-on: ${{ matrix.os }}
-
-    concurrency:
-      group: ${{ matrix.update_platform == 'WINDOWS' && 'chat2db-desktop-windows-signing' || format('chat2db-desktop-{0}-{1}', github.run_id, matrix.update_target) }}
-      cancel-in-progress: false
 
     env:
       JCEF_PROJECT_ROOT: ${{ github.workspace }}/${{ secrets.REPO_PATH }}
