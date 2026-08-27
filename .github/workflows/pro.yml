@@ -1,4 +1,4 @@
-name: Build jcef_Offline Client
+name: Build Chat2DB Pro
 
 on:
   workflow_dispatch:
@@ -156,7 +156,7 @@ jobs:
       - name: Send Feishu start notification
         env:
           FEISHU_WEBHOOK_URL: ${{ secrets.FEISHU_RELEASE_NOTIFY_WEBHOOK }}
-          RELEASE_EDITION: Chat2DB Local
+          RELEASE_EDITION: Chat2DB Pro
           RELEASE_VERSION: ${{ github.event.inputs.version }}
           SOURCE_REF: ${{ github.event.inputs.source_ref || secrets.REPO_BRANCH }}
           UPLOAD_LATEST: ${{ github.event.inputs.upload_latest }}
@@ -389,7 +389,7 @@ jobs:
           '''
 
           Path(os.environ["RUNNER_TEMP"], "notify_package.py").write_text(script, encoding="utf-8")
-      
+
 
       # =================================================================
       # 【第一阶段】准备环境：下载 JBR 并安装 Temurin JDK
@@ -402,7 +402,7 @@ jobs:
           curl.exe -L -o jbr.tar.gz "https://cache-redirector.jetbrains.com/intellij-jbr/jbr_jcef-17.0.12-windows-x64-b1207.37.tar.gz"
           New-Item -Path "jbr-for-build" -ItemType Directory -Force
           tar.exe -xzf jbr.tar.gz -C jbr-for-build --strip-components=1
-          
+
           # 将 JBR 的路径保存到一个环境变量中，供后续步骤使用
           $jbrPath = Resolve-Path -Path "jbr-for-build"
           echo "JBR_BUILD_PATH=$jbrPath" >> $env:GITHUB_ENV
@@ -427,6 +427,7 @@ jobs:
           "OPENJDK_PATH=$env:JAVA_HOME" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           Write-Host "Windows packaging JDK is ready at: $env:JAVA_HOME"
 
+
       # =================================================================
       # 【第一阶段】准备环境：将 JBR 设置为默认，并安装好 Temurin
       # =================================================================
@@ -439,179 +440,17 @@ jobs:
           else
             JBR_URL="https://cache-redirector.jetbrains.com/intellij-jbr/jbr_jcef-17.0.12-osx-x64-b1207.37.tar.gz"
           fi
-          
+
           echo "Downloading JBR for ${{ matrix.arch }}..."
           curl -L -o jbr.tar.gz "$JBR_URL"
           mkdir -p jbr-default
           tar -xzf jbr.tar.gz -C jbr-default --strip-components=1
-          
+
           # 获取 JBR 的绝对路径并设置为默认的 JAVA_HOME
           JBR_HOME_PATH=$(cd jbr-default/Contents/Home && pwd)
           echo "Setting default JAVA_HOME to JBR: $JBR_HOME_PATH"
           echo "JAVA_HOME=$JBR_HOME_PATH" >> "$GITHUB_ENV"
           echo "$JBR_HOME_PATH/bin" >> "$GITHUB_PATH"
-          
-          
-          # # Install jre Windows
-          # - name: Install Jre for Windows
-          #   if: ${{ runner.os == 'Windows' }}
-          #   uses: actions/setup-java@main
-          #   with:
-          #     java-version: '17'
-          #     distribution: 'temurin'
-          #     java-package: 'jre'
-          
-          # - name: Setup Custom JBR for Windows
-          #   if: runner.os == 'Windows'
-          #   # 显式指定使用 PowerShell
-          #   shell: pwsh
-          #   run: |
-          #     # --------------------- 准备工作 ---------------------
-          #     Write-Host "Downloading and extracting JBR for Windows..."
-          #     # 下载用户指定的 Windows JBR 版本
-          #     curl.exe -L -o jbr.tar.gz "https://cache-redirector.jetbrains.com/intellij-jbr/jbr_jcef-17.0.12-windows-x64-b1207.37.tar.gz"
-          
-          #     # 使用 PowerShell 原生命令创建目录
-          #     New-Item -Path "jbr-17" -ItemType Directory -Force
-          
-          #     # GitHub Actions 的 Windows 运行器支持 tar 命令
-          #     tar.exe -xzf jbr.tar.gz -C jbr-17 --strip-components=1
-          
-          #     # --------------------- 核心配置步骤 ---------------------
-          #     Write-Host "Configuring environment variables for Windows..."
-          
-          #     # 步骤 1: 获取 JBR Home 目录的绝对路径
-          #     # Windows JBR 的结构更简单，解压后就是 Home 目录
-          #     $jbrPath = Resolve-Path -Path "jbr-17"
-          #     Write-Host "Correct JAVA_HOME path will be: $jbrPath"
-          
-          #     # 步骤 2: 设置 JAVA_HOME 环境变量，供后续步骤使用
-          #     echo "JAVA_HOME=$jbrPath" >> $env:GITHUB_ENV
-          
-          #     # 步骤 3: 使用 GITHUB_PATH 将 JBR 的 bin 目录添加到 PATH 最前端
-          #     $jbrBinPath = Join-Path $jbrPath "bin"
-          #     echo "$jbrBinPath" >> $env:GITHUB_PATH
-          
-          #     Write-Host "Configuration complete."
-          
-          # - name: Verify Final Java Configuration for Windows
-          #   if: runner.os == 'Windows'
-          #   shell: pwsh
-          #   run: |
-          #     Write-Host "--- Verifying final configuration for Windows ---"
-          
-          #     # 1. 检查 JAVA_HOME 环境变量
-          #     Write-Host "JAVA_HOME is: $env:JAVA_HOME"
-          
-          #     # 2. 检查 'java' 命令的指向
-          #     $javaPath = (Get-Command java).Source
-          #     Write-Host "'Get-Command java' points to: $javaPath"
-          
-          #     # 3. 检查 Java 版本
-          #     Write-Host "Final 'java -version' output:"
-          #     java -version
-          
-          #     # 4. 最终断言，确保路径正确 (已更新为 Windows 路径格式)
-          #     $expectedPathPart = "jbr-17\bin\java.exe"
-          #     if (-not ($javaPath -like "*$expectedPathPart*")) {
-          #       Write-Error "Failed to set custom JBR path correctly! Expected path to contain '$expectedPathPart' but got '$javaPath'."
-          #       exit 1
-          #     }
-          
-          #     Write-Host "JBR path verification successful."    
-          
-          # # Install jre MacOS X64
-          # - name: Install Jre MacOS X64
-          #   if: ${{ runner.os == 'macOS' && matrix.arch == 'x86_64' }}
-          #   uses: actions/setup-java@v2
-          #   with:
-          #     java-version: '17'
-          #     distribution: 'temurin'
-          #     java-package: 'jre'
-          #     architecture: 'x64'
-          
-          # - name: Setup Custom JBR For Mac arm (Final Correct Path)
-          #   if: ${{ runner.os == 'macOS' && matrix.arch == 'arm64' }}
-          #   run: |
-          #     # --------------------- 准备工作 ---------------------
-          #     echo "Downloading and extracting JBR..."
-          #     curl -L -o jbr.tar.gz "https://cache-redirector.jetbrains.com/intellij-jbr/jbr_jcef-17.0.12-osx-aarch64-b1207.37.tar.gz"
-          #     mkdir -p jbr-17
-          #     tar -xzf jbr.tar.gz -C jbr-17 --strip-components=1
-          
-          #     # --------------------- 核心配置步骤 (已根据最终路径 jbr-17/Contents/Home 修正) ---------------------
-          #     echo "Configuring environment variables..."
-          
-          #     # 步骤 1: 获取 JBR 的 Home 目录的绝对路径 (关键修正)
-          #     # 我们进入 jbr-17/Contents/Home 目录后再获取路径
-          #     JBR_HOME=$(cd jbr-17/Contents/Home && pwd)
-          #     echo "Correct JAVA_HOME path will be: $JBR_HOME"
-          
-          #     # 步骤 2: 设置 JAVA_HOME 环境变量
-          #     echo "JAVA_HOME=$JBR_HOME" >> $GITHUB_ENV
-          
-          #     # 步骤 3: 使用 GITHUB_PATH 将 JBR 的 bin 目录添加到 PATH 最前端
-          #     echo "$JBR_HOME/bin" >> $GITHUB_PATH
-          
-          #     echo "Configuration complete."
-          
-          # - name: Setup Custom JBR For Mac x64 (Final Correct Path)
-          #   if: ${{ runner.os == 'macOS' && matrix.arch == 'x86_64' }}
-          #   run: |
-          #     # --------------------- 准备工作 ---------------------
-          #     echo "Downloading and extracting JBR..."
-          #     curl -L -o jbr.tar.gz "https://cache-redirector.jetbrains.com/intellij-jbr/jbr_jcef-17.0.12-osx-x64-b1207.37.tar.gz"
-          #     mkdir -p jbr-17
-          #     tar -xzf jbr.tar.gz -C jbr-17 --strip-components=1
-          
-          #     # --------------------- 核心配置步骤 (已根据最终路径 jbr-17/Contents/Home 修正) ---------------------
-          #     echo "Configuring environment variables..."
-          
-          #     # 步骤 1: 获取 JBR 的 Home 目录的绝对路径 (关键修正)
-          #     # 我们进入 jbr-17/Contents/Home 目录后再获取路径
-          #     JBR_HOME=$(cd jbr-17/Contents/Home && pwd)
-          #     echo "Correct JAVA_HOME path will be: $JBR_HOME"
-          
-          #     # 步骤 2: 设置 JAVA_HOME 环境变量
-          #     echo "JAVA_HOME=$JBR_HOME" >> $GITHUB_ENV
-          
-          #     # 步骤 3: 使用 GITHUB_PATH 将 JBR 的 bin 目录添加到 PATH 最前端
-          #     echo "$JBR_HOME/bin" >> $GITHUB_PATH
-          
-          #     echo "Configuration complete."    
-          
-          # - name: Verify Final Java Configuration
-          #   if: ${{ runner.os == 'macOS'}}
-          #   run: |
-          #     echo "--- Verifying final configuration ---"
-          
-          #     # 1. 检查 JAVA_HOME
-          #     echo "JAVA_HOME is: $JAVA_HOME"
-          
-          #     # 2. 检查 'java' 命令的指向
-          #     WHICH_JAVA=$(which java)
-          #     echo "'which java' points to: $WHICH_JAVA"
-          
-          #     # 3. 检查 Java 版本
-          #     echo "Final 'java -version' output:"
-          #     java -version
-          
-          #     # 4. 最终断言，确保路径正确 (已更新断言路径)
-          #     if [[ ! "$WHICH_JAVA" == *"/jbr-17/Contents/Home/bin/java"* ]]; then
-          #       echo "::error::Failed to set custom JBR path correctly!"
-          #       exit 1
-          #     fi
-
-      # Install jre MacOS arm64
-      # - name: Install Jre MacOS arm64
-      #   if: ${{ runner.os == 'macOS' && matrix.arch == 'arm64' }}
-      #   uses: actions/setup-java@main
-      #   with:
-      #     java-version: '17'
-      #     distribution: 'temurin'
-      #     java-package: 'jre'
-      #     architecture: 'aarch64'
-
 
 
       - name: Setup Custom JBR for Linux Runtime Image
@@ -637,7 +476,7 @@ jobs:
         if: ${{ runner.os == 'Linux' }}
         run: |
           sudo apt-get update
-          sudo apt-get install -y fakeroot zip rpm cpio desktop-file-utils file libsecret-1-dev
+          sudo apt-get install -y fakeroot rpm cpio desktop-file-utils file libsecret-1-dev
 
       # java.security open tls1 Windows
       - name: Enable tls1
@@ -701,7 +540,7 @@ jobs:
           rm -rf "${JCEF_PROJECT_ROOT}/jpackage/input/mac/Frameworks"
           cp -R "$JAVA_HOME/../Frameworks" "${JCEF_PROJECT_ROOT}/jpackage/input/mac"
           rm -rf "${JCEF_PROJECT_ROOT}/jpackage/input/mac/Frameworks/cef_server.app"
-      
+
 
       # Copy jre Linux
       - name: Copy Jre for Linux
@@ -805,27 +644,27 @@ jobs:
           JAVA_HOME: ${{ env.JBR_BUILD_PATH }}
         run: |
           pwd
-          mvn -v 
+          mvn -v
           mvn clean install -U -B '-Dmaven.test.skip=true' `
             "-P${env:CHAT2DB_MAVEN_PROFILE}" `
             "-Dchat2db.update.key-id=${env:CHAT2DB_UPDATE_KEY_ID}" `
             "-Dchat2db.update.public-key=${env:CHAT2DB_UPDATE_PUBLIC_KEY_B64}" `
             -f "${env:JCEF_POM_PATH}"
-          # ossutil cp -rf ${{ secrets.REPO_JAR_PATH }} "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/"
-          # cp ${{ secrets.REPO_JAR_PATH }} ${{ secrets.REPO_STATIC_JAR_PATH }} 
+          # ossutil cp -rf ${{ secrets.REPO_JAR_PATH }} "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/"
+          # cp ${{ secrets.REPO_JAR_PATH }} ${{ secrets.REPO_STATIC_JAR_PATH }}
 
       # 打包后端工程
       - name: Build BE Static mac
         if: ${{ runner.os == 'macOS' }}
         run: |
           pwd
-          mvn -v 
+          mvn -v
           mvn clean install -U -B '-Dmaven.test.skip=true' \
             -P"${CHAT2DB_MAVEN_PROFILE}" \
             -Dchat2db.update.key-id="${CHAT2DB_UPDATE_KEY_ID}" \
             -Dchat2db.update.public-key="${CHAT2DB_UPDATE_PUBLIC_KEY_B64}" \
             -f "${JCEF_POM_PATH}"
-          # ossutil cp -rf ${{ secrets.REPO_JAR_PATH }} "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/"
+          # ossutil cp -rf ${{ secrets.REPO_JAR_PATH }} "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/"
           # cp ${{ secrets.REPO_JAR_PATH }} ${{ secrets.REPO_STATIC_JAR_PATH }}
 
       - name: Build BE Static linux
@@ -838,9 +677,9 @@ jobs:
             -Dchat2db.update.key-id="${CHAT2DB_UPDATE_KEY_ID}" \
             -Dchat2db.update.public-key="${CHAT2DB_UPDATE_PUBLIC_KEY_B64}" \
             -f "${JCEF_POM_PATH}"
-          # ossutil cp -rf ${{ secrets.REPO_JAR_PATH }} "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/"
+          # ossutil cp -rf ${{ secrets.REPO_JAR_PATH }} "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/"
           # cp ${{ secrets.REPO_JAR_PATH }} ${{ secrets.REPO_STATIC_JAR_PATH }}
-      
+
 
       # 打包前端资源
       - name: Build FE Static
@@ -852,17 +691,17 @@ jobs:
 
           pushd ${{ env.JCEF_FRONT_PATH }}
           yarn install --frozen-lockfile --non-interactive
-          yarn run modify:package:name chat2db-local Chat2DB-Local
-          yarn run build:web:offline --app_version=${{ github.event.inputs.version }}
+          yarn run build:web:desktop --app_version=${{ github.event.inputs.version }}
           rm -f dist.zip
           zip -qr dist.zip dist
-          
+          # ossutil cp -rf dist.zip "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/"
+
           cp -r dist ./static/
-          
+
           popd
           echo "Returned to the original directory. Current path is:"
           pwd
-          
+
           bash "${JCEF_PACKAGE_SCRIPT_DIR}/prepare_desktop_layout.sh" \
             "${{ github.event.inputs.version }}" \
             "${JCEF_FRONT_PATH}/dist" \
@@ -875,7 +714,7 @@ jobs:
             cp "${JCEF_FRONT_PATH}/dist.zip" "${JCEF_PROJECT_ROOT}/jpackage/input/sourceFile/dist.zip"
             test -f "${JCEF_PROJECT_ROOT}/jpackage/input/sourceFile/chat2db-enterprise.jar"
             test ! -e "${JCEF_PROJECT_ROOT}/jpackage/input/sourceFile/chat2db-studio.jar"
-            CHAT2DB_PACKAGE_EDITION="local" \
+            CHAT2DB_PACKAGE_EDITION="pro" \
             CHAT2DB_PACKAGE_MODE="enterprise-over-community" \
             CHAT2DB_SOURCE_REF="${JCEF_SOURCE_REF}" \
             CHAT2DB_ENTERPRISE_SOURCE_REF="${JCEF_ENTERPRISE_SOURCE_REF}" \
@@ -883,7 +722,7 @@ jobs:
               bash "${JCEF_PACKAGE_SCRIPT_DIR}/generate_metadata.sh" \
                 "${{ github.event.inputs.version }}" \
                 "${JCEF_PROJECT_ROOT}/jpackage/input/sourceFile" \
-                https://cdn.chat2db-ai.com/offline/updates
+                https://cdn.chat2db-ai.com/download/updates
             cp "${JCEF_PROJECT_ROOT}/jpackage/input/sourceFile/version.json" \
               "${JCEF_PROJECT_ROOT}/jpackage/input/sourceFile/local_version.json"
             for platform in mac win linux; do
@@ -908,19 +747,19 @@ jobs:
 
           pushd "$FRONT_PATH"
           yarn install --frozen-lockfile --non-interactive
-          yarn run modify:package:name chat2db-local Chat2DB-Local
-          yarn run build:web:offline --app_version=${{ github.event.inputs.version }}
-          
+          yarn run build:web:desktop --app_version=${{ github.event.inputs.version }}
+
           # 【已修改】在 Windows 上，使用 7-Zip 创建标准的 zip 文件，避免编码问题
           # 7-Zip is pre-installed on GitHub's Windows runners
           7z a -tzip dist.zip ./dist
-          
+
+          # ossutil cp -rf dist.zip "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/"
           cp -r dist ./static/
           popd
-          
+
           echo "Returned to the original directory. Current path is:"
           pwd
-          
+
           bash "$PACKAGE_SCRIPT_DIR/prepare_desktop_layout.sh" \
             "${{ github.event.inputs.version }}" \
             "$FRONT_PATH/dist" \
@@ -933,7 +772,7 @@ jobs:
             cp "$FRONT_PATH/dist.zip" "$PROJECT_ROOT/jpackage/input/sourceFile/dist.zip"
             test -f "$PROJECT_ROOT/jpackage/input/sourceFile/chat2db-enterprise.jar"
             test ! -e "$PROJECT_ROOT/jpackage/input/sourceFile/chat2db-studio.jar"
-            CHAT2DB_PACKAGE_EDITION="local" \
+            CHAT2DB_PACKAGE_EDITION="pro" \
             CHAT2DB_PACKAGE_MODE="enterprise-over-community" \
             CHAT2DB_SOURCE_REF="${JCEF_SOURCE_REF}" \
             CHAT2DB_ENTERPRISE_SOURCE_REF="${JCEF_ENTERPRISE_SOURCE_REF}" \
@@ -941,7 +780,7 @@ jobs:
               bash "$PACKAGE_SCRIPT_DIR/generate_metadata.sh" \
                 "${{ github.event.inputs.version }}" \
                 "$PROJECT_ROOT/jpackage/input/sourceFile" \
-                https://cdn.chat2db-ai.com/offline/updates
+                https://cdn.chat2db-ai.com/download/updates
             cp "$PROJECT_ROOT/jpackage/input/sourceFile/version.json" \
               "$PROJECT_ROOT/jpackage/input/sourceFile/local_version.json"
             for platform in mac win linux; do
@@ -1002,6 +841,7 @@ jobs:
           name: build-provenance-${{ matrix.os }}-${{ matrix.file_name }}
           path: ${{ env.JCEF_PROJECT_ROOT }}/jpackage/input/sourceFile/build-provenance.json
           if-no-files-found: warn
+
 
       - name: Import Code-Signing Certificate
         if: ${{ runner.os == 'macOS' }}
@@ -1068,17 +908,17 @@ jobs:
       - name: package mac arm64
         if: ${{ runner.os == 'macOS' && matrix.arch == 'arm64' }}
         run: |
-          bash ${{ env.JCEF_PACKAGE_SCRIPT_DIR }}/package_macos_offline.sh  ${{ github.event.inputs.version }} "" "${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg"
+          bash ${{ env.JCEF_PACKAGE_SCRIPT_DIR }}/package_macos.sh  ${{ github.event.inputs.version }} "" "${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg"
 
       - name: package mac x86_64
         if: ${{ runner.os == 'macOS' && matrix.arch == 'x86_64' }}
         run: |
-          bash ${{ env.JCEF_PACKAGE_SCRIPT_DIR }}/package_macos_offline.sh  ${{ github.event.inputs.version }} "" "${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.dmg"
+          bash ${{ env.JCEF_PACKAGE_SCRIPT_DIR }}/package_macos.sh  ${{ github.event.inputs.version }} "" "${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.dmg"
 
       - name: package linux
         if: ${{ runner.os == 'Linux' }}
         run: |
-          bash ${{ env.JCEF_PACKAGE_SCRIPT_DIR }}/package_linux_offline.sh ${{ github.event.inputs.version }}
+          bash ${{ env.JCEF_PACKAGE_SCRIPT_DIR }}/package_linux.sh ${{ github.event.inputs.version }}
 
       - name: Notarize macOS package
         if: runner.os == 'macOS'
@@ -1091,11 +931,11 @@ jobs:
           set -euo pipefail
           case "${{ matrix.arch }}" in
             arm64)
-              PACKAGE_FILE="${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg"
+              PACKAGE_FILE="${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.dmg"
               PACKAGE_PLATFORM="macOS arm64"
               ;;
             x86_64)
-              PACKAGE_FILE="${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.dmg"
+              PACKAGE_FILE="${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x64.dmg"
               PACKAGE_PLATFORM="macOS x64"
               ;;
             *)
@@ -1153,13 +993,13 @@ jobs:
 
           xcrun stapler staple "${DMG_PATH}"
           xcrun stapler validate "${DMG_PATH}"
-          ossutil cp -rf "${DMG_PATH}" "oss://${{ secrets.BUCKET_NAME }}/offline/${{ github.event.inputs.version }}/"
+          ossutil cp -rf "${DMG_PATH}" "oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/"
           FEISHU_WEBHOOK_URL="${{ secrets.FEISHU_RELEASE_NOTIFY_WEBHOOK }}" \
-            PACKAGE_EDITION="Chat2DB Local" \
+            PACKAGE_EDITION="Chat2DB Pro" \
             PACKAGE_VERSION="${{ github.event.inputs.version }}" \
             PACKAGE_PLATFORM="${PACKAGE_PLATFORM}" \
             PACKAGE_NAME="${PACKAGE_FILE}" \
-            PACKAGE_URL="https://cdn.chat2db-ai.com/offline/${{ github.event.inputs.version }}/${PACKAGE_FILE}" \
+            PACKAGE_URL="https://cdn.chat2db-ai.com/download/${{ github.event.inputs.version }}/${PACKAGE_FILE}" \
             python3 "${RUNNER_TEMP}/notify_package.py"
           echo "oss successful"
 
@@ -1167,34 +1007,46 @@ jobs:
         if: ${{ runner.os == 'Linux' }}
         run: |
           if [ "${{ matrix.arch }}" = "arm64" ]; then
-            DEB_FILE="${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.deb"
-            RPM_FILE="${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-aarch64.rpm"
-            APPIMAGE_FILE="${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.AppImage"
+            DEB_FILE="${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.deb"
+            RPM_FILE="${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-aarch64.rpm"
+            APPIMAGE_FILE="${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-arm64.AppImage"
           else
-            DEB_FILE="${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-amd64.deb"
-            RPM_FILE="${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x86_64.rpm"
-            APPIMAGE_FILE="${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x86_64.AppImage"
+            DEB_FILE="${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-amd64.deb"
+            RPM_FILE="${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x86_64.rpm"
+            APPIMAGE_FILE="${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-x86_64.AppImage"
           fi
 
           notify_package() {
             local platform="$1"
             local package_file="$2"
             FEISHU_WEBHOOK_URL="${{ secrets.FEISHU_RELEASE_NOTIFY_WEBHOOK }}" \
-              PACKAGE_EDITION="Chat2DB Local" \
+              PACKAGE_EDITION="Chat2DB Pro" \
               PACKAGE_VERSION="${{ github.event.inputs.version }}" \
               PACKAGE_PLATFORM="$platform" \
               PACKAGE_NAME="$package_file" \
-              PACKAGE_URL="https://cdn.chat2db-ai.com/offline/${{ github.event.inputs.version }}/$package_file" \
+              PACKAGE_URL="https://cdn.chat2db-ai.com/download/${{ github.event.inputs.version }}/$package_file" \
               python3 "$RUNNER_TEMP/notify_package.py"
           }
 
-          echo "上传 Linux 离线版本产物到 OSS..."
-          ossutil cp -rf "${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/${DEB_FILE}" "oss://${{ secrets.BUCKET_NAME }}/offline/${{ github.event.inputs.version }}/"
+          echo "上传 Linux 版本产物到 OSS..."
+          ossutil cp -rf "${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/${DEB_FILE}" "oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/"
           notify_package "Linux ${{ matrix.arch }} deb" "$DEB_FILE"
-          ossutil cp -rf "${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/${RPM_FILE}" "oss://${{ secrets.BUCKET_NAME }}/offline/${{ github.event.inputs.version }}/"
+          ossutil cp -rf "${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/${RPM_FILE}" "oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/"
           notify_package "Linux ${{ matrix.arch }} rpm" "$RPM_FILE"
-          ossutil cp -rf "${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/${APPIMAGE_FILE}" "oss://${{ secrets.BUCKET_NAME }}/offline/${{ github.event.inputs.version }}/"
+          ossutil cp -rf "${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/${APPIMAGE_FILE}" "oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/"
           notify_package "Linux ${{ matrix.arch }} AppImage" "$APPIMAGE_FILE"
+
+      # # 打包Electron
+      # - name: Build/release Electron app
+      #   uses: samuelmeuli/action-electron-builder@v1
+      #   with:
+      #     package_root: ${{ secrets.REPO_FRONT_PATH }}
+      #     GITHUB_TOKEN: ${{ secrets.ACCESS_TOKEN }}
+      #     mac_certs: ${{ secrets.MAC_CERTS }}
+      #     mac_certs_password: ${{ secrets.MAC_CERTS_PASSWORD }}
+      #     skip_build: true
+      #     args: >
+      #       -c.appId=${{ secrets.APP_ID }} -c.productName="${{ secrets.PRODUCT_NAME }}" -c.win.publisherName="${{ secrets.PUBLISHER_NAME }}" -c.nsis.shortcutName="${{ secrets.PRODUCT_NAME }}" -c.extraMetadata.version=${{ github.event.inputs.version }} ${{ matrix.build_arg }}
 
       - name: Install WinSCP
         if: ${{ runner.os == 'Windows' }}
@@ -1230,11 +1082,10 @@ jobs:
           export PATH="$JAVA_HOME/bin:$PATH"
           java -version
           jpackage --version
-          bash "$PACKAGE_SCRIPT_DIR/package_win_offline.sh" "${{ github.event.inputs.version }}"
+          bash "$PACKAGE_SCRIPT_DIR/package_win.sh" "${{ github.event.inputs.version }}"
 
       # ==============================================================
       # Windows installer: sign MSI -> wrap in Inno Setup EXE -> sign EXE
-      # (Chat2DB Local / offline edition)
       #
       # Background: jpackage's --type exe wraps an unsigned MSI inside a
       # bootstrap EXE. On SRP/AppLocker-managed machines this triggers
@@ -1266,8 +1117,8 @@ jobs:
         run: |
           set -euo pipefail
           PROJECT_ROOT="$(cygpath -u "${JCEF_PROJECT_ROOT}")"
-          ossutil cp -rf "$PROJECT_ROOT/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.msi" \
-            "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/signing/${{ github.run_id }}-${{ github.run_attempt }}/unsigned/"
+          ossutil cp -rf "$PROJECT_ROOT/jpackage/output/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.msi" \
+            "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/signing/${{ github.run_id }}-${{ github.run_attempt }}/unsigned/"
 
       - name: Sign MSI on remote signing server
         if: ${{ runner.os == 'Windows' }}
@@ -1277,12 +1128,12 @@ jobs:
           SCP_PASSWORD: ${{ secrets.WIN_SSH_PRIVATE_KEY }}
           REMOTE_HOST: ${{ secrets.WIN_SERVER_IP }}
           REMOTE_USER: ${{ secrets.WIN_SERVER_USER }}
-          REMOTE_MSI_PATH: '${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-${{ github.run_id }}-${{ github.run_attempt }}.msi'
+          REMOTE_MSI_PATH: '${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-${{ github.run_id }}-${{ github.run_attempt }}.msi'
           REMOTE_OSS: ${{ secrets.REMOTE_SIGN_SCRIPT_OSS }}
-          SIGN_MSI_SHA1: '${{ secrets.REMOTE_SIGN_SCRIPT }} --alg SHA-1 ${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-${{ github.run_id }}-${{ github.run_attempt }}.msi'
-          SIGN_MSI_SHA256: '${{ secrets.REMOTE_SIGN_SCRIPT }} --alg SHA-256 ${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-${{ github.run_id }}-${{ github.run_attempt }}.msi'
-          UNSIGNED_MSI_URI: 'oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/signing/${{ github.run_id }}-${{ github.run_attempt }}/unsigned/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.msi'
-          SIGNED_MSI_URI: 'oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/signing/${{ github.run_id }}-${{ github.run_attempt }}/signed/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.msi'
+          SIGN_MSI_SHA1: '${{ secrets.REMOTE_SIGN_SCRIPT }} --alg SHA-1 ${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-${{ github.run_id }}-${{ github.run_attempt }}.msi'
+          SIGN_MSI_SHA256: '${{ secrets.REMOTE_SIGN_SCRIPT }} --alg SHA-256 ${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-${{ github.run_id }}-${{ github.run_attempt }}.msi'
+          UNSIGNED_MSI_URI: 'oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/signing/${{ github.run_id }}-${{ github.run_attempt }}/unsigned/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.msi'
+          SIGNED_MSI_URI: 'oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/signing/${{ github.run_id }}-${{ github.run_attempt }}/signed/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.msi'
         run: |
           $commands = @(
             "option batch abort"
@@ -1313,14 +1164,14 @@ jobs:
           set -euo pipefail
           PROJECT_ROOT="$(cygpath -u "${JCEF_PROJECT_ROOT}")"
           ossutil cp -rf \
-            "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/signing/${{ github.run_id }}-${{ github.run_attempt }}/signed/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.msi" \
+            "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/signing/${{ github.run_id }}-${{ github.run_attempt }}/signed/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.msi" \
             "$PROJECT_ROOT/jpackage/output/"
 
       - name: Verify signed MSI
         if: ${{ runner.os == 'Windows' }}
         shell: pwsh
         run: |
-          $packagePath = Join-Path $env:JCEF_PROJECT_ROOT "jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.msi"
+          $packagePath = Join-Path $env:JCEF_PROJECT_ROOT "jpackage/output/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.msi"
           if (-not (Test-Path -LiteralPath $packagePath -PathType Leaf)) {
             throw "Signed MSI is missing: $packagePath"
           }
@@ -1338,7 +1189,7 @@ jobs:
         run: |
           set -euo pipefail
           PACKAGE_SCRIPT_DIR="$(cygpath -u "${JCEF_PACKAGE_SCRIPT_DIR}")"
-          bash "$PACKAGE_SCRIPT_DIR/wrap_win_installer.sh" "${{ github.event.inputs.version }}" local
+          bash "$PACKAGE_SCRIPT_DIR/wrap_win_installer.sh" "${{ github.event.inputs.version }}"
 
       # ---- Sign the outer EXE (existing flow, now operates on the wrapped EXE) ----
 
@@ -1353,9 +1204,9 @@ jobs:
           WORKSPACE_PATH="$(cygpath -u "${GITHUB_WORKSPACE}")"
           pwd
           mkdir -p "$FRONT_PATH/release"
-          cp -r "$PROJECT_ROOT/jpackage/output/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe" "$FRONT_PATH/release"
+          cp -r "$PROJECT_ROOT/jpackage/output/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe" "$FRONT_PATH/release"
           ls "$FRONT_PATH/release"
-          cp -r "$FRONT_PATH/release/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe" "$WORKSPACE_PATH"
+          cp -r "$FRONT_PATH/release/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe" "$WORKSPACE_PATH"
 
       # 上传文件到OSS准备
       - name: Upload to OSS for windows
@@ -1364,8 +1215,8 @@ jobs:
         run: |
           set -euo pipefail
           WORKSPACE_PATH="$(cygpath -u "${GITHUB_WORKSPACE}")"
-          ossutil cp -rf "$WORKSPACE_PATH/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe" \
-            "oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/signing/${{ github.run_id }}-${{ github.run_attempt }}/unsigned/"
+          ossutil cp -rf "$WORKSPACE_PATH/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe" \
+            "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/signing/${{ github.run_id }}-${{ github.run_attempt }}/unsigned/"
 
       # 上传文件到远程服务器
       - name: Copy files to remote server
@@ -1376,15 +1227,15 @@ jobs:
           SCP_PASSWORD: ${{ secrets.WIN_SSH_PRIVATE_KEY }}
           REMOTE_HOST: ${{ secrets.WIN_SERVER_IP }}
           REMOTE_USER: ${{ secrets.WIN_SERVER_USER }}
-          REMOTE_PATH: '${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-${{ github.run_id }}-${{ github.run_attempt }}.exe'
+          REMOTE_PATH: '${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-${{ github.run_id }}-${{ github.run_attempt }}.exe'
           REMOTE_OSS: ${{ secrets.REMOTE_SIGN_SCRIPT_OSS }}
           HOST_KEY: ${{ secrets.HOST_KEY }}
-          FILE_TO_UPLOAD: '${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe'
-          REMOTE_SCRIPT_PATH_1: '${{ secrets.REMOTE_SIGN_SCRIPT }} --alg SHA-1 ${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-${{ github.run_id }}-${{ github.run_attempt }}.exe'
-          REMOTE_SCRIPT_PATH_2: '${{ secrets.REMOTE_SIGN_SCRIPT }} --alg SHA-256 ${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-${{ github.run_id }}-${{ github.run_attempt }}.exe'
-          LOCAL_DOWNLOAD_PATH: '${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe'
-          UNSIGNED_EXE_URI: 'oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/signing/${{ github.run_id }}-${{ github.run_attempt }}/unsigned/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe'
-          SIGNED_EXE_URI: 'oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/signing/${{ github.run_id }}-${{ github.run_attempt }}/signed/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe'
+          FILE_TO_UPLOAD: '${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe'
+          REMOTE_SCRIPT_PATH_1: '${{ secrets.REMOTE_SIGN_SCRIPT }} --alg SHA-1 ${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-${{ github.run_id }}-${{ github.run_attempt }}.exe'
+          REMOTE_SCRIPT_PATH_2: '${{ secrets.REMOTE_SIGN_SCRIPT }} --alg SHA-256 ${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-${{ github.run_id }}-${{ github.run_attempt }}.exe'
+          LOCAL_DOWNLOAD_PATH: '${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe'
+          UNSIGNED_EXE_URI: 'oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/signing/${{ github.run_id }}-${{ github.run_attempt }}/unsigned/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe'
+          SIGNED_EXE_URI: 'oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/signing/${{ github.run_id }}-${{ github.run_attempt }}/signed/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe'
         run: |
           $commands = @(
             "option batch abort"
@@ -1413,10 +1264,10 @@ jobs:
         if: ${{ runner.os == 'Windows' }}
         shell: pwsh
         env:
-          SIGNED_EXE_URI: 'oss://${{ secrets.BUCKET_NAME }}/offline/updates/${{ github.event.inputs.version }}/signing/${{ github.run_id }}-${{ github.run_attempt }}/signed/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe'
-          FINAL_EXE_URI: 'oss://${{ secrets.BUCKET_NAME }}/offline/${{ github.event.inputs.version }}/${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe'
+          SIGNED_EXE_URI: 'oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/signing/${{ github.run_id }}-${{ github.run_attempt }}/signed/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe'
+          FINAL_EXE_URI: 'oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe'
         run: |
-          $packageFile = "${{ secrets.OFFLINE_PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe"
+          $packageFile = "${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe"
           $packagePath = Join-Path $env:JCEF_PROJECT_ROOT "jpackage/output/$packageFile"
           $signedDownloadDirectory = Join-Path $env:RUNNER_TEMP "signed-exe-${{ github.run_id }}-${{ github.run_attempt }}"
           New-Item -ItemType Directory -Path $signedDownloadDirectory -Force | Out-Null
@@ -1438,11 +1289,11 @@ jobs:
             throw "Cannot publish verified EXE to the release path."
           }
           $env:FEISHU_WEBHOOK_URL = "${{ secrets.FEISHU_RELEASE_NOTIFY_WEBHOOK }}"
-          $env:PACKAGE_EDITION = "Chat2DB Local"
+          $env:PACKAGE_EDITION = "Chat2DB Pro"
           $env:PACKAGE_VERSION = "${{ github.event.inputs.version }}"
           $env:PACKAGE_PLATFORM = "Windows x64"
           $env:PACKAGE_NAME = $packageFile
-          $env:PACKAGE_URL = "https://cdn.chat2db-ai.com/offline/${{ github.event.inputs.version }}/$packageFile"
+          $env:PACKAGE_URL = "https://cdn.chat2db-ai.com/download/${{ github.event.inputs.version }}/$packageFile"
           python "$env:RUNNER_TEMP/notify_package.py"
 
       - name: Archive updater-v2 full package
@@ -1469,7 +1320,7 @@ jobs:
         if: ${{ github.event.inputs.publish_mode != 'v1' && (env.CHAT2DB_MAVEN_PROFILE == 'versioned-thin' || env.CHAT2DB_RELEASE_CHANNEL == 'BETA' || github.event.inputs.version != '5.3.3') && startsWith(matrix.update_target, 'macos-') }}
         uses: actions/upload-artifact@v4
         with:
-          name: full-package-local-${{ matrix.update_target }}
+          name: full-package-pro-${{ matrix.update_target }}
           path: ${{ runner.temp }}/full-package-${{ matrix.update_target }}.tar.gz
           if-no-files-found: error
           retention-days: 7
@@ -1494,13 +1345,13 @@ jobs:
         if: ${{ runner.os == 'Windows' && github.event.inputs.publish_mode != 'v2' && env.CHAT2DB_MAVEN_PROFILE == 'bridge-fat' && env.CHAT2DB_RELEASE_CHANNEL == 'STABLE' }}
         uses: actions/upload-artifact@v4
         with:
-          name: bridge-update-local
+          name: bridge-update-pro
           path: ${{ runner.temp }}/bridge-update.tar.gz
           if-no-files-found: error
           retention-days: 7
 
   promote:
-    name: Promote Local desktop release
+    name: Promote Pro desktop release
     runs-on: ubuntu-latest
     needs:
       - resolve_source
@@ -1526,14 +1377,14 @@ jobs:
         if: ${{ github.event.inputs.publish_mode != 'v2' && needs.resolve_source.outputs.release_profile == 'bridge-fat' && needs.resolve_source.outputs.release_channel_upper == 'STABLE' }}
         uses: actions/download-artifact@v4
         with:
-          name: bridge-update-local
-          path: ${{ runner.temp }}/update-artifacts/bridge-update-local
+          name: bridge-update-pro
+          path: ${{ runner.temp }}/update-artifacts/bridge-update-pro
 
       - name: Download updater-v2 full packages
         if: ${{ github.event.inputs.publish_mode != 'v1' && (needs.resolve_source.outputs.release_profile == 'versioned-thin' || needs.resolve_source.outputs.release_channel_upper == 'BETA' || github.event.inputs.version != '5.3.3') }}
         uses: actions/download-artifact@v4
         with:
-          pattern: full-package-local-*
+          pattern: full-package-pro-*
           path: ${{ runner.temp }}/update-artifacts
           merge-multiple: false
 
@@ -1599,9 +1450,9 @@ jobs:
       - name: Promote immutable resources and mutable pointers
         shell: bash
         env:
-          CHAT2DB_PRODUCT: LOCAL
-          CHAT2DB_RELEASE_ROOT: offline
-          CHAT2DB_PRODUCT_APP_NAME: ${{ secrets.OFFLINE_PRODUCT_APP_NAME }}
+          CHAT2DB_PRODUCT: PRO
+          CHAT2DB_RELEASE_ROOT: download
+          CHAT2DB_PRODUCT_APP_NAME: ${{ secrets.PRODUCT_APP_NAME }}
           CHAT2DB_RELEASE_VERSION: ${{ github.event.inputs.version }}
           CHAT2DB_RELEASE_PROFILE: ${{ needs.resolve_source.outputs.release_profile }}
           CHAT2DB_PUBLISH_MODE: ${{ github.event.inputs.publish_mode }}
@@ -1653,17 +1504,17 @@ jobs:
           result = os.environ["RELEASE_RESULT"]
           promotion_result = os.environ["PROMOTION_RESULT"]
           run_url = os.environ["RUN_URL"]
-          base = f"https://cdn.chat2db-ai.com/offline/{version}"
+          base = f"https://cdn.chat2db-ai.com/download/{version}"
           files = [
-              f"Chat2DB-Local-{version}.exe",
-              f"Chat2DB-Local-{version}-x64.dmg",
-              f"Chat2DB-Local-{version}-arm64.dmg",
-              f"Chat2DB-Local-{version}-x86_64.AppImage",
-              f"Chat2DB-Local-{version}-arm64.AppImage",
-              f"Chat2DB-Local-{version}-amd64.deb",
-              f"Chat2DB-Local-{version}-arm64.deb",
-              f"Chat2DB-Local-{version}-x86_64.rpm",
-              f"Chat2DB-Local-{version}-aarch64.rpm",
+              f"Chat2DB-Pro-{version}.exe",
+              f"Chat2DB-Pro-{version}-x64.dmg",
+              f"Chat2DB-Pro-{version}-arm64.dmg",
+              f"Chat2DB-Pro-{version}-x86_64.AppImage",
+              f"Chat2DB-Pro-{version}-arm64.AppImage",
+              f"Chat2DB-Pro-{version}-amd64.deb",
+              f"Chat2DB-Pro-{version}-arm64.deb",
+              f"Chat2DB-Pro-{version}-x86_64.rpm",
+              f"Chat2DB-Pro-{version}-aarch64.rpm",
           ]
 
           def failed_release_jobs():
@@ -1695,7 +1546,7 @@ jobs:
 
           if result == "success" and promotion_result == "success":
               lines = [
-                  "Chat2DB Local 灰度包全部上传成功",
+                  "Chat2DB Pro 灰度包全部上传成功",
                   f"版本：{version}",
                   "下载链接：",
                   *[f"- {base}/{name}" for name in files],
@@ -1703,7 +1554,7 @@ jobs:
               ]
           else:
               lines = [
-                  "Chat2DB Local 灰度打包未全部成功",
+                  "Chat2DB Pro 灰度打包未全部成功",
                   f"版本：{version}",
                   f"结果：{result}",
                   f"发布结果：{promotion_result}",
