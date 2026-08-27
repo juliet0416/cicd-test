@@ -9,6 +9,8 @@ param(
     [Parameter(Mandatory = $true)]
     [string[]]$Commands,
 
+    [ScriptBlock]$SuccessProbe,
+
     [int]$MaxAttempts = 3
 )
 
@@ -24,6 +26,26 @@ if ($Commands.Count -eq 0) {
     throw 'At least one WinSCP command is required.'
 }
 
+function Test-SuccessProbe {
+    if ($null -eq $SuccessProbe) {
+        return $false
+    }
+
+    for ($probeAttempt = 1; $probeAttempt -le 3; $probeAttempt++) {
+        try {
+            if ([bool](& $SuccessProbe)) {
+                return $true
+            }
+        } catch {
+            Write-Warning "Success probe attempt $probeAttempt failed: $($_.Exception.Message)"
+        }
+        if ($probeAttempt -lt 3) {
+            Start-Sleep -Seconds 5
+        }
+    }
+    return $false
+}
+
 $lastExitCode = 1
 for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
     $attemptLog = "$LogPath.attempt-$attempt.log"
@@ -33,6 +55,11 @@ for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
     $lastExitCode = $LASTEXITCODE
     if ($lastExitCode -eq 0) {
         Write-Host "WinSCP operation completed on attempt $attempt."
+        exit 0
+    }
+
+    if (Test-SuccessProbe) {
+        Write-Warning "WinSCP returned exit code $lastExitCode, but the operation-specific success probe passed."
         exit 0
     }
 

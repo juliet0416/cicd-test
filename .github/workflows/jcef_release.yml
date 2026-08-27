@@ -1116,7 +1116,8 @@ jobs:
         run: |
           set -euo pipefail
           PROJECT_ROOT="$(cygpath -u "${JCEF_PROJECT_ROOT}")"
-          ossutil cp -rf "$PROJECT_ROOT/jpackage/output/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.msi" "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/temp-msi/"
+          ossutil cp -rf "$PROJECT_ROOT/jpackage/output/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.msi" \
+            "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/signing/${{ github.run_id }}-${{ github.run_attempt }}/unsigned/"
 
       - name: Sign MSI on remote signing server
         if: ${{ runner.os == 'Windows' }}
@@ -1126,25 +1127,32 @@ jobs:
           SCP_PASSWORD: ${{ secrets.WIN_SSH_PRIVATE_KEY }}
           REMOTE_HOST: ${{ secrets.WIN_SERVER_IP }}
           REMOTE_USER: ${{ secrets.WIN_SERVER_USER }}
-          REMOTE_MSI_PATH: '${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.msi'
+          REMOTE_MSI_PATH: '${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-${{ github.run_id }}-${{ github.run_attempt }}.msi'
           REMOTE_OSS: ${{ secrets.REMOTE_SIGN_SCRIPT_OSS }}
-          SIGN_MSI_SHA1: '${{ secrets.REMOTE_SIGN_SCRIPT }} --alg SHA-1 ${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.msi'
-          SIGN_MSI_SHA256: '${{ secrets.REMOTE_SIGN_SCRIPT }} --alg SHA-256 ${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.msi'
+          SIGN_MSI_SHA1: '${{ secrets.REMOTE_SIGN_SCRIPT }} --alg SHA-1 ${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-${{ github.run_id }}-${{ github.run_attempt }}.msi'
+          SIGN_MSI_SHA256: '${{ secrets.REMOTE_SIGN_SCRIPT }} --alg SHA-256 ${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-${{ github.run_id }}-${{ github.run_attempt }}.msi'
+          UNSIGNED_MSI_URI: 'oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/signing/${{ github.run_id }}-${{ github.run_attempt }}/unsigned/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.msi'
+          SIGNED_MSI_URI: 'oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/signing/${{ github.run_id }}-${{ github.run_attempt }}/signed/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.msi'
         run: |
           $commands = @(
             "option batch abort"
             "option confirm off"
             "open scp://${{ env.REMOTE_USER }}:${{ env.SCP_PASSWORD }}@${{ env.REMOTE_HOST }} -hostkey=* -rawsettings SendBuf=0"
-            "call ${{ env.REMOTE_OSS }} oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/temp-msi/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.msi ${env:REMOTE_MSI_PATH}"
+            "call ${env:REMOTE_OSS} ${env:UNSIGNED_MSI_URI} ${env:REMOTE_MSI_PATH}"
             "call ${env:SIGN_MSI_SHA1}"
             "call ${env:SIGN_MSI_SHA256}"
-            "call ${{ env.REMOTE_OSS }} ${env:REMOTE_MSI_PATH} oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/signed-msi/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.msi "
+            "call ${env:REMOTE_OSS} ${env:REMOTE_MSI_PATH} ${env:SIGNED_MSI_URI}"
             "exit"
           )
+          $successProbe = {
+            & ossutil stat $env:SIGNED_MSI_URI *> $null
+            return $LASTEXITCODE -eq 0
+          }
           & "$env:GITHUB_WORKSPACE\cicd-packaging-source\.github\scripts\invoke-winscp-with-retry.ps1" `
             -WinScpPath $env:WINSCP_PATH `
             -LogPath "winscp-msi" `
-            -Commands $commands
+            -Commands $commands `
+            -SuccessProbe $successProbe
 
       - name: Download signed MSI from OSS
         if: ${{ runner.os == 'Windows' }}
@@ -1152,7 +1160,23 @@ jobs:
         run: |
           set -euo pipefail
           PROJECT_ROOT="$(cygpath -u "${JCEF_PROJECT_ROOT}")"
-          ossutil cp -rf "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/signed-msi/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.msi" "$PROJECT_ROOT/jpackage/output/"
+          ossutil cp -rf \
+            "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/signing/${{ github.run_id }}-${{ github.run_attempt }}/signed/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.msi" \
+            "$PROJECT_ROOT/jpackage/output/"
+
+      - name: Verify signed MSI
+        if: ${{ runner.os == 'Windows' }}
+        shell: pwsh
+        run: |
+          $packagePath = Join-Path $env:JCEF_PROJECT_ROOT "jpackage/output/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.msi"
+          if (-not (Test-Path -LiteralPath $packagePath -PathType Leaf)) {
+            throw "Signed MSI is missing: $packagePath"
+          }
+          $signature = Get-AuthenticodeSignature -LiteralPath $packagePath
+          if ($signature.Status -ne [System.Management.Automation.SignatureStatus]::Valid) {
+            throw "Signed MSI verification failed: $($signature.Status) $($signature.StatusMessage)"
+          }
+          Write-Host "Signed MSI verification passed."
 
       # ---- Wrap the signed MSI in an Inno Setup EXE (still unsigned outer) ----
 
@@ -1188,7 +1212,8 @@ jobs:
         run: |
           set -euo pipefail
           WORKSPACE_PATH="$(cygpath -u "${GITHUB_WORKSPACE}")"
-          ossutil cp -rf "$WORKSPACE_PATH/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe" "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/temp/"
+          ossutil cp -rf "$WORKSPACE_PATH/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe" \
+            "oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/signing/${{ github.run_id }}-${{ github.run_attempt }}/unsigned/"
 
       # 上传文件到远程服务器
       - name: Copy files to remote server
@@ -1199,36 +1224,58 @@ jobs:
           SCP_PASSWORD: ${{ secrets.WIN_SSH_PRIVATE_KEY }}
           REMOTE_HOST: ${{ secrets.WIN_SERVER_IP }}
           REMOTE_USER: ${{ secrets.WIN_SERVER_USER }}
-          REMOTE_PATH: '${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe'
+          REMOTE_PATH: '${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-${{ github.run_id }}-${{ github.run_attempt }}.exe'
           REMOTE_OSS: ${{ secrets.REMOTE_SIGN_SCRIPT_OSS }}
           HOST_KEY: ${{ secrets.HOST_KEY }}
           FILE_TO_UPLOAD: '${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe'
-          REMOTE_SCRIPT_PATH_1: '${{ secrets.REMOTE_SIGN_SCRIPT }} --alg SHA-1 ${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe'
-          REMOTE_SCRIPT_PATH_2: '${{ secrets.REMOTE_SIGN_SCRIPT }} --alg SHA-256 ${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe'
+          REMOTE_SCRIPT_PATH_1: '${{ secrets.REMOTE_SIGN_SCRIPT }} --alg SHA-1 ${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-${{ github.run_id }}-${{ github.run_attempt }}.exe'
+          REMOTE_SCRIPT_PATH_2: '${{ secrets.REMOTE_SIGN_SCRIPT }} --alg SHA-256 ${{ secrets.REMOTE_SIGN_PATH }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}-${{ github.run_id }}-${{ github.run_attempt }}.exe'
           LOCAL_DOWNLOAD_PATH: '${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe'
+          UNSIGNED_EXE_URI: 'oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/signing/${{ github.run_id }}-${{ github.run_attempt }}/unsigned/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe'
+          SIGNED_EXE_URI: 'oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/signing/${{ github.run_id }}-${{ github.run_attempt }}/signed/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe'
         run: |
           $commands = @(
             "option batch abort"
             "option confirm off"
             "open scp://${{ env.REMOTE_USER }}:${{ env.SCP_PASSWORD }}@${{ env.REMOTE_HOST }} -hostkey=* -rawsettings SendBuf=0"
-            "call ${{ env.REMOTE_OSS }} oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/temp/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe ${env:REMOTE_PATH}"
+            "call ${env:REMOTE_OSS} ${env:UNSIGNED_EXE_URI} ${env:REMOTE_PATH}"
             "call ${env:REMOTE_SCRIPT_PATH_1}"
             "call ${env:REMOTE_SCRIPT_PATH_2}"
-            "call ${{ env.REMOTE_OSS }} ${env:REMOTE_PATH} oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe "
+            "call ${env:REMOTE_OSS} ${env:REMOTE_PATH} ${env:SIGNED_EXE_URI}"
             "exit"
           )
+          $successProbe = {
+            & ossutil stat $env:SIGNED_EXE_URI *> $null
+            return $LASTEXITCODE -eq 0
+          }
           & "$env:GITHUB_WORKSPACE\cicd-packaging-source\.github\scripts\invoke-winscp-with-retry.ps1" `
             -WinScpPath $env:WINSCP_PATH `
             -LogPath "winscp-exe" `
-            -Commands $commands
+            -Commands $commands `
+            -SuccessProbe $successProbe
 
       # 拉取OSS文件
       - name: Prepare upload for OSS on windows
         if: ${{ runner.os == 'Windows' }}
         shell: pwsh
+        env:
+          SIGNED_EXE_URI: 'oss://${{ secrets.BUCKET_NAME }}/download/updates/${{ github.event.inputs.version }}/signing/${{ github.run_id }}-${{ github.run_attempt }}/signed/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe'
+          FINAL_EXE_URI: 'oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe'
         run: |
-          ossutil cp -rf oss://${{ secrets.BUCKET_NAME }}/download/${{ github.event.inputs.version }}/${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe ${{ env.JCEF_PROJECT_ROOT }}/jpackage/output/
           $packageFile = "${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe"
+          $packagePath = Join-Path $env:JCEF_PROJECT_ROOT "jpackage/output/$packageFile"
+          & ossutil cp -rf $env:SIGNED_EXE_URI $packagePath
+          if ($LASTEXITCODE -ne 0) {
+            throw "Cannot download signed EXE from the operation staging path."
+          }
+          $signature = Get-AuthenticodeSignature -LiteralPath $packagePath
+          if ($signature.Status -ne [System.Management.Automation.SignatureStatus]::Valid) {
+            throw "Signed EXE verification failed: $($signature.Status) $($signature.StatusMessage)"
+          }
+          & ossutil cp -rf $packagePath $env:FINAL_EXE_URI
+          if ($LASTEXITCODE -ne 0) {
+            throw "Cannot publish verified EXE to the release path."
+          }
           $env:FEISHU_WEBHOOK_URL = "${{ secrets.FEISHU_RELEASE_NOTIFY_WEBHOOK }}"
           $env:PACKAGE_EDITION = "Chat2DB Pro"
           $env:PACKAGE_VERSION = "${{ github.event.inputs.version }}"
