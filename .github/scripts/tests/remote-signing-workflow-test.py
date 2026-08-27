@@ -28,6 +28,10 @@ for workflow in WORKFLOWS:
     require(source.count('"/log=winscp-exe.log"') == 1, f"{workflow.name} must invoke EXE signing once")
     require(source.count("Get-AuthenticodeSignature") == 2,
             f"{workflow.name} must validate both signed MSI and EXE artifacts")
+    require(source.count("signedDownloadDirectory") == 4,
+            f"{workflow.name} must download the signed EXE away from the existing unsigned package path")
+    require(source.count("Copy-Item -LiteralPath $signedPackagePath -Destination $packagePath -Force") == 1,
+            f"{workflow.name} must replace the unsigned EXE only after signature validation")
     require(source.count("${{ github.run_id }}-${{ github.run_attempt }}") >= 8,
             f"{workflow.name} signing paths must be isolated by run and attempt")
     require(source.count("will be validated independently") == 2,

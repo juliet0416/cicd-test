@@ -1269,14 +1269,21 @@ jobs:
         run: |
           $packageFile = "${{ secrets.PRODUCT_APP_NAME }}-${{ github.event.inputs.version }}.exe"
           $packagePath = Join-Path $env:JCEF_PROJECT_ROOT "jpackage/output/$packageFile"
-          & ossutil cp -rf $env:SIGNED_EXE_URI $packagePath
+          $signedDownloadDirectory = Join-Path $env:RUNNER_TEMP "signed-exe-${{ github.run_id }}-${{ github.run_attempt }}"
+          New-Item -ItemType Directory -Path $signedDownloadDirectory -Force | Out-Null
+          & ossutil cp -rf $env:SIGNED_EXE_URI "$signedDownloadDirectory/"
           if ($LASTEXITCODE -ne 0) {
             throw "Cannot download signed EXE from the operation staging path."
           }
-          $signature = Get-AuthenticodeSignature -LiteralPath $packagePath
+          $signedPackagePath = Join-Path $signedDownloadDirectory $packageFile
+          if (-not (Test-Path -LiteralPath $signedPackagePath -PathType Leaf)) {
+            throw "Downloaded signed EXE is missing: $signedPackagePath"
+          }
+          $signature = Get-AuthenticodeSignature -LiteralPath $signedPackagePath
           if ($signature.Status -ne [System.Management.Automation.SignatureStatus]::Valid) {
             throw "Signed EXE verification failed: $($signature.Status) $($signature.StatusMessage)"
           }
+          Copy-Item -LiteralPath $signedPackagePath -Destination $packagePath -Force
           & ossutil cp -rf $packagePath $env:FINAL_EXE_URI
           if ($LASTEXITCODE -ne 0) {
             throw "Cannot publish verified EXE to the release path."
