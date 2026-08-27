@@ -5,8 +5,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
 WORKFLOWS = (
-    ROOT / ".github/workflows/jcef_offline.yml",
-    ROOT / ".github/workflows/jcef_release.yml",
+    ROOT / ".github/workflows/local.yml",
+    ROOT / ".github/workflows/pro.yml",
 )
 
 
