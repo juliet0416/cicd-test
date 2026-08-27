@@ -132,6 +132,7 @@ jobs:
       - name: Test desktop release contract
         run: |
           python3 "${GITHUB_WORKSPACE}/cicd-packaging-source/.github/scripts/tests/resolve-desktop-release-test.py"
+          python3 "${GITHUB_WORKSPACE}/cicd-packaging-source/.github/scripts/tests/remote-signing-workflow-test.py"
 
       - name: Validate trusted update key configuration
         env:
@@ -1293,15 +1294,17 @@ jobs:
             "call ${env:REMOTE_OSS} ${env:REMOTE_MSI_PATH} ${env:SIGNED_MSI_URI}"
             "exit"
           )
-          $successProbe = {
-            & ossutil stat $env:SIGNED_MSI_URI *> $null
-            return $LASTEXITCODE -eq 0
+          $winScpExitCode = 1
+          try {
+            & $env:WINSCP_PATH "/log=winscp-msi.log" /command @commands
+            $winScpExitCode = $LASTEXITCODE
+          } catch {
+            Write-Warning "WinSCP could not complete the remote MSI signing command: $($_.Exception.Message)"
           }
-          & "$env:GITHUB_WORKSPACE\cicd-packaging-source\.github\scripts\invoke-winscp-with-retry.ps1" `
-            -WinScpPath $env:WINSCP_PATH `
-            -LogPath "winscp-msi" `
-            -Commands $commands `
-            -SuccessProbe $successProbe
+          if ($winScpExitCode -ne 0) {
+            Write-Warning "WinSCP returned exit code $winScpExitCode; the signed MSI artifact will be validated independently."
+          }
+          exit 0
 
       - name: Download signed MSI from OSS
         if: ${{ runner.os == 'Windows' }}
@@ -1393,15 +1396,17 @@ jobs:
             "call ${env:REMOTE_OSS} ${env:REMOTE_PATH} ${env:SIGNED_EXE_URI}"
             "exit"
           )
-          $successProbe = {
-            & ossutil stat $env:SIGNED_EXE_URI *> $null
-            return $LASTEXITCODE -eq 0
+          $winScpExitCode = 1
+          try {
+            & $env:WINSCP_PATH "/log=winscp-exe.log" /command @commands
+            $winScpExitCode = $LASTEXITCODE
+          } catch {
+            Write-Warning "WinSCP could not complete the remote EXE signing command: $($_.Exception.Message)"
           }
-          & "$env:GITHUB_WORKSPACE\cicd-packaging-source\.github\scripts\invoke-winscp-with-retry.ps1" `
-            -WinScpPath $env:WINSCP_PATH `
-            -LogPath "winscp-exe" `
-            -Commands $commands `
-            -SuccessProbe $successProbe
+          if ($winScpExitCode -ne 0) {
+            Write-Warning "WinSCP returned exit code $winScpExitCode; the signed EXE artifact will be validated independently."
+          }
+          exit 0
 
       # 拉取OSS文件
       - name: Prepare upload for OSS on windows
