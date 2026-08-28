@@ -647,6 +647,7 @@ jobs:
           mvn -v
           mvn clean install -U -B '-Dmaven.test.skip=true' `
             "-P${env:CHAT2DB_MAVEN_PROFILE}" `
+            "-Dchat2db.product=pro" `
             "-Dchat2db.update.key-id=${env:CHAT2DB_UPDATE_KEY_ID}" `
             "-Dchat2db.update.public-key=${env:CHAT2DB_UPDATE_PUBLIC_KEY_B64}" `
             -f "${env:JCEF_POM_PATH}"
@@ -661,6 +662,7 @@ jobs:
           mvn -v
           mvn clean install -U -B '-Dmaven.test.skip=true' \
             -P"${CHAT2DB_MAVEN_PROFILE}" \
+            -Dchat2db.product=pro \
             -Dchat2db.update.key-id="${CHAT2DB_UPDATE_KEY_ID}" \
             -Dchat2db.update.public-key="${CHAT2DB_UPDATE_PUBLIC_KEY_B64}" \
             -f "${JCEF_POM_PATH}"
@@ -674,6 +676,7 @@ jobs:
           mvn -v
           mvn clean install -U -B '-Dmaven.test.skip=true' \
             -P"${CHAT2DB_MAVEN_PROFILE}" \
+            -Dchat2db.product=pro \
             -Dchat2db.update.key-id="${CHAT2DB_UPDATE_KEY_ID}" \
             -Dchat2db.update.public-key="${CHAT2DB_UPDATE_PUBLIC_KEY_B64}" \
             -f "${JCEF_POM_PATH}"
@@ -713,6 +716,11 @@ jobs:
             mkdir -p "${JCEF_PROJECT_ROOT}/jpackage/input/sourceFile"
             cp "${JCEF_FRONT_PATH}/dist.zip" "${JCEF_PROJECT_ROOT}/jpackage/input/sourceFile/dist.zip"
             test -f "${JCEF_PROJECT_ROOT}/jpackage/input/sourceFile/chat2db-enterprise.jar"
+            if ! jar tf "${JCEF_PROJECT_ROOT}/jpackage/input/sourceFile/chat2db-enterprise.jar" \
+                | grep -q '^BOOT-INF/lib/chat2db-studio-sqlite-exit-[^/]*\.jar$'; then
+              echo "Error: Pro bridge-fat jar is missing chat2db-studio-sqlite-exit" >&2
+              exit 1
+            fi
             test ! -e "${JCEF_PROJECT_ROOT}/jpackage/input/sourceFile/chat2db-studio.jar"
             CHAT2DB_PACKAGE_EDITION="pro" \
             CHAT2DB_PACKAGE_MODE="enterprise-over-community" \
@@ -771,6 +779,11 @@ jobs:
             mkdir -p "$PROJECT_ROOT/jpackage/input/sourceFile"
             cp "$FRONT_PATH/dist.zip" "$PROJECT_ROOT/jpackage/input/sourceFile/dist.zip"
             test -f "$PROJECT_ROOT/jpackage/input/sourceFile/chat2db-enterprise.jar"
+            if ! jar tf "$PROJECT_ROOT/jpackage/input/sourceFile/chat2db-enterprise.jar" \
+                | grep -q '^BOOT-INF/lib/chat2db-studio-sqlite-exit-[^/]*\.jar$'; then
+              echo "Error: Pro bridge-fat jar is missing chat2db-studio-sqlite-exit" >&2
+              exit 1
+            fi
             test ! -e "$PROJECT_ROOT/jpackage/input/sourceFile/chat2db-studio.jar"
             CHAT2DB_PACKAGE_EDITION="pro" \
             CHAT2DB_PACKAGE_MODE="enterprise-over-community" \
