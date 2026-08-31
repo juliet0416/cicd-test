@@ -26,15 +26,15 @@ target.releaseEpoch > installed.releaseEpoch
 
 ```bash
 # Pro
-curl -fsSL 'https://cdn.chat2db-ai.com/download/updates-v2/stable/latest_version.json' \
+curl --compressed -fsSL 'https://cdn.chat2db-ai.com/download/updates-v2/stable/latest_version.json' \
   | jq '{channel, releaseEpoch}'
-curl -fsSL 'https://cdn.chat2db-ai.com/download/updates-v2/beta/latest_version.json' \
+curl --compressed -fsSL 'https://cdn.chat2db-ai.com/download/updates-v2/beta/latest_version.json' \
   | jq '{channel, releaseEpoch}'
 
 # Local
-curl -fsSL 'https://cdn.chat2db-ai.com/offline/updates-v2/stable/latest_version.json' \
+curl --compressed -fsSL 'https://cdn.chat2db-ai.com/offline/updates-v2/stable/latest_version.json' \
   | jq '{channel, releaseEpoch}'
-curl -fsSL 'https://cdn.chat2db-ai.com/offline/updates-v2/beta/latest_version.json' \
+curl --compressed -fsSL 'https://cdn.chat2db-ai.com/offline/updates-v2/beta/latest_version.json' \
   | jq '{channel, releaseEpoch}'
 ```
 
@@ -53,7 +53,8 @@ curl -fsSL 'https://cdn.chat2db-ai.com/offline/updates-v2/beta/latest_version.js
 ```text
 Pro 5.3.3: releaseEpoch=0
 Pro 5.3.4: releaseEpoch=1
-Pro 5.3.5 protocol-2 transition: releaseEpoch=2
+Pro Beta current maximum: releaseEpoch=4
+Pro 5.3.5 protocol-2 transition candidate: releaseEpoch=5
 ```
 
 后续版本不能仅根据版本号写死 epoch。例如先发布 Beta 后再发布 Stable，Stable 必须继续使用线上最大 epoch 的下一个值。
@@ -105,7 +106,7 @@ update_latest_version_json=true
 
 Pro 5.3.5 是一次性 protocol 2 入站兼容版本：
 
-- `release_epoch=2`
+- `release_epoch=5`（2026-08-31 手动读取 Stable=1、Beta=4 后取最大值加 1）
 - `publish_mode=v2`
 - 目标包为 `bridge-fat`
 - 5.3.3/5.3.4 原生安装器使用各自 rollback package

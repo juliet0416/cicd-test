@@ -86,12 +86,19 @@ def resolve(args: argparse.Namespace) -> tuple[str, str]:
                 f"the 5.3.3 {channel} bridge requires release_epoch={expected_epoch}"
             )
         profile = "bridge-fat"
-    elif version in (fat_release, transition_fat_release) and not version.prerelease:
+    elif version == fat_release and not version.prerelease:
         if channel != "stable":
             raise ValueError(f"the {args.version} fat release must use the stable channel")
-        expected_epoch = 1 if version == fat_release else 2
-        if release_epoch != expected_epoch:
-            raise ValueError(f"the {args.version} fat release requires release_epoch={expected_epoch}")
+        if release_epoch != 1:
+            raise ValueError("the 5.3.4 fat release requires release_epoch=1")
+        profile = "bridge-fat"
+    elif version == transition_fat_release and not version.prerelease:
+        if channel != "stable":
+            raise ValueError("the 5.3.5 transition fat release must use the stable channel")
+        if release_epoch <= 1:
+            raise ValueError(
+                "the 5.3.5 transition release_epoch must be manually resolved above all published epochs"
+            )
         profile = "bridge-fat"
     else:
         if release_epoch == 0:
