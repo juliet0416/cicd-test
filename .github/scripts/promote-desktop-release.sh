@@ -664,18 +664,28 @@ publish_v2_update() {
     local base_url="https://cdn.chat2db-ai.com/${update_root}"
     local generated="${PUBLISH_ROOT}/updates-v2"
     local previous_index="${PROMOTE_ROOT}/previous-release-index.json"
-    local product_display current_file package_type arch launcher manifest native_version upload_total
+    local product_display current_file package_type package_extension arch launcher manifest native_version upload_total
     local current_path target
     local manifests=()
     local reusable_package_sources=()
     local current_files=()
     local previous_index_environment=()
+    local transition_mode=false
 
     if [ -z "${CHAT2DB_UPDATE_SIGNING_PRIVATE_KEY_B64:-}" ]; then
-        echo "Error: CHAT2DB_UPDATE_SIGNING_PRIVATE_KEY_B64 is required for versioned-thin" >&2
+        echo "Error: CHAT2DB_UPDATE_SIGNING_PRIVATE_KEY_B64 is required for updater-v2 publication" >&2
         exit 1
     fi
+    # TEMP-5.3.3-5.3.4-PROTOCOL-2-COMPAT: 5.3.5 is the one inbound
+    # transition release for already-installed protocol-2 Pro clients.
+    if [ "${CHAT2DB_PRODUCT}" = "PRO" ] \
+            && [ "${CHAT2DB_RELEASE_VERSION}" = "5.3.5" ] \
+            && [ "${CHAT2DB_RELEASE_PROFILE}" = "bridge-fat" ] \
+            && [ "${CHAT2DB_RELEASE_CHANNEL}" = "STABLE" ]; then
+        transition_mode=true
+    fi
     mkdir -p "${generated}"
+    rm -f "${generated}"/*
     # shellcheck source=script/package/desktop_layout.sh
     source "${CHAT2DB_ENTERPRISE_ROOT}/script/package/desktop_layout.sh"
     native_version=$(chat2db_jpackage_version "${CHAT2DB_RELEASE_VERSION}")
@@ -685,38 +695,74 @@ publish_v2_update() {
         product_display="Chat2DB Local"
     fi
 
+    generate_manifest() {
+        local platform="$1"
+        local arch="$2"
+        local package_type="$3"
+        local current_path="$4"
+        local launcher="$5"
+        local baseline="$6"
+        local platform_lower arch_lower package_type_lower suffix rollback_file rollback_url manifest
+        platform_lower=$(printf '%s' "${platform}" | tr '[:upper:]' '[:lower:]')
+        arch_lower=$(printf '%s' "${arch}" | tr '[:upper:]' '[:lower:]')
+        package_type_lower=$(printf '%s' "${package_type}" | tr '[:upper:]' '[:lower:]' | tr '_' '-')
+        suffix=""
+        rollback_file=""
+        rollback_url=""
+        if [ "${transition_mode}" = "true" ]; then
+            suffix="-from-${baseline}"
+            case "${package_type}" in
+                WINDOWS_EXE|LINUX_DEB|LINUX_RPM)
+                    rollback_file="${INSTALLER_ROOT}/rollback-${baseline}-${current_file}"
+                    download_release_artifact "${baseline}" "${current_file}" "${rollback_file}"
+                    rollback_url="https://cdn.chat2db-ai.com/${CHAT2DB_RELEASE_ROOT}/${baseline}/${current_file}"
+                    ;;
+            esac
+        fi
+        if [ "${transition_mode}" = "true" ]; then
+            CHAT2DB_UPDATE_SIGNING_PRIVATE_KEY_B64="${CHAT2DB_UPDATE_SIGNING_PRIVATE_KEY_B64}" \
+            CHAT2DB_UPDATE_KEY_ID="${CHAT2DB_UPDATE_KEY_ID}" \
+            CHAT2DB_UPDATE_PUBLIC_KEY_B64="${CHAT2DB_UPDATE_PUBLIC_KEY_B64}" \
+            CHAT2DB_UPDATE_MANIFEST_SUFFIX="${suffix}" \
+                bash "${CHAT2DB_ENTERPRISE_ROOT}/script/package/generate_update_v2.sh" \
+                    "${CHAT2DB_RELEASE_VERSION}" "${native_version}" "${CHAT2DB_PRODUCT}" "${CHAT2DB_RELEASE_CHANNEL}" \
+                    "${platform}" "${arch}" "${package_type}" "${current_path}" "${launcher}" \
+                    "${generated}" "${base_url}" "${CHAT2DB_RELEASE_EPOCH}" "${CHAT2DB_ENTERPRISE_SHA}" \
+                    "${CHAT2DB_RELEASE_NOTES_URL}" 2 1 "${baseline}" "${rollback_file}" "${rollback_url}"
+        else
+            CHAT2DB_UPDATE_SIGNING_PRIVATE_KEY_B64="${CHAT2DB_UPDATE_SIGNING_PRIVATE_KEY_B64}" \
+            CHAT2DB_UPDATE_KEY_ID="${CHAT2DB_UPDATE_KEY_ID}" \
+            CHAT2DB_UPDATE_PUBLIC_KEY_B64="${CHAT2DB_UPDATE_PUBLIC_KEY_B64}" \
+            CHAT2DB_UPDATE_MANIFEST_SUFFIX="${suffix}" \
+                bash "${CHAT2DB_ENTERPRISE_ROOT}/script/package/generate_update_v2.sh" \
+                    "${CHAT2DB_RELEASE_VERSION}" "${native_version}" "${CHAT2DB_PRODUCT}" "${CHAT2DB_RELEASE_CHANNEL}" \
+                    "${platform}" "${arch}" "${package_type}" "${current_path}" "${launcher}" \
+                    "${generated}" "${base_url}" "${CHAT2DB_RELEASE_EPOCH}" "${CHAT2DB_ENTERPRISE_SHA}" \
+                    "${CHAT2DB_RELEASE_NOTES_URL}"
+        fi
+        manifest="${generated}/manifest-${PRODUCT_LOWER}-${platform_lower}-${arch_lower}-${package_type_lower}${suffix}.json"
+        test -s "${manifest}"
+        manifests+=("${manifest}")
+    }
+
     for target in macos-x64 macos-arm64; do
         if [ "${target}" = "macos-x64" ]; then arch=X64; else arch=ARM64; fi
         current_path="${CHAT2DB_UPDATE_ARTIFACT_ROOT}/full-package-${PRODUCT_LOWER}-${target}/full-package-${target}.tar.gz"
         test -s "${current_path}"
-        CHAT2DB_UPDATE_SIGNING_PRIVATE_KEY_B64="${CHAT2DB_UPDATE_SIGNING_PRIVATE_KEY_B64}" \
-        CHAT2DB_UPDATE_KEY_ID="${CHAT2DB_UPDATE_KEY_ID}" \
-        CHAT2DB_UPDATE_PUBLIC_KEY_B64="${CHAT2DB_UPDATE_PUBLIC_KEY_B64}" \
-            bash "${CHAT2DB_ENTERPRISE_ROOT}/script/package/generate_update_v2.sh" \
-                "${CHAT2DB_RELEASE_VERSION}" "${native_version}" "${CHAT2DB_PRODUCT}" "${CHAT2DB_RELEASE_CHANNEL}" \
-                MACOS "${arch}" MACOS_APP_ARCHIVE "${current_path}" \
-                "Contents/MacOS/${product_display}" "${generated}" "${base_url}" \
-                "${CHAT2DB_RELEASE_EPOCH}" "${CHAT2DB_ENTERPRISE_SHA}" \
-                "${CHAT2DB_RELEASE_NOTES_URL}"
-        manifest="${generated}/manifest-${PRODUCT_LOWER}-macos-$(printf '%s' "${arch}" | tr '[:upper:]' '[:lower:]')-macos-app-archive.json"
-        test -s "${manifest}"
-        manifests+=("${manifest}")
+        current_file="full-package-${target}.tar.gz"
+        generate_manifest MACOS "${arch}" MACOS_APP_ARCHIVE "${current_path}" \
+            "Contents/MacOS/${product_display}" 5.3.3
     done
 
     current_file="${CHAT2DB_PRODUCT_APP_NAME}-${CHAT2DB_RELEASE_VERSION}.exe"
     current_path="${INSTALLER_ROOT}/${current_file}"
     download_release_artifact "${CHAT2DB_RELEASE_VERSION}" "${current_file}" "${current_path}"
-    CHAT2DB_UPDATE_SIGNING_PRIVATE_KEY_B64="${CHAT2DB_UPDATE_SIGNING_PRIVATE_KEY_B64}" \
-    CHAT2DB_UPDATE_KEY_ID="${CHAT2DB_UPDATE_KEY_ID}" \
-    CHAT2DB_UPDATE_PUBLIC_KEY_B64="${CHAT2DB_UPDATE_PUBLIC_KEY_B64}" \
-        bash "${CHAT2DB_ENTERPRISE_ROOT}/script/package/generate_update_v2.sh" \
-            "${CHAT2DB_RELEASE_VERSION}" "${native_version}" "${CHAT2DB_PRODUCT}" "${CHAT2DB_RELEASE_CHANNEL}" \
-            WINDOWS X64 WINDOWS_EXE "${current_path}" "${product_display}.exe" \
-            "${generated}" "${base_url}" "${CHAT2DB_RELEASE_EPOCH}" "${CHAT2DB_ENTERPRISE_SHA}" \
-            "${CHAT2DB_RELEASE_NOTES_URL}"
-    manifest="${generated}/manifest-${PRODUCT_LOWER}-windows-x64-windows-exe.json"
-    test -s "${manifest}"
-    manifests+=("${manifest}")
+    if [ "${transition_mode}" = "true" ]; then
+        generate_manifest WINDOWS X64 WINDOWS_EXE "${current_path}" "${product_display}.exe" 5.3.3
+        generate_manifest WINDOWS X64 WINDOWS_EXE "${current_path}" "${product_display}.exe" 5.3.4
+    else
+        generate_manifest WINDOWS X64 WINDOWS_EXE "${current_path}" "${product_display}.exe" ""
+    fi
     reusable_package_sources+=(
         "package-${PRODUCT_LOWER}-windows-x64-windows-exe.exe::${CHAT2DB_RELEASE_ROOT}/${CHAT2DB_RELEASE_VERSION}/${current_file}"
     )
@@ -740,25 +786,29 @@ publish_v2_update() {
         for index in 0 1 2; do
             current_file="${current_files[$index]%%:*}"
             package_type="${current_files[$index]##*:}"
+            case "${package_type}" in
+                LINUX_APPIMAGE) package_extension=AppImage ;;
+                LINUX_DEB) package_extension=deb ;;
+                LINUX_RPM) package_extension=rpm ;;
+            esac
             current_path="${INSTALLER_ROOT}/${current_file}"
             download_release_artifact "${CHAT2DB_RELEASE_VERSION}" "${current_file}" "${current_path}"
             launcher="bin/${product_display}"
             if [ "${package_type}" = "LINUX_APPIMAGE" ]; then
                 launcher="."
             fi
-            CHAT2DB_UPDATE_SIGNING_PRIVATE_KEY_B64="${CHAT2DB_UPDATE_SIGNING_PRIVATE_KEY_B64}" \
-            CHAT2DB_UPDATE_KEY_ID="${CHAT2DB_UPDATE_KEY_ID}" \
-            CHAT2DB_UPDATE_PUBLIC_KEY_B64="${CHAT2DB_UPDATE_PUBLIC_KEY_B64}" \
-                bash "${CHAT2DB_ENTERPRISE_ROOT}/script/package/generate_update_v2.sh" \
-                    "${CHAT2DB_RELEASE_VERSION}" "${native_version}" "${CHAT2DB_PRODUCT}" "${CHAT2DB_RELEASE_CHANNEL}" \
-                    LINUX "${arch}" "${package_type}" "${current_path}" "${launcher}" \
-                    "${generated}" "${base_url}" "${CHAT2DB_RELEASE_EPOCH}" \
-                    "${CHAT2DB_ENTERPRISE_SHA}" "${CHAT2DB_RELEASE_NOTES_URL}"
-            manifest="${generated}/manifest-${PRODUCT_LOWER}-linux-$(printf '%s' "${arch}" | tr '[:upper:]' '[:lower:]')-$(printf '%s' "${package_type}" | tr '[:upper:]' '[:lower:]' | tr '_' '-').json"
-            test -s "${manifest}"
-            manifests+=("${manifest}")
+            if [ "${transition_mode}" = "true" ]; then
+                if [ "${package_type}" = "LINUX_APPIMAGE" ]; then
+                    generate_manifest LINUX "${arch}" "${package_type}" "${current_path}" "${launcher}" 5.3.3
+                else
+                    generate_manifest LINUX "${arch}" "${package_type}" "${current_path}" "${launcher}" 5.3.3
+                    generate_manifest LINUX "${arch}" "${package_type}" "${current_path}" "${launcher}" 5.3.4
+                fi
+            else
+                generate_manifest LINUX "${arch}" "${package_type}" "${current_path}" "${launcher}" ""
+            fi
             reusable_package_sources+=(
-                "$(basename "$(jq -r '.packageUrl' "${manifest}")")::${CHAT2DB_RELEASE_ROOT}/${CHAT2DB_RELEASE_VERSION}/${current_file}"
+                "package-${PRODUCT_LOWER}-linux-$(printf '%s' "${arch}" | tr '[:upper:]' '[:lower:]')-$(printf '%s' "${package_type}" | tr '[:upper:]' '[:lower:]' | tr '_' '-').${package_extension}::${CHAT2DB_RELEASE_ROOT}/${CHAT2DB_RELEASE_VERSION}/${current_file}"
             )
         done
     done
@@ -769,10 +819,17 @@ publish_v2_update() {
         test -s "${previous_index}"
         previous_index_environment+=("CHAT2DB_PREVIOUS_UPDATE_INDEX=${previous_index}")
     fi
-    env "${previous_index_environment[@]}" \
-        bash "${CHAT2DB_ENTERPRISE_ROOT}/script/package/generate_update_index_v2.sh" \
-            "${CHAT2DB_RELEASE_CHANNEL}" "${CHAT2DB_RELEASE_EPOCH}" "${base_url}" \
-            "${generated}/release-index.json" "${manifests[@]}"
+    if [ "${transition_mode}" = "true" ]; then
+        env "${previous_index_environment[@]}" CHAT2DB_UPDATE_INDEX_TRANSITION=true \
+            bash "${CHAT2DB_ENTERPRISE_ROOT}/script/package/generate_update_index_v2.sh" \
+                "${CHAT2DB_RELEASE_CHANNEL}" "${CHAT2DB_RELEASE_EPOCH}" "${base_url}" \
+                "${generated}/release-index.json" "${manifests[@]}"
+    else
+        env "${previous_index_environment[@]}" \
+            bash "${CHAT2DB_ENTERPRISE_ROOT}/script/package/generate_update_index_v2.sh" \
+                "${CHAT2DB_RELEASE_CHANNEL}" "${CHAT2DB_RELEASE_EPOCH}" "${base_url}" \
+                "${generated}/release-index.json" "${manifests[@]}"
+    fi
 
     upload_total=$(find "${generated}" -maxdepth 1 -type f -print | wc -l | tr -d '[:space:]')
     begin_upload_phase updates-v2 "${upload_total}"

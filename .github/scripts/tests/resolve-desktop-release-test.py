@@ -52,8 +52,12 @@ class ResolveDesktopReleaseTest(unittest.TestCase):
     def test_resolves_535_stable_as_transition_fat_release(self):
         self.assertEqual(
             ("bridge-fat", "STABLE"),
-            MODULE.resolve(arguments(version="5.3.5")),
+            MODULE.resolve(arguments(version="5.3.5", release_epoch="2")),
         )
+
+    def test_rejects_535_transition_with_previous_epoch(self):
+        with self.assertRaisesRegex(ValueError, "release_epoch=2"):
+            MODULE.resolve(arguments(version="5.3.5", release_epoch="1"))
 
     def test_resolves_later_stable_thin_release(self):
         self.assertEqual(

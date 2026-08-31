@@ -43,7 +43,7 @@ on:
           - stable
           - beta
       release_epoch:
-        description: '单调递增的更新发布序号；5.3.3 使用 0'
+        description: '单调递增的更新发布序号；5.3.3 使用 0，5.3.4 使用 1，5.3.5 过渡版本使用 2'
         required: true
         default: '0'
         type: string
@@ -275,6 +275,9 @@ jobs:
       CHAT2DB_UPDATE_PUBLIC_KEY_B64: ${{ secrets.CHAT2DB_UPDATE_PUBLIC_KEY_B64 }}
       CHAT2DB_MAVEN_PROFILE: ${{ needs.resolve_source.outputs.release_profile }}
       CHAT2DB_RELEASE_CHANNEL: ${{ needs.resolve_source.outputs.release_channel_upper }}
+      # TEMP-5.3.3-5.3.4-PROTOCOL-2-COMPAT: the 5.3.5 Pro transition
+      # package carries the first migrated data schema marker.
+      CHAT2DB_DATA_SCHEMA_VERSION: ${{ (github.event.inputs.version == '5.3.5' && github.event.inputs.channel == 'stable') && '1' || '' }}
 
     # 将release_test分支的代码检出（即复制）到 GitHub Actions 的运行环境中。
     steps:
@@ -710,7 +713,8 @@ jobs:
             "${JCEF_FRONT_PATH}/dist" \
             "${CHAT2DB_RELEASE_EPOCH}" \
             "${JCEF_ENTERPRISE_SOURCE_REF}" \
-            "${JCEF_PROJECT_ROOT}"
+            "${JCEF_PROJECT_ROOT}" \
+            "${CHAT2DB_DATA_SCHEMA_VERSION:-}"
 
           if [ "${CHAT2DB_MAVEN_PROFILE}" = "bridge-fat" ]; then
             mkdir -p "${JCEF_PROJECT_ROOT}/jpackage/input/sourceFile"
@@ -773,7 +777,8 @@ jobs:
             "$FRONT_PATH/dist" \
             "$CHAT2DB_RELEASE_EPOCH" \
             "$JCEF_ENTERPRISE_SOURCE_REF" \
-            "$PROJECT_ROOT"
+            "$PROJECT_ROOT" \
+            "${CHAT2DB_DATA_SCHEMA_VERSION:-}"
 
           if [ "$CHAT2DB_MAVEN_PROFILE" = "bridge-fat" ]; then
             mkdir -p "$PROJECT_ROOT/jpackage/input/sourceFile"

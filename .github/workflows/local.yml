@@ -43,7 +43,7 @@ on:
           - stable
           - beta
       release_epoch:
-        description: '单调递增的更新发布序号；5.3.3 使用 0'
+        description: '单调递增的更新发布序号；5.3.3 使用 0，5.3.4 使用 1，5.3.5 过渡版本使用 2'
         required: true
         default: '0'
         type: string

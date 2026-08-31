@@ -138,12 +138,21 @@ mkdir -p "${FAKE_ENTERPRISE_SCRIPTS}"
 cat > "${FAKE_ENTERPRISE_SCRIPTS}/generate_update_v2.sh" <<'BASH'
 #!/usr/bin/env bash
 set -euo pipefail
-test "$#" -eq 14
+test "$#" -eq 14 || test "$#" -eq 19
 test "$2" = "5.3.401"
 product_lower=$(printf '%s' "$3" | tr '[:upper:]' '[:lower:]')
 platform_lower=$(printf '%s' "$5" | tr '[:upper:]' '[:lower:]')
 arch_lower=$(printf '%s' "$6" | tr '[:upper:]' '[:lower:]')
 package_type_lower=$(printf '%s' "$7" | tr '[:upper:]' '[:lower:]' | tr '_' '-')
+suffix="${CHAT2DB_UPDATE_MANIFEST_SUFFIX:-}"
+protocol=3
+schema=0
+baseline=""
+if [ "$#" -eq 19 ]; then
+    protocol="${15}"
+    schema="${16}"
+    baseline="${17}"
+fi
 mkdir -p "${10}"
 case "$7" in
     MACOS_APP_ARCHIVE) extension=tar.gz ;;
@@ -153,10 +162,20 @@ case "$7" in
     LINUX_RPM) extension=rpm ;;
 esac
 cp "$8" "${10}/package-${product_lower}-${platform_lower}-${arch_lower}-${package_type_lower}.${extension}"
-printf '{"schemaVersion":2,"releaseEpoch":%s,"status":"ACTIVE","product":"%s","channel":"%s","version":"%s","nativeVersion":"%s","platform":"%s","arch":"%s","updateScope":"FULL_PACKAGE","packageType":"%s","packageUrl":"%s/package-%s-%s-%s-%s.%s","signature":"test"}\n' \
-    "${12}" "$3" "$4" "$1" "$2" "$5" "$6" "$7" \
-    "${11}" "${product_lower}" "${platform_lower}" "${arch_lower}" "${package_type_lower}" "${extension}" \
-    > "${10}/manifest-${product_lower}-${platform_lower}-${arch_lower}-${package_type_lower}.json"
+if [ "$protocol" -eq 2 ]; then
+    jq -cn \
+        --argjson releaseEpoch "${12}" --arg product "$3" --arg channel "$4" --arg version "$1" \
+        --arg platform "$5" --arg arch "$6" --arg updateScope FULL_PACKAGE --arg packageType "$7" \
+        --arg packageUrl "${11}/package-${product_lower}-${platform_lower}-${arch_lower}-${package_type_lower}.${extension}" \
+        --arg baseline "$baseline" --argjson schema "$schema" \
+        '{schemaVersion:2,releaseEpoch:$releaseEpoch,status:"ACTIVE",product:$product,channel:$channel,version:$version,buildSha:"test",platform:$platform,arch:$arch,updateScope:$updateScope,packageType:$packageType,packageUrl:$packageUrl,packageSize:1,packageSha256:("a"*64),launcherRelativePath:".",rollbackPackageUrl:"",rollbackPackageSize:0,rollbackPackageSha256:"",updaterProtocolVersion:2,minUpdaterProtocolVersion:2,dataSchemaVersion:$schema,rollbackCompatibleFrom:$baseline,releaseNotesUrl:"https://chat2db.ai/release-notes",keyId:"test-key",signature:"test"}' \
+        > "${10}/manifest-${product_lower}-${platform_lower}-${arch_lower}-${package_type_lower}${suffix}.json"
+else
+    printf '{"schemaVersion":2,"releaseEpoch":%s,"status":"ACTIVE","product":"%s","channel":"%s","version":"%s","nativeVersion":"%s","platform":"%s","arch":"%s","updateScope":"FULL_PACKAGE","packageType":"%s","packageUrl":"%s/package-%s-%s-%s-%s.%s","signature":"test"}\n' \
+        "${12}" "$3" "$4" "$1" "$2" "$5" "$6" "$7" \
+        "${11}" "${product_lower}" "${platform_lower}" "${arch_lower}" "${package_type_lower}" "${extension}" \
+        > "${10}/manifest-${product_lower}-${platform_lower}-${arch_lower}-${package_type_lower}${suffix}.json"
+fi
 BASH
 cat > "${FAKE_ENTERPRISE_SCRIPTS}/desktop_layout.sh" <<'BASH'
 #!/usr/bin/env bash
@@ -167,11 +186,24 @@ BASH
 cat > "${FAKE_ENTERPRISE_SCRIPTS}/generate_update_index_v2.sh" <<'BASH'
 #!/usr/bin/env bash
 set -euo pipefail
-test "$#" -eq 13
+if [ "${CHAT2DB_UPDATE_INDEX_TRANSITION:-false}" = "true" ]; then
+    test "$#" -eq 18
+else
+    test "$#" -eq 13
+fi
 test -s "${CHAT2DB_PREVIOUS_UPDATE_INDEX}"
-test "$(jq '.releases | length' "${CHAT2DB_PREVIOUS_UPDATE_INDEX}")" -eq 1
-printf '{"schemaVersion":2,"releaseEpoch":%s,"status":"ACTIVE","channel":"%s","releases":[{"version":"5.3.3"}]}\n' \
-    "$2" "$1" > "$4"
+channel="$1"
+epoch="$2"
+output="$4"
+shift 4
+references='[]'
+for manifest in "$@"; do
+    reference=$(jq --arg manifestUrl "https://cdn.example.com/$(basename "$manifest")" \
+        '{version,platform,arch,packageType,manifestUrl:$manifestUrl}' "$manifest")
+    references=$(jq --argjson reference "$reference" '. + [$reference]' <<<"$references")
+done
+jq -cn --argjson releaseEpoch "$epoch" --arg channel "$channel" --argjson releases "$references" \
+    '{schemaVersion:2,releaseEpoch:$releaseEpoch,status:"ACTIVE",channel:$channel,releases:$releases}' > "$output"
 BASH
 chmod +x "${FAKE_ENTERPRISE_SCRIPTS}"/*.sh
 
@@ -254,7 +286,34 @@ if grep -Fq 'download/updates/5.3.4/version.json' "${LOG_FILE}"; then
 fi
 
 : > "${LOG_FILE}"
+export CHAT2DB_RELEASE_VERSION=5.3.5
+export CHAT2DB_RELEASE_PROFILE=bridge-fat
+export CHAT2DB_RELEASE_CHANNEL=STABLE
+export CHAT2DB_RELEASE_EPOCH=2
+export CHAT2DB_UPLOAD_LATEST=false
+export CHAT2DB_UPDATE_LATEST_VERSION_JSON=true
+rm -rf "${CHAT2DB_PROMOTE_WORK_DIR}"
+TRANSITION_OUTPUT_LOG="${WORK_DIR}/transition-output.log"
+bash "${SCRIPT_DIR}/promote-desktop-release.sh" > "${TRANSITION_OUTPUT_LOG}"
+grep -Fq 'download/updates-v2/stable/5.3.5/manifest-pro-macos-arm64-macos-app-archive-from-5.3.3.json' "${LOG_FILE}"
+grep -Fq 'download/updates-v2/stable/5.3.5/manifest-pro-windows-x64-windows-exe-from-5.3.4.json' "${LOG_FILE}"
+grep -Fq 'download/5.3.3/Chat2DB-Pro-5.3.5.exe' "${LOG_FILE}"
+grep -Fq 'download/5.3.4/Chat2DB-Pro-5.3.5.exe' "${LOG_FILE}"
+test "$(grep -Ec '^ossutil cp -f .*/manifest-pro-.* oss://test-bucket/download/updates-v2/stable/5\.3\.5/manifest-pro-' "${LOG_FILE}")" -eq 14
+test "$(grep -Ec '^ossutil cp -f .*/package-pro-.* oss://test-bucket/download/updates-v2/stable/5\.3\.5/package-pro-' "${LOG_FILE}")" -eq 2
+test "$(grep -Ec '^ossutil cp -f oss://test-bucket/download/5\.3\.5/Chat2DB-Pro-.* oss://test-bucket/download/updates-v2/stable/5\.3\.5/package-pro-' "${LOG_FILE}")" -eq 7
+grep -Fq 'event=phase_start phase=updates-v2 objects=24' "${TRANSITION_OUTPUT_LOG}"
+grep -Fq 'event=phase_complete phase=updates-v2 objects=24/24' "${TRANSITION_OUTPUT_LOG}"
+grep -Fq 'event=promotion_complete product=PRO version=5.3.5' "${TRANSITION_OUTPUT_LOG}"
+
+: > "${LOG_FILE}"
 export PROMOTE_TEST_FAIL_LATEST_COPY=true
+export CHAT2DB_RELEASE_VERSION=5.3.4
+export CHAT2DB_RELEASE_PROFILE=bridge-fat
+export CHAT2DB_RELEASE_CHANNEL=STABLE
+export CHAT2DB_RELEASE_EPOCH=1
+export CHAT2DB_UPLOAD_LATEST=true
+export CHAT2DB_UPDATE_LATEST_VERSION_JSON=true
 rm -rf "${CHAT2DB_PROMOTE_WORK_DIR}"
 FAILED_STABLE_OUTPUT_LOG="${WORK_DIR}/failed-stable-output.log"
 if bash "${SCRIPT_DIR}/promote-desktop-release.sh" > "${FAILED_STABLE_OUTPUT_LOG}" 2>&1; then
