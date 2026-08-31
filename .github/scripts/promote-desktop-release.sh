@@ -702,7 +702,7 @@ publish_v2_update() {
         local current_path="$4"
         local launcher="$5"
         local baseline="$6"
-        local platform_lower arch_lower package_type_lower suffix rollback_file rollback_url manifest
+        local platform_lower arch_lower package_type_lower suffix rollback_file rollback_name rollback_url manifest
         platform_lower=$(printf '%s' "${platform}" | tr '[:upper:]' '[:lower:]')
         arch_lower=$(printf '%s' "${arch}" | tr '[:upper:]' '[:lower:]')
         package_type_lower=$(printf '%s' "${package_type}" | tr '[:upper:]' '[:lower:]' | tr '_' '-')
@@ -713,9 +713,15 @@ publish_v2_update() {
             suffix="-from-${baseline}"
             case "${package_type}" in
                 WINDOWS_EXE|LINUX_DEB|LINUX_RPM)
-                    rollback_file="${INSTALLER_ROOT}/rollback-${baseline}-${current_file}"
-                    download_release_artifact "${baseline}" "${current_file}" "${rollback_file}"
-                    rollback_url="https://cdn.chat2db-ai.com/${CHAT2DB_RELEASE_ROOT}/${baseline}/${current_file}"
+                    rollback_name=$(basename "${current_path}")
+                    rollback_name="${rollback_name/${CHAT2DB_RELEASE_VERSION}/${baseline}}"
+                    if [ "${rollback_name}" = "$(basename "${current_path}")" ]; then
+                        echo "Error: target package name does not contain the release version: ${current_path}" >&2
+                        exit 1
+                    fi
+                    rollback_file="${INSTALLER_ROOT}/rollback-${baseline}-${rollback_name}"
+                    download_release_artifact "${baseline}" "${rollback_name}" "${rollback_file}"
+                    rollback_url="https://cdn.chat2db-ai.com/${CHAT2DB_RELEASE_ROOT}/${baseline}/${rollback_name}"
                     ;;
             esac
         fi

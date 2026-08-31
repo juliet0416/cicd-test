@@ -297,8 +297,20 @@ TRANSITION_OUTPUT_LOG="${WORK_DIR}/transition-output.log"
 bash "${SCRIPT_DIR}/promote-desktop-release.sh" > "${TRANSITION_OUTPUT_LOG}"
 grep -Fq 'download/updates-v2/stable/5.3.5/manifest-pro-macos-arm64-macos-app-archive-from-5.3.3.json' "${LOG_FILE}"
 grep -Fq 'download/updates-v2/stable/5.3.5/manifest-pro-windows-x64-windows-exe-from-5.3.4.json' "${LOG_FILE}"
-grep -Fq 'download/5.3.3/Chat2DB-Pro-5.3.5.exe' "${LOG_FILE}"
-grep -Fq 'download/5.3.4/Chat2DB-Pro-5.3.5.exe' "${LOG_FILE}"
+for baseline in 5.3.3 5.3.4; do
+    for rollback_name in \
+        "Chat2DB-Pro-${baseline}.exe" \
+        "Chat2DB-Pro-${baseline}-amd64.deb" \
+        "Chat2DB-Pro-${baseline}-x86_64.rpm" \
+        "Chat2DB-Pro-${baseline}-arm64.deb" \
+        "Chat2DB-Pro-${baseline}-aarch64.rpm"; do
+        grep -Fq "download/${baseline}/${rollback_name}" "${LOG_FILE}"
+    done
+done
+if grep -Eq 'download/5\.3\.[34]/Chat2DB-Pro-5\.3\.5' "${LOG_FILE}"; then
+    echo 'transition rollback downloads must use the baseline version file name' >&2
+    exit 1
+fi
 test "$(grep -Ec '^ossutil cp -f .*/manifest-pro-.* oss://test-bucket/download/updates-v2/stable/5\.3\.5/manifest-pro-' "${LOG_FILE}")" -eq 14
 test "$(grep -Ec '^ossutil cp -f .*/package-pro-.* oss://test-bucket/download/updates-v2/stable/5\.3\.5/package-pro-' "${LOG_FILE}")" -eq 2
 test "$(grep -Ec '^ossutil cp -f oss://test-bucket/download/5\.3\.5/Chat2DB-Pro-.* oss://test-bucket/download/updates-v2/stable/5\.3\.5/package-pro-' "${LOG_FILE}")" -eq 7
