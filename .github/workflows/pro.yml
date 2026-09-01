@@ -708,13 +708,17 @@ jobs:
           echo "Returned to the original directory. Current path is:"
           pwd
 
-          bash "${JCEF_PACKAGE_SCRIPT_DIR}/prepare_desktop_layout.sh" \
-            "${{ github.event.inputs.version }}" \
-            "${JCEF_FRONT_PATH}/dist" \
-            "${CHAT2DB_RELEASE_EPOCH}" \
-            "${JCEF_ENTERPRISE_SOURCE_REF}" \
-            "${JCEF_PROJECT_ROOT}" \
-            "${CHAT2DB_DATA_SCHEMA_VERSION:-}"
+          layout_args=(
+            "${{ github.event.inputs.version }}"
+            "${JCEF_FRONT_PATH}/dist"
+            "${CHAT2DB_RELEASE_EPOCH}"
+            "${JCEF_ENTERPRISE_SOURCE_REF}"
+            "${JCEF_PROJECT_ROOT}"
+          )
+          if [ -n "${CHAT2DB_DATA_SCHEMA_VERSION:-}" ]; then
+            layout_args+=("${CHAT2DB_DATA_SCHEMA_VERSION}")
+          fi
+          bash "${JCEF_PACKAGE_SCRIPT_DIR}/prepare_desktop_layout.sh" "${layout_args[@]}"
 
           if [ "${CHAT2DB_MAVEN_PROFILE}" = "bridge-fat" ]; then
             mkdir -p "${JCEF_PROJECT_ROOT}/jpackage/input/sourceFile"
@@ -772,13 +776,17 @@ jobs:
           echo "Returned to the original directory. Current path is:"
           pwd
 
-          bash "$PACKAGE_SCRIPT_DIR/prepare_desktop_layout.sh" \
-            "${{ github.event.inputs.version }}" \
-            "$FRONT_PATH/dist" \
-            "$CHAT2DB_RELEASE_EPOCH" \
-            "$JCEF_ENTERPRISE_SOURCE_REF" \
-            "$PROJECT_ROOT" \
-            "${CHAT2DB_DATA_SCHEMA_VERSION:-}"
+          layout_args=(
+            "${{ github.event.inputs.version }}"
+            "$FRONT_PATH/dist"
+            "$CHAT2DB_RELEASE_EPOCH"
+            "$JCEF_ENTERPRISE_SOURCE_REF"
+            "$PROJECT_ROOT"
+          )
+          if [ -n "${CHAT2DB_DATA_SCHEMA_VERSION:-}" ]; then
+            layout_args+=("${CHAT2DB_DATA_SCHEMA_VERSION}")
+          fi
+          bash "$PACKAGE_SCRIPT_DIR/prepare_desktop_layout.sh" "${layout_args[@]}"
 
           if [ "$CHAT2DB_MAVEN_PROFILE" = "bridge-fat" ]; then
             mkdir -p "$PROJECT_ROOT/jpackage/input/sourceFile"
