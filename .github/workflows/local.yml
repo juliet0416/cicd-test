@@ -11,15 +11,6 @@ on:
         description: 'Version number'
         required: true
         default: '1.0.0'
-      publish_mode:
-        description: 'Release metadata to publish'
-        required: false
-        default: 'both'
-        type: choice
-        options:
-          - v1
-          - v2
-          - both
       source_ref:
         description: 'Chat2DB source branch/ref; empty uses REPO_BRANCH secret'
         required: false
@@ -854,9 +845,6 @@ jobs:
           yarn install --frozen-lockfile --non-interactive
           yarn run modify:package:name chat2db-local Chat2DB-Local
           yarn run build:web:offline --app_version=${{ github.event.inputs.version }}
-          rm -f dist.zip
-          zip -qr dist.zip dist
-          
           cp -r dist ./static/
           
           popd
@@ -870,27 +858,6 @@ jobs:
             "${JCEF_ENTERPRISE_SOURCE_REF}" \
             "${JCEF_PROJECT_ROOT}"
 
-          if [ "${CHAT2DB_MAVEN_PROFILE}" = "bridge-fat" ]; then
-            mkdir -p "${JCEF_PROJECT_ROOT}/jpackage/input/sourceFile"
-            cp "${JCEF_FRONT_PATH}/dist.zip" "${JCEF_PROJECT_ROOT}/jpackage/input/sourceFile/dist.zip"
-            test -f "${JCEF_PROJECT_ROOT}/jpackage/input/sourceFile/chat2db-enterprise.jar"
-            test ! -e "${JCEF_PROJECT_ROOT}/jpackage/input/sourceFile/chat2db-studio.jar"
-            CHAT2DB_PACKAGE_EDITION="local" \
-            CHAT2DB_PACKAGE_MODE="enterprise-over-community" \
-            CHAT2DB_SOURCE_REF="${JCEF_SOURCE_REF}" \
-            CHAT2DB_ENTERPRISE_SOURCE_REF="${JCEF_ENTERPRISE_SOURCE_REF}" \
-            CHAT2DB_COMMUNITY_SOURCE_REF="${JCEF_COMMUNITY_SOURCE_REF}" \
-              bash "${JCEF_PACKAGE_SCRIPT_DIR}/generate_metadata.sh" \
-                "${{ github.event.inputs.version }}" \
-                "${JCEF_PROJECT_ROOT}/jpackage/input/sourceFile" \
-                https://cdn.chat2db-ai.com/offline/updates
-            cp "${JCEF_PROJECT_ROOT}/jpackage/input/sourceFile/version.json" \
-              "${JCEF_PROJECT_ROOT}/jpackage/input/sourceFile/local_version.json"
-            for platform in mac win linux; do
-              cp "${JCEF_PROJECT_ROOT}/jpackage/input/sourceFile/local_version.json" \
-                "${JCEF_PROJECT_ROOT}/jpackage/input/${platform}/local_version.json"
-            done
-          fi
       
 
       # Step specifically for Windows
@@ -911,10 +878,6 @@ jobs:
           yarn run modify:package:name chat2db-local Chat2DB-Local
           yarn run build:web:offline --app_version=${{ github.event.inputs.version }}
           
-          # 【已修改】在 Windows 上，使用 7-Zip 创建标准的 zip 文件，避免编码问题
-          # 7-Zip is pre-installed on GitHub's Windows runners
-          7z a -tzip dist.zip ./dist
-          
           cp -r dist ./static/
           popd
           
@@ -928,27 +891,6 @@ jobs:
             "$JCEF_ENTERPRISE_SOURCE_REF" \
             "$PROJECT_ROOT"
 
-          if [ "$CHAT2DB_MAVEN_PROFILE" = "bridge-fat" ]; then
-            mkdir -p "$PROJECT_ROOT/jpackage/input/sourceFile"
-            cp "$FRONT_PATH/dist.zip" "$PROJECT_ROOT/jpackage/input/sourceFile/dist.zip"
-            test -f "$PROJECT_ROOT/jpackage/input/sourceFile/chat2db-enterprise.jar"
-            test ! -e "$PROJECT_ROOT/jpackage/input/sourceFile/chat2db-studio.jar"
-            CHAT2DB_PACKAGE_EDITION="local" \
-            CHAT2DB_PACKAGE_MODE="enterprise-over-community" \
-            CHAT2DB_SOURCE_REF="${JCEF_SOURCE_REF}" \
-            CHAT2DB_ENTERPRISE_SOURCE_REF="${JCEF_ENTERPRISE_SOURCE_REF}" \
-            CHAT2DB_COMMUNITY_SOURCE_REF="${JCEF_COMMUNITY_SOURCE_REF}" \
-              bash "$PACKAGE_SCRIPT_DIR/generate_metadata.sh" \
-                "${{ github.event.inputs.version }}" \
-                "$PROJECT_ROOT/jpackage/input/sourceFile" \
-                https://cdn.chat2db-ai.com/offline/updates
-            cp "$PROJECT_ROOT/jpackage/input/sourceFile/version.json" \
-              "$PROJECT_ROOT/jpackage/input/sourceFile/local_version.json"
-            for platform in mac win linux; do
-              cp "$PROJECT_ROOT/jpackage/input/sourceFile/local_version.json" \
-                "$PROJECT_ROOT/jpackage/input/$platform/local_version.json"
-            done
-          fi
 
       - name: Restore Windows runtime image after build clean
         if: runner.os == 'Windows'
@@ -1446,7 +1388,7 @@ jobs:
           python "$env:RUNNER_TEMP/notify_package.py"
 
       - name: Archive updater-v2 full package
-        if: ${{ github.event.inputs.publish_mode != 'v1' && (env.CHAT2DB_MAVEN_PROFILE == 'versioned-thin' || env.CHAT2DB_RELEASE_CHANNEL == 'BETA' || github.event.inputs.version != '5.3.3') && startsWith(matrix.update_target, 'macos-') }}
+        if: ${{ startsWith(matrix.update_target, 'macos-') }}
         shell: bash
         run: |
           set -euo pipefail
@@ -1466,36 +1408,11 @@ jobs:
             package
 
       - name: Upload updater-v2 full package artifact
-        if: ${{ github.event.inputs.publish_mode != 'v1' && (env.CHAT2DB_MAVEN_PROFILE == 'versioned-thin' || env.CHAT2DB_RELEASE_CHANNEL == 'BETA' || github.event.inputs.version != '5.3.3') && startsWith(matrix.update_target, 'macos-') }}
+        if: ${{ startsWith(matrix.update_target, 'macos-') }}
         uses: actions/upload-artifact@v4
         with:
           name: full-package-local-${{ matrix.update_target }}
           path: ${{ runner.temp }}/full-package-${{ matrix.update_target }}.tar.gz
-          if-no-files-found: error
-          retention-days: 7
-
-      - name: Archive legacy bridge update payload
-        if: ${{ runner.os == 'Windows' && github.event.inputs.publish_mode != 'v2' && env.CHAT2DB_MAVEN_PROFILE == 'bridge-fat' && env.CHAT2DB_RELEASE_CHANNEL == 'STABLE' }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          PROJECT_ROOT="$(cygpath -u "${JCEF_PROJECT_ROOT}")"
-          RUNNER_TEMP_UNIX="$(cygpath -u "${RUNNER_TEMP}")"
-          SOURCE_DIR="${PROJECT_ROOT}/jpackage/input/sourceFile"
-          test -s "${SOURCE_DIR}/version.json"
-          test -s "${SOURCE_DIR}/chat2db-enterprise.jar"
-          test -s "${SOURCE_DIR}/chat2db-updater.jar"
-          test -s "${SOURCE_DIR}/dist.zip"
-          test ! -e "${SOURCE_DIR}/lib.zip"
-          tar -C "${SOURCE_DIR}" -czf "${RUNNER_TEMP_UNIX}/bridge-update.tar.gz" \
-            version.json build-provenance.json chat2db-enterprise.jar chat2db-updater.jar dist.zip
-
-      - name: Upload legacy bridge update payload artifact
-        if: ${{ runner.os == 'Windows' && github.event.inputs.publish_mode != 'v2' && env.CHAT2DB_MAVEN_PROFILE == 'bridge-fat' && env.CHAT2DB_RELEASE_CHANNEL == 'STABLE' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: bridge-update-local
-          path: ${{ runner.temp }}/bridge-update.tar.gz
           if-no-files-found: error
           retention-days: 7
 
@@ -1522,15 +1439,8 @@ jobs:
           ref: ${{ github.sha }}
           persist-credentials: false
 
-      - name: Download legacy bridge update payload
-        if: ${{ github.event.inputs.publish_mode != 'v2' && needs.resolve_source.outputs.release_profile == 'bridge-fat' && needs.resolve_source.outputs.release_channel_upper == 'STABLE' }}
-        uses: actions/download-artifact@v4
-        with:
-          name: bridge-update-local
-          path: ${{ runner.temp }}/update-artifacts/bridge-update-local
-
       - name: Download updater-v2 full packages
-        if: ${{ github.event.inputs.publish_mode != 'v1' && (needs.resolve_source.outputs.release_profile == 'versioned-thin' || needs.resolve_source.outputs.release_channel_upper == 'BETA' || github.event.inputs.version != '5.3.3') }}
+        if: ${{ needs.resolve_source.outputs.release_profile == 'versioned-thin' }}
         uses: actions/download-artifact@v4
         with:
           pattern: full-package-local-*
@@ -1604,7 +1514,6 @@ jobs:
           CHAT2DB_PRODUCT_APP_NAME: ${{ secrets.OFFLINE_PRODUCT_APP_NAME }}
           CHAT2DB_RELEASE_VERSION: ${{ github.event.inputs.version }}
           CHAT2DB_RELEASE_PROFILE: ${{ needs.resolve_source.outputs.release_profile }}
-          CHAT2DB_PUBLISH_MODE: ${{ github.event.inputs.publish_mode }}
           CHAT2DB_RELEASE_CHANNEL: ${{ needs.resolve_source.outputs.release_channel_upper }}
           CHAT2DB_RELEASE_EPOCH: ${{ github.event.inputs.release_epoch }}
           CHAT2DB_ENTERPRISE_SHA: ${{ needs.resolve_source.outputs.enterprise_sha }}

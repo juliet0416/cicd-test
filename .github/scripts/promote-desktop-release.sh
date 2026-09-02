@@ -8,7 +8,6 @@ required_variables=(
     CHAT2DB_PRODUCT_APP_NAME
     CHAT2DB_RELEASE_VERSION
     CHAT2DB_RELEASE_PROFILE
-    CHAT2DB_PUBLISH_MODE
     CHAT2DB_RELEASE_CHANNEL
     CHAT2DB_RELEASE_EPOCH
     CHAT2DB_ENTERPRISE_SHA
@@ -36,16 +35,12 @@ done
 
 case "${CHAT2DB_PRODUCT}" in PRO|LOCAL) ;; *) echo "Error: invalid product" >&2; exit 1 ;; esac
 case "${CHAT2DB_RELEASE_ROOT}" in download|offline) ;; *) echo "Error: invalid release root" >&2; exit 1 ;; esac
-case "${CHAT2DB_RELEASE_PROFILE}" in bridge-fat|versioned-thin) ;; *) echo "Error: invalid release profile" >&2; exit 1 ;; esac
-case "${CHAT2DB_PUBLISH_MODE}" in v1|v2|both) ;; *) echo "Error: invalid publish mode" >&2; exit 1 ;; esac
+case "${CHAT2DB_RELEASE_PROFILE}" in versioned-thin) ;; *) echo "Error: only versioned-thin releases are supported" >&2; exit 1 ;; esac
 case "${CHAT2DB_RELEASE_CHANNEL}" in STABLE|BETA) ;; *) echo "Error: invalid release channel" >&2; exit 1 ;; esac
 case "${CHAT2DB_UPLOAD_LATEST}" in true|false) ;; *) echo "Error: invalid upload_latest flag" >&2; exit 1 ;; esac
 case "${CHAT2DB_UPDATE_LATEST_VERSION_JSON}" in true|false) ;; *) echo "Error: invalid pointer flag" >&2; exit 1 ;; esac
-
-if [ "${CHAT2DB_PUBLISH_MODE}" != "v2" ] \
-        && { [ "${CHAT2DB_RELEASE_PROFILE}" != "bridge-fat" ] \
-            || [ "${CHAT2DB_RELEASE_CHANNEL}" != "STABLE" ]; }; then
-    echo "Error: v1 publication requires a stable bridge-fat release" >&2
+if [ "${CHAT2DB_RELEASE_CHANNEL}" = "BETA" ] && [ "${CHAT2DB_UPLOAD_LATEST}" = "true" ]; then
+    echo "Error: Beta releases must not publish download-server latest installers" >&2
     exit 1
 fi
 
@@ -65,6 +60,10 @@ DEFERRED_UPDATE_POINTER_DESTINATION=""
 PRODUCT_LOWER=$(printf '%s' "${CHAT2DB_PRODUCT}" | tr '[:upper:]' '[:lower:]')
 CHANNEL_LOWER=$(printf '%s' "${CHAT2DB_RELEASE_CHANNEL}" | tr '[:upper:]' '[:lower:]')
 mkdir -p "${PUBLISH_ROOT}" "${INSTALLER_ROOT}"
+
+download_server_publication_enabled() {
+    [ "${CHANNEL_LOWER}" = "stable" ]
+}
 
 DOWNLOAD_TARGET="${DOWNLOAD_SERVER_USER}@${DOWNLOAD_SERVER_HOST}"
 SSH_OPTIONS=(-i "${DOWNLOAD_SERVER_KEY}" -o StrictHostKeyChecking=accept-new -o BatchMode=yes)
@@ -463,7 +462,7 @@ copy_download_server_file() {
     expected_sha256=$(sha256sum "${source_file}" | awk '{print $1}')
     run_transfer download-server provider-copy "${source_path}" "${DOWNLOAD_TARGET}:${destination_path}" \
         ssh "${SSH_OPTIONS[@]}" "${DOWNLOAD_TARGET}" \
-            "set -e; mkdir -p '${destination_dir}'; rm -f '${temporary_path}'; ln '${source_path}' '${temporary_path}'; actual=\$(sha256sum '${temporary_path}' | awk '{print \$1}'); test \"\${actual}\" = '${expected_sha256}'; chmod 644 '${temporary_path}'; mv -f '${temporary_path}' '${destination_path}'" \
+            "set -e; mkdir -p '${destination_dir}'; rm -f '${temporary_path}'; cp -f -- '${source_path}' '${temporary_path}'; actual=\$(sha256sum '${temporary_path}' | awk '{print \$1}'); test \"\${actual}\" = '${expected_sha256}'; chmod 644 '${temporary_path}'; mv -f '${temporary_path}' '${destination_path}'" \
             </dev/null
 }
 
@@ -488,9 +487,13 @@ ensure_versioned_replicas() {
     run_transfer cloudflare-r2 replica-source "${source_file}" "${R2_REMOTE}/${source_relative_path}" \
         rclone copyto "${source_file}" "${R2_REMOTE}/${source_relative_path}" </dev/null &
     r2_pid=$!
-    upload_download_server "${source_file}" "${source_relative_path}" true "${source_relative_path}" &
-    download_pid=$!
-    wait_for_parallel_transfers "${r2_pid}" "${download_pid}"
+    if download_server_publication_enabled; then
+        upload_download_server "${source_file}" "${source_relative_path}" true "${source_relative_path}" &
+        download_pid=$!
+        wait_for_parallel_transfers "${r2_pid}" "${download_pid}"
+    else
+        wait_for_parallel_transfers "${r2_pid}"
+    fi
     VERSIONED_REPLICAS_READY+=("${source_relative_path}")
     promotion_log replica_source_complete \
         "phase=${PROMOTION_PHASE}" \
@@ -520,13 +523,23 @@ copy_provider_replicas() {
             "${R2_REMOTE}/${source_relative_path}" \
             "${R2_REMOTE}/${destination_relative_path}" </dev/null &
     r2_pid=$!
-    copy_download_server_file \
-        "${source_file}" "${source_relative_path}" "${destination_relative_path}" &
-    download_pid=$!
+    if download_server_publication_enabled; then
+        copy_download_server_file \
+            "${source_file}" "${source_relative_path}" "${destination_relative_path}" &
+        download_pid=$!
+    fi
     if [ "${publish_oss_last}" = "true" ]; then
-        wait_for_parallel_transfers "${r2_pid}" "${download_pid}"
+        if download_server_publication_enabled; then
+            wait_for_parallel_transfers "${r2_pid}" "${download_pid}"
+        else
+            wait_for_parallel_transfers "${r2_pid}"
+        fi
     else
-        wait_for_parallel_transfers "${oss_pid}" "${r2_pid}" "${download_pid}"
+        if download_server_publication_enabled; then
+            wait_for_parallel_transfers "${oss_pid}" "${r2_pid}" "${download_pid}"
+        else
+            wait_for_parallel_transfers "${oss_pid}" "${r2_pid}"
+        fi
     fi
     if [ "${publish_oss_last}" = "true" ]; then
         run_transfer aliyun-oss provider-copy \
@@ -573,9 +586,13 @@ upload_immutable() {
     run_transfer cloudflare-r2 upload "${source_file}" "${R2_REMOTE}/${remote_relative_path}" \
         rclone copyto "${source_file}" "${R2_REMOTE}/${remote_relative_path}" </dev/null &
     r2_pid=$!
-    upload_download_server "${source_file}" "${remote_relative_path}" true &
-    download_pid=$!
-    wait_for_parallel_transfers "${r2_pid}" "${download_pid}"
+    if download_server_publication_enabled; then
+        upload_download_server "${source_file}" "${remote_relative_path}" true &
+        download_pid=$!
+        wait_for_parallel_transfers "${r2_pid}" "${download_pid}"
+    else
+        wait_for_parallel_transfers "${r2_pid}"
+    fi
     complete_upload_object immutable "${remote_relative_path}"
 }
 
@@ -584,65 +601,15 @@ upload_mutable() {
     local remote_relative_path="$2"
     test -s "${source_file}"
     begin_upload_object mutable "${source_file}" "${remote_relative_path}"
-    # Publish the public OSS object last after both replicas are complete.
-    upload_download_server "${source_file}" "${remote_relative_path}" false
+    # Stable publishes the download-server replica before the public pointers.
+    if download_server_publication_enabled; then
+        upload_download_server "${source_file}" "${remote_relative_path}" false
+    fi
     run_transfer cloudflare-r2 upload "${source_file}" "${R2_REMOTE}/${remote_relative_path}" \
         rclone copyto "${source_file}" "${R2_REMOTE}/${remote_relative_path}" </dev/null
     run_transfer aliyun-oss upload "${source_file}" "oss://${BUCKET_NAME}/${remote_relative_path}" \
         ossutil cp -f "${source_file}" "oss://${BUCKET_NAME}/${remote_relative_path}" </dev/null
     complete_upload_object mutable "${remote_relative_path}"
-}
-
-publish_bridge_update() {
-    local artifact_dir="${CHAT2DB_UPDATE_ARTIFACT_ROOT}/bridge-update-${PRODUCT_LOWER}"
-    local archive="${artifact_dir}/bridge-update.tar.gz"
-    local extracted="${PROMOTE_ROOT}/bridge"
-    local update_root="${CHAT2DB_RELEASE_ROOT}/updates/${CHAT2DB_RELEASE_VERSION}"
-    local pointer="${PROMOTE_ROOT}/latest_version.json"
-    local required upload_total=1
-
-    test -s "${archive}"
-    mkdir -p "${extracted}"
-    tar -xzf "${archive}" -C "${extracted}"
-    if find "${extracted}" -type l -print -quit | grep -q .; then
-        echo "Error: bridge update payload must not contain symbolic links" >&2
-        exit 1
-    fi
-    for required in version.json chat2db-enterprise.jar chat2db-updater.jar dist.zip; do
-        test -s "${extracted}/${required}"
-    done
-    if [ -e "${extracted}/lib.zip" ]; then
-        echo "Error: a bridge-fat release must not publish lib.zip" >&2
-        exit 1
-    fi
-
-    for required in "${extracted}"/*.jar "${extracted}"/*.zip; do
-        upload_total=$((upload_total + 1))
-    done
-    if [ -s "${extracted}/build-provenance.json" ]; then
-        upload_total=$((upload_total + 1))
-    fi
-    if [ "${CHAT2DB_UPDATE_LATEST_VERSION_JSON}" = "true" ]; then
-        upload_total=$((upload_total + 1))
-    fi
-    begin_upload_phase bridge-update "${upload_total}"
-
-    upload_immutable "${extracted}/version.json" "${update_root}/version.json"
-    for required in "${extracted}"/*.jar "${extracted}"/*.zip; do
-        upload_immutable "${required}" "${update_root}/$(basename "${required}")"
-    done
-    if [ -s "${extracted}/build-provenance.json" ]; then
-        upload_immutable "${extracted}/build-provenance.json" "${update_root}/build-provenance.json"
-    fi
-
-    jq -cn \
-        --arg latestVersion "${CHAT2DB_RELEASE_VERSION}" \
-        --arg metadataUrl "https://cdn.chat2db-ai.com/${update_root}/version.json" \
-        '{latestVersion: $latestVersion, metadataUrl: $metadataUrl, forceUpdate: false}' \
-        > "${pointer}"
-    if [ "${CHAT2DB_UPDATE_LATEST_VERSION_JSON}" = "true" ]; then
-        upload_mutable "${pointer}" "${CHAT2DB_RELEASE_ROOT}/updates/latest_version.json"
-    fi
 }
 
 download_release_artifact() {
@@ -670,19 +637,10 @@ publish_v2_update() {
     local reusable_package_sources=()
     local current_files=()
     local previous_index_environment=()
-    local transition_mode=false
 
     if [ -z "${CHAT2DB_UPDATE_SIGNING_PRIVATE_KEY_B64:-}" ]; then
         echo "Error: CHAT2DB_UPDATE_SIGNING_PRIVATE_KEY_B64 is required for updater-v2 publication" >&2
         exit 1
-    fi
-    # TEMP-5.3.3-5.3.4-PROTOCOL-2-COMPAT: 5.3.5 is the one inbound
-    # transition release for already-installed protocol-2 Pro clients.
-    if [ "${CHAT2DB_PRODUCT}" = "PRO" ] \
-            && [ "${CHAT2DB_RELEASE_VERSION}" = "5.3.5" ] \
-            && [ "${CHAT2DB_RELEASE_PROFILE}" = "bridge-fat" ] \
-            && [ "${CHAT2DB_RELEASE_CHANNEL}" = "STABLE" ]; then
-        transition_mode=true
     fi
     mkdir -p "${generated}"
     rm -f "${generated}"/*
@@ -701,52 +659,19 @@ publish_v2_update() {
         local package_type="$3"
         local current_path="$4"
         local launcher="$5"
-        local baseline="$6"
-        local platform_lower arch_lower package_type_lower suffix rollback_file rollback_name rollback_url manifest
+        local platform_lower arch_lower package_type_lower manifest
         platform_lower=$(printf '%s' "${platform}" | tr '[:upper:]' '[:lower:]')
         arch_lower=$(printf '%s' "${arch}" | tr '[:upper:]' '[:lower:]')
         package_type_lower=$(printf '%s' "${package_type}" | tr '[:upper:]' '[:lower:]' | tr '_' '-')
-        suffix=""
-        rollback_file=""
-        rollback_url=""
-        if [ "${transition_mode}" = "true" ]; then
-            suffix="-from-${baseline}"
-            case "${package_type}" in
-                WINDOWS_EXE|LINUX_DEB|LINUX_RPM)
-                    rollback_name=$(basename "${current_path}")
-                    rollback_name="${rollback_name/${CHAT2DB_RELEASE_VERSION}/${baseline}}"
-                    if [ "${rollback_name}" = "$(basename "${current_path}")" ]; then
-                        echo "Error: target package name does not contain the release version: ${current_path}" >&2
-                        exit 1
-                    fi
-                    rollback_file="${INSTALLER_ROOT}/rollback-${baseline}-${rollback_name}"
-                    download_release_artifact "${baseline}" "${rollback_name}" "${rollback_file}"
-                    rollback_url="https://cdn.chat2db-ai.com/${CHAT2DB_RELEASE_ROOT}/${baseline}/${rollback_name}"
-                    ;;
-            esac
-        fi
-        if [ "${transition_mode}" = "true" ]; then
-            CHAT2DB_UPDATE_SIGNING_PRIVATE_KEY_B64="${CHAT2DB_UPDATE_SIGNING_PRIVATE_KEY_B64}" \
-            CHAT2DB_UPDATE_KEY_ID="${CHAT2DB_UPDATE_KEY_ID}" \
-            CHAT2DB_UPDATE_PUBLIC_KEY_B64="${CHAT2DB_UPDATE_PUBLIC_KEY_B64}" \
-            CHAT2DB_UPDATE_MANIFEST_SUFFIX="${suffix}" \
-                bash "${CHAT2DB_ENTERPRISE_ROOT}/script/package/generate_update_v2.sh" \
-                    "${CHAT2DB_RELEASE_VERSION}" "${native_version}" "${CHAT2DB_PRODUCT}" "${CHAT2DB_RELEASE_CHANNEL}" \
-                    "${platform}" "${arch}" "${package_type}" "${current_path}" "${launcher}" \
-                    "${generated}" "${base_url}" "${CHAT2DB_RELEASE_EPOCH}" "${CHAT2DB_ENTERPRISE_SHA}" \
-                    "${CHAT2DB_RELEASE_NOTES_URL}" 2 1 "${baseline}" "${rollback_file}" "${rollback_url}"
-        else
-            CHAT2DB_UPDATE_SIGNING_PRIVATE_KEY_B64="${CHAT2DB_UPDATE_SIGNING_PRIVATE_KEY_B64}" \
-            CHAT2DB_UPDATE_KEY_ID="${CHAT2DB_UPDATE_KEY_ID}" \
-            CHAT2DB_UPDATE_PUBLIC_KEY_B64="${CHAT2DB_UPDATE_PUBLIC_KEY_B64}" \
-            CHAT2DB_UPDATE_MANIFEST_SUFFIX="${suffix}" \
-                bash "${CHAT2DB_ENTERPRISE_ROOT}/script/package/generate_update_v2.sh" \
-                    "${CHAT2DB_RELEASE_VERSION}" "${native_version}" "${CHAT2DB_PRODUCT}" "${CHAT2DB_RELEASE_CHANNEL}" \
-                    "${platform}" "${arch}" "${package_type}" "${current_path}" "${launcher}" \
-                    "${generated}" "${base_url}" "${CHAT2DB_RELEASE_EPOCH}" "${CHAT2DB_ENTERPRISE_SHA}" \
-                    "${CHAT2DB_RELEASE_NOTES_URL}"
-        fi
-        manifest="${generated}/manifest-${PRODUCT_LOWER}-${platform_lower}-${arch_lower}-${package_type_lower}${suffix}.json"
+        CHAT2DB_UPDATE_SIGNING_PRIVATE_KEY_B64="${CHAT2DB_UPDATE_SIGNING_PRIVATE_KEY_B64}" \
+        CHAT2DB_UPDATE_KEY_ID="${CHAT2DB_UPDATE_KEY_ID}" \
+        CHAT2DB_UPDATE_PUBLIC_KEY_B64="${CHAT2DB_UPDATE_PUBLIC_KEY_B64}" \
+            bash "${CHAT2DB_ENTERPRISE_ROOT}/script/package/generate_update_v2.sh" \
+                "${CHAT2DB_RELEASE_VERSION}" "${native_version}" "${CHAT2DB_PRODUCT}" "${CHAT2DB_RELEASE_CHANNEL}" \
+                "${platform}" "${arch}" "${package_type}" "${current_path}" "${launcher}" \
+                "${generated}" "${base_url}" "${CHAT2DB_RELEASE_EPOCH}" "${CHAT2DB_ENTERPRISE_SHA}" \
+                "${CHAT2DB_RELEASE_NOTES_URL}"
+        manifest="${generated}/manifest-${PRODUCT_LOWER}-${platform_lower}-${arch_lower}-${package_type_lower}.json"
         test -s "${manifest}"
         manifests+=("${manifest}")
     }
@@ -757,18 +682,13 @@ publish_v2_update() {
         test -s "${current_path}"
         current_file="full-package-${target}.tar.gz"
         generate_manifest MACOS "${arch}" MACOS_APP_ARCHIVE "${current_path}" \
-            "Contents/MacOS/${product_display}" 5.3.3
+            "Contents/MacOS/${product_display}"
     done
 
     current_file="${CHAT2DB_PRODUCT_APP_NAME}-${CHAT2DB_RELEASE_VERSION}.exe"
     current_path="${INSTALLER_ROOT}/${current_file}"
     download_release_artifact "${CHAT2DB_RELEASE_VERSION}" "${current_file}" "${current_path}"
-    if [ "${transition_mode}" = "true" ]; then
-        generate_manifest WINDOWS X64 WINDOWS_EXE "${current_path}" "${product_display}.exe" 5.3.3
-        generate_manifest WINDOWS X64 WINDOWS_EXE "${current_path}" "${product_display}.exe" 5.3.4
-    else
-        generate_manifest WINDOWS X64 WINDOWS_EXE "${current_path}" "${product_display}.exe" ""
-    fi
+    generate_manifest WINDOWS X64 WINDOWS_EXE "${current_path}" "${product_display}.exe"
     reusable_package_sources+=(
         "package-${PRODUCT_LOWER}-windows-x64-windows-exe.exe::${CHAT2DB_RELEASE_ROOT}/${CHAT2DB_RELEASE_VERSION}/${current_file}"
     )
@@ -803,16 +723,7 @@ publish_v2_update() {
             if [ "${package_type}" = "LINUX_APPIMAGE" ]; then
                 launcher="."
             fi
-            if [ "${transition_mode}" = "true" ]; then
-                if [ "${package_type}" = "LINUX_APPIMAGE" ]; then
-                    generate_manifest LINUX "${arch}" "${package_type}" "${current_path}" "${launcher}" 5.3.3
-                else
-                    generate_manifest LINUX "${arch}" "${package_type}" "${current_path}" "${launcher}" 5.3.3
-                    generate_manifest LINUX "${arch}" "${package_type}" "${current_path}" "${launcher}" 5.3.4
-                fi
-            else
-                generate_manifest LINUX "${arch}" "${package_type}" "${current_path}" "${launcher}" ""
-            fi
+            generate_manifest LINUX "${arch}" "${package_type}" "${current_path}" "${launcher}"
             reusable_package_sources+=(
                 "package-${PRODUCT_LOWER}-linux-$(printf '%s' "${arch}" | tr '[:upper:]' '[:lower:]')-$(printf '%s' "${package_type}" | tr '[:upper:]' '[:lower:]' | tr '_' '-').${package_extension}::${CHAT2DB_RELEASE_ROOT}/${CHAT2DB_RELEASE_VERSION}/${current_file}"
             )
@@ -825,17 +736,10 @@ publish_v2_update() {
         test -s "${previous_index}"
         previous_index_environment+=("CHAT2DB_PREVIOUS_UPDATE_INDEX=${previous_index}")
     fi
-    if [ "${transition_mode}" = "true" ]; then
-        env "${previous_index_environment[@]}" CHAT2DB_UPDATE_INDEX_TRANSITION=true \
-            bash "${CHAT2DB_ENTERPRISE_ROOT}/script/package/generate_update_index_v2.sh" \
-                "${CHAT2DB_RELEASE_CHANNEL}" "${CHAT2DB_RELEASE_EPOCH}" "${base_url}" \
-                "${generated}/release-index.json" "${manifests[@]}"
-    else
-        env "${previous_index_environment[@]}" \
-            bash "${CHAT2DB_ENTERPRISE_ROOT}/script/package/generate_update_index_v2.sh" \
-                "${CHAT2DB_RELEASE_CHANNEL}" "${CHAT2DB_RELEASE_EPOCH}" "${base_url}" \
-                "${generated}/release-index.json" "${manifests[@]}"
-    fi
+    env "${previous_index_environment[@]}" \
+        bash "${CHAT2DB_ENTERPRISE_ROOT}/script/package/generate_update_index_v2.sh" \
+            "${CHAT2DB_RELEASE_CHANNEL}" "${CHAT2DB_RELEASE_EPOCH}" "${base_url}" \
+            "${generated}/release-index.json" "${manifests[@]}"
 
     upload_total=$(find "${generated}" -maxdepth 1 -type f -print | wc -l | tr -d '[:space:]')
     begin_upload_phase updates-v2 "${upload_total}"
@@ -950,7 +854,6 @@ promotion_log promotion_start \
     "product=${CHAT2DB_PRODUCT}" \
     "version=${CHAT2DB_RELEASE_VERSION}" \
     "profile=${CHAT2DB_RELEASE_PROFILE}" \
-    "publish_mode=${CHAT2DB_PUBLISH_MODE}" \
     "channel=${CHAT2DB_RELEASE_CHANNEL}" \
     "upload_latest=${CHAT2DB_UPLOAD_LATEST}" \
     "update_pointer=${CHAT2DB_UPDATE_LATEST_VERSION_JSON}"
@@ -963,18 +866,7 @@ promotion_log download_server_capacity \
     "target=${DOWNLOAD_TARGET}" \
     "available_and_usage=${download_server_capacity:-unknown}"
 
-case "${CHAT2DB_PUBLISH_MODE}" in
-    v1)
-        publish_bridge_update
-        ;;
-    v2)
-        publish_v2_update
-        ;;
-    both)
-        publish_bridge_update
-        publish_v2_update
-        ;;
-esac
+publish_v2_update
 
 if [ "${CHAT2DB_UPLOAD_LATEST}" = "true" ]; then
     publish_latest_installers

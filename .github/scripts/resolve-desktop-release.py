@@ -73,44 +73,17 @@ def resolve(args: argparse.Namespace) -> tuple[str, str]:
     if parsed_notes_url.scheme != "https" or not parsed_notes_url.netloc:
         raise ValueError("release_notes_url must be an absolute HTTPS URL")
 
-    bridge = SemVer.parse("5.3.3")
-    fat_release = SemVer.parse("5.3.4")
-    transition_fat_release = SemVer.parse("5.3.5")
-    comparison = version.compare(bridge)
-    if comparison < 0:
-        raise ValueError("desktop updates only support releases starting at 5.3.3")
-    if args.version == "5.3.3":
-        expected_epoch = 0 if channel == "stable" else 1
-        if release_epoch != expected_epoch:
-            raise ValueError(
-                f"the 5.3.3 {channel} bridge requires release_epoch={expected_epoch}"
-            )
-        profile = "bridge-fat"
-    elif version == fat_release and not version.prerelease:
-        if channel != "stable":
-            raise ValueError(f"the {args.version} fat release must use the stable channel")
-        if release_epoch != 1:
-            raise ValueError("the 5.3.4 fat release requires release_epoch=1")
-        profile = "bridge-fat"
-    elif version == transition_fat_release and not version.prerelease:
-        if channel != "stable":
-            raise ValueError("the 5.3.5 transition fat release must use the stable channel")
-        if release_epoch <= 1:
-            raise ValueError(
-                "the 5.3.5 transition release_epoch must be manually resolved above all published epochs"
-            )
-        profile = "bridge-fat"
-    else:
-        if release_epoch == 0:
-            raise ValueError("versioned-thin releases require a positive release_epoch")
-        expected_channel = "beta" if version.prerelease else "stable"
-        if channel != expected_channel:
-            raise ValueError(
-                f"version {args.version} must use the {expected_channel} channel"
-            )
-        profile = "versioned-thin"
-
-    return profile, channel.upper()
+    minimum_version = (5, 3, 6)
+    if (version.major, version.minor, version.patch) < minimum_version:
+        raise ValueError("desktop releases before 5.3.6 are retired")
+    if release_epoch == 0:
+        raise ValueError("versioned-thin releases require a positive release_epoch")
+    expected_channel = "beta" if version.prerelease else "stable"
+    if channel != expected_channel:
+        raise ValueError(
+            f"version {args.version} must use the {expected_channel} channel"
+        )
+    return "versioned-thin", channel.upper()
 
 
 def main() -> None:

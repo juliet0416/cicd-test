@@ -15,9 +15,9 @@ SPEC.loader.exec_module(MODULE)
 
 def arguments(**overrides):
     values = {
-        "version": "5.3.4",
+        "version": "5.3.6",
         "channel": "stable",
-        "release_epoch": "1",
+        "release_epoch": "2",
         "release_notes_url": "https://chat2db.ai/release-notes",
     }
     values.update(overrides)
@@ -25,65 +25,35 @@ def arguments(**overrides):
 
 
 class ResolveDesktopReleaseTest(unittest.TestCase):
-    def test_resolves_533_bridge(self):
-        profile, channel = MODULE.resolve(
-            arguments(version="5.3.3", release_epoch="0")
-        )
-        self.assertEqual("bridge-fat", profile)
-        self.assertEqual("STABLE", channel)
-
-    def test_resolves_533_beta_as_fat_bridge(self):
-        profile, channel = MODULE.resolve(
-            arguments(
-                version="5.3.3",
-                channel="beta",
-                release_epoch="1",
-            )
-        )
-        self.assertEqual("bridge-fat", profile)
-        self.assertEqual("BETA", channel)
-
-    def test_resolves_534_stable_as_fat_release(self):
-        self.assertEqual(
-            ("bridge-fat", "STABLE"),
-            MODULE.resolve(arguments()),
-        )
-
-    def test_resolves_535_stable_as_transition_fat_release(self):
-        self.assertEqual(
-            ("bridge-fat", "STABLE"),
-            MODULE.resolve(arguments(version="5.3.5", release_epoch="5")),
-        )
-
-    def test_rejects_535_transition_without_a_new_epoch(self):
-        with self.assertRaisesRegex(ValueError, "manually resolved"):
-            MODULE.resolve(arguments(version="5.3.5", release_epoch="1"))
-
-    def test_resolves_later_stable_thin_release(self):
+    def test_resolves_stable_thin_release(self):
         self.assertEqual(
             ("versioned-thin", "STABLE"),
-            MODULE.resolve(arguments(version="5.3.6", release_epoch="2")),
+            MODULE.resolve(arguments()),
         )
 
     def test_resolves_beta_thin_release(self):
         self.assertEqual(
             ("versioned-thin", "BETA"),
-            MODULE.resolve(
-                arguments(version="5.3.4-beta.1", channel="beta")
-            ),
+            MODULE.resolve(arguments(version="5.3.6-beta.3", channel="beta")),
+        )
+
+    def test_resolves_later_thin_release(self):
+        self.assertEqual(
+            ("versioned-thin", "BETA"),
+            MODULE.resolve(arguments(version="5.4.0-beta.1", channel="beta")),
         )
 
     def test_rejects_prerelease_on_stable_channel(self):
         with self.assertRaisesRegex(ValueError, "must use the beta channel"):
-            MODULE.resolve(arguments(version="5.3.4-beta.1"))
+            MODULE.resolve(arguments(version="5.3.6-beta.1"))
 
-    def test_rejects_534_fat_release_with_wrong_epoch(self):
-        with self.assertRaisesRegex(ValueError, "release_epoch=1"):
-            MODULE.resolve(arguments(release_epoch="2"))
+    def test_rejects_zero_epoch(self):
+        with self.assertRaisesRegex(ValueError, "positive release_epoch"):
+            MODULE.resolve(arguments(release_epoch="0"))
 
-    def test_rejects_release_before_bridge(self):
-        with self.assertRaisesRegex(ValueError, "starting at 5.3.3"):
-            MODULE.resolve(arguments(version="5.3.2"))
+    def test_rejects_retired_release(self):
+        with self.assertRaisesRegex(ValueError, "before 5.3.6 are retired"):
+            MODULE.resolve(arguments(version="5.3.5"))
 
     def test_rejects_non_https_release_notes(self):
         with self.assertRaisesRegex(ValueError, "absolute HTTPS URL"):

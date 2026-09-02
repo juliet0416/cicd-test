@@ -48,23 +48,13 @@ curl --compressed -fsSL 'https://cdn.chat2db-ai.com/offline/updates-v2/beta/late
 6. 正式发布前必须重新读取一次线上 Index，确认期间没有其他发布推进 epoch。
 7. 安装包 `version.json`、平台 Manifest 和频道 Index 必须使用同一个 epoch。
 
-当前过渡基线：
-
-```text
-Pro 5.3.3: releaseEpoch=0
-Pro 5.3.4: releaseEpoch=1
-Pro Beta current maximum: releaseEpoch=4
-Pro 5.3.5 protocol-2 transition candidate: releaseEpoch=5
-```
-
-后续版本不能仅根据版本号写死 epoch。例如先发布 Beta 后再发布 Stable，Stable 必须继续使用线上最大 epoch 的下一个值。
+历史过渡版本的 epoch 和发布参数只在对应的 release tag 中保留，当前主线不再复用。
 
 ## 参数
 
 | 参数 | 含义 |
 | --- | --- |
 | `version` | 应用 SemVer，例如 `5.3.5` |
-| `publish_mode` | `v1`、`v2` 或 `both` |
 | `source_ref` | Studio 分支、Tag 或完整 SHA |
 | `channel` | `stable` 或 `beta` |
 | `release_epoch` | 按上述规则人工读取并传入 |
@@ -82,7 +72,6 @@ gh workflow run pro.yml \
   --ref '<cicd-ref>' \
   -f logLevel=warning \
   -f version='<version>' \
-  -f publish_mode=v2 \
   -f source_ref='<studio-ref>' \
   -f upload_latest=false \
   -f update_latest_version_json=false \
@@ -102,14 +91,10 @@ update_latest_version_json=true
 
 发布完成后再次读取线上 Index，确认 `releaseEpoch`、版本、频道和目标 Manifest 已更新为本次发布值。
 
-## Pro 5.3.5 Transition
+## Current desktop release contract
 
-Pro 5.3.5 是一次性 protocol 2 入站兼容版本：
+All new Pro and Local releases use the `versioned-thin` layout and updater protocol 3.
+The legacy 5.3.5 bridge-fat/V1 transition is preserved only in its release tags and
+immutable CDN resources; it is no longer a supported CI/CD input.
 
-- `release_epoch=5`（2026-08-31 手动读取 Stable=1、Beta=4 后取最大值加 1）
-- `publish_mode=v2`
-- 目标包为 `bridge-fat`
-- 5.3.3/5.3.4 原生安装器使用各自 rollback package
-- 测试阶段保持 `upload_latest=false`、`update_latest_version_json=false`
-
-该过渡发布完成并经过真实升级验证后，5.3.6+ 只保留 protocol 3 发布路径。
+Beta resources are published to OSS/CDN/R2 and are never copied to the download server.
