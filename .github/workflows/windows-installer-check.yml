@@ -1,0 +1,36 @@
+name: Check Windows installer languages
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_ref:
+        description: 'Exact Studio source commit or tag to validate; no release artifacts are uploaded'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  installer:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ secrets.REPO_URL }}
+          ref: ${{ inputs.source_ref }}
+          token: ${{ secrets.ACCESS_TOKEN }}
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup -y --no-progress
+      - name: Check language resources
+        run: python -B script/package/tests/test_windows_installer_resources.py -v
+      - name: Check multilingual MSI and EXE
+        shell: powershell
+        run: ./script/package/tests/windows-installer-i18n-test.ps1
