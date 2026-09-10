@@ -418,6 +418,40 @@ jobs:
           "OPENJDK_PATH=$env:JAVA_HOME" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           Write-Host "Windows packaging JDK is ready at: $env:JAVA_HOME"
 
+      - name: Install Inno Setup
+        if: ${{ runner.os == 'Windows' }}
+        shell: pwsh
+        run: |
+          choco install innosetup -y --no-progress
+
+          $candidates = @(
+            "C:\Program Files (x86)\Inno Setup 6\ISCC.exe",
+            "C:\Program Files\Inno Setup 6\ISCC.exe"
+          )
+          $isccPath = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $isccPath) {
+            Write-Error "ISCC.exe was not found after Inno Setup installation."
+            exit 1
+          }
+          Write-Host "Resolved ISCC: $isccPath"
+
+      - name: Test Windows installer languages
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $scriptRoot = $env:JCEF_PACKAGE_SCRIPT_DIR
+          # Historical source refs predate multilingual MSI support.
+          if (-not (Test-Path -LiteralPath (Join-Path $scriptRoot 'localize_win_msi.ps1'))) {
+            Write-Host 'Source predates multilingual MSI support; no language tests to run.'
+            exit 0
+          }
+          $env:JAVA_HOME = $env:OPENJDK_PATH
+          $env:PATH = (Join-Path $env:JAVA_HOME 'bin') + ';' + $env:PATH
+          python -B (Join-Path $scriptRoot 'tests/test_windows_installer_resources.py') -v
+          if ($LASTEXITCODE -ne 0) { throw 'Windows installer language resource tests failed.' }
+          & (Join-Path $scriptRoot 'tests/windows-installer-i18n-test.ps1')
+
       # =================================================================
       # 【第一阶段】准备环境：将 JBR 设置为默认，并安装好 Temurin
       # =================================================================
@@ -1182,23 +1216,6 @@ jobs:
       # bootstrap EXE. On SRP/AppLocker-managed machines this triggers
       # MSI error 1718 / exit code 1625. Fix = sign both layers.
       # ==============================================================
-
-      - name: Install Inno Setup
-        if: ${{ runner.os == 'Windows' }}
-        shell: pwsh
-        run: |
-          choco install innosetup -y --no-progress
-
-          $candidates = @(
-            "C:\Program Files (x86)\Inno Setup 6\ISCC.exe",
-            "C:\Program Files\Inno Setup 6\ISCC.exe"
-          )
-          $isccPath = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
-          if (-not $isccPath) {
-            Write-Error "ISCC.exe was not found after Inno Setup installation."
-            exit 1
-          }
-          Write-Host "Resolved ISCC: $isccPath"
 
       # ---- Sign the inner MSI on the remote signing server ----
 
