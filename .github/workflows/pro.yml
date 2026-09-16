@@ -1269,6 +1269,8 @@ jobs:
   promote:
     name: Promote Pro desktop release
     runs-on: ubuntu-latest
+    env:
+      JCEF_COMMUNITY_ROOT: ${{ github.workspace }}/chat2db-community-source
     needs:
       - resolve_source
       - release
@@ -1280,6 +1282,14 @@ jobs:
           path: enterprise-source
           ref: ${{ needs.resolve_source.outputs.enterprise_sha }}
           token: ${{ secrets.ACCESS_TOKEN }}
+          persist-credentials: false
+
+      - name: Check out locked Community packaging scripts
+        uses: actions/checkout@v4
+        with:
+          repository: OtterMind/Chat2DB
+          path: chat2db-community-source
+          ref: ${{ needs.resolve_source.outputs.community_sha }}
           persist-credentials: false
 
       - name: Check out CI promotion helpers
