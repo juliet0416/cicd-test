@@ -34,14 +34,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install WiX
-        shell: pwsh
-        run: choco install wixtoolset --version=3.14.1 -y --no-progress
-
       - name: Build unsigned MSI fixture
         shell: pwsh
         run: |
           $wix = Join-Path ${env:ProgramFiles(x86)} 'WiX Toolset v3.14/bin'
+          foreach ($tool in @('candle.exe', 'light.exe')) {
+            if (-not (Test-Path -LiteralPath (Join-Path $wix $tool))) {
+              throw "WiX 3.14 tool is missing from the Windows runner: $tool"
+            }
+          }
           $object = Join-Path $env:RUNNER_TEMP 'signing-smoke.wixobj'
           $msi = Join-Path $env:RUNNER_TEMP 'Chat2DB-Pro-0.0.0.msi'
           & "$wix/candle.exe" -nologo -out $object .github/fixtures/signing-smoke.wxs
