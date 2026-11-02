@@ -14,11 +14,15 @@ replace its own stage output.
 ## Host setup
 
 - Register a native macOS ARM64 runner in this packaging repository, with the
-  custom label `macstudio-signing`. Keep one signing runner instance so hardware
-  certificate operations execute serially.
+  custom label `macstudio-signing`. Keep one signing runner instance so its
+  hardware certificate jobs execute serially.
 - Run the runner service as the macOS account that already has access to the
   hardware token and working signing script.
-- Set the repository variable `WINDOWS_SIGN_SCRIPT` to the existing local script
+- Stage the signing script, JAR, PKCS11 configuration, and certificate chain in a
+  private host directory outside macOS-protected Documents/Desktop folders, such
+  as `~/.local/share/chat2db-windows-signing`. Update the copied script's resource
+  paths. Background runner jobs must not wait for a desktop privacy prompt.
+- Set the repository variable `WINDOWS_SIGN_SCRIPT` to the host-local script
   path. The script must accept `--alg SHA-1 <file>` and `--alg SHA-256 <file>` and
   return a nonzero exit code on failure. Certificate credentials stay on the host.
 - Configure the runner's outbound HTTPS proxy if direct GitHub access is not
