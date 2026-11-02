@@ -1,0 +1,183 @@
+name: Finish Pro Windows installer
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        type: string
+        required: true
+      source_sha:
+        type: string
+        required: true
+      unsigned_msi_artifact:
+        type: string
+        required: true
+      publish_release:
+        type: boolean
+        default: false
+    outputs:
+      artifact_id:
+        description: Verified Windows installer artifact ID
+        value: ${{ jobs.finalize.outputs.artifact_id }}
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  sign_msi:
+    name: Sign MSI
+    uses: ./.github/workflows/sign-windows-artifact.yml
+    with:
+      artifact_name: ${{ inputs.unsigned_msi_artifact }}
+      package_filename: Chat2DB-Pro-${{ inputs.version }}.msi
+
+  wrap_exe:
+    name: Verify MSI and wrap EXE
+    needs: sign_msi
+    runs-on: windows-latest
+    outputs:
+      artifact_name: ${{ steps.artifact.outputs.name }}
+    steps:
+      - name: Check out locked packaging source
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ secrets.REPO_URL }}
+          ref: ${{ inputs.source_sha }}
+          path: source
+          token: ${{ secrets.ACCESS_TOKEN }}
+          persist-credentials: false
+
+      - name: Download signed MSI
+        uses: actions/download-artifact@v4
+        with:
+          artifact-ids: ${{ needs.sign_msi.outputs.artifact_id }}
+          path: source/jpackage/output
+          merge-multiple: true
+
+      - name: Verify signed MSI
+        shell: pwsh
+        env:
+          PACKAGE_VERSION: ${{ inputs.version }}
+        run: |
+          $packagePath = Join-Path $env:GITHUB_WORKSPACE "source/jpackage/output/Chat2DB-Pro-$env:PACKAGE_VERSION.msi"
+          if (-not (Test-Path -LiteralPath $packagePath -PathType Leaf)) {
+            throw "Signed MSI is missing: $packagePath"
+          }
+          $signature = Get-AuthenticodeSignature -LiteralPath $packagePath
+          if ($signature.Status -ne [System.Management.Automation.SignatureStatus]::Valid) {
+            throw "Signed MSI verification failed: $($signature.Status) $($signature.StatusMessage)"
+          }
+          Get-FileHash -LiteralPath $packagePath -Algorithm SHA256
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup -y --no-progress
+
+      - name: Wrap signed MSI with Inno Setup
+        shell: bash
+        env:
+          PACKAGE_VERSION: ${{ inputs.version }}
+        run: bash source/script/package/wrap_win_installer.sh "${PACKAGE_VERSION}" pro
+
+      - name: Name unsigned EXE artifact
+        id: artifact
+        shell: bash
+        run: echo "name=unsigned-pro-exe-${GITHUB_RUN_ID}" >> "${GITHUB_OUTPUT}"
+
+      - name: Upload unsigned EXE
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.artifact.outputs.name }}
+          path: source/jpackage/output/Chat2DB-Pro-${{ inputs.version }}.exe
+          if-no-files-found: error
+          compression-level: 0
+          overwrite: true
+          retention-days: 7
+
+  sign_exe:
+    name: Sign EXE
+    needs: wrap_exe
+    uses: ./.github/workflows/sign-windows-artifact.yml
+    with:
+      artifact_name: ${{ needs.wrap_exe.outputs.artifact_name }}
+      package_filename: Chat2DB-Pro-${{ inputs.version }}.exe
+
+  finalize:
+    name: Verify and deliver Windows installer
+    needs: sign_exe
+    runs-on: windows-latest
+    outputs:
+      artifact_id: ${{ steps.upload.outputs.artifact-id }}
+    steps:
+      - name: Download signed EXE into a fresh directory
+        uses: actions/download-artifact@v4
+        with:
+          artifact-ids: ${{ needs.sign_exe.outputs.artifact_id }}
+          path: ${{ runner.temp }}/signed-pro-exe
+          merge-multiple: true
+
+      - name: Verify signed EXE
+        shell: pwsh
+        env:
+          PACKAGE_VERSION: ${{ inputs.version }}
+        run: |
+          $packagePath = Join-Path $env:RUNNER_TEMP "signed-pro-exe/Chat2DB-Pro-$env:PACKAGE_VERSION.exe"
+          if (-not (Test-Path -LiteralPath $packagePath -PathType Leaf)) {
+            throw "Signed EXE is missing: $packagePath"
+          }
+          $signature = Get-AuthenticodeSignature -LiteralPath $packagePath
+          if ($signature.Status -ne [System.Management.Automation.SignatureStatus]::Valid) {
+            throw "Signed EXE verification failed: $($signature.Status) $($signature.StatusMessage)"
+          }
+          Get-FileHash -LiteralPath $packagePath -Algorithm SHA256
+
+      - name: Keep verified Windows installer
+        id: upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: verified-pro-windows-${{ github.run_id }}
+          path: ${{ runner.temp }}/signed-pro-exe/Chat2DB-Pro-${{ inputs.version }}.exe
+          if-no-files-found: error
+          compression-level: 0
+          overwrite: true
+          retention-days: 7
+
+      - name: Set up OSS client for publication
+        if: inputs.publish_release
+        uses: yizhoumo/setup-ossutil@v1
+        with:
+          endpoint: ${{ secrets.OSS_ENDPOINT }}
+          access-key-id: ${{ secrets.OSS_ACCESS_KEY_ID }}
+          access-key-secret: ${{ secrets.OSS_ACCESS_KEY_SECRET }}
+          ossutil-version: '1.7.16'
+
+      - name: Publish verified Windows installer
+        if: inputs.publish_release
+        shell: bash
+        env:
+          PACKAGE_VERSION: ${{ inputs.version }}
+          BUCKET_NAME: ${{ secrets.BUCKET_NAME }}
+        run: |
+          set -euo pipefail
+          package="Chat2DB-Pro-${PACKAGE_VERSION}.exe"
+          ossutil cp -f "$(cygpath -u "${RUNNER_TEMP}")/signed-pro-exe/${package}" \
+            "oss://${BUCKET_NAME}/download/${PACKAGE_VERSION}/${package}"
+
+      - name: Notify Windows package publication
+        if: inputs.publish_release
+        shell: python
+        env:
+          FEISHU_WEBHOOK_URL: ${{ secrets.FEISHU_RELEASE_NOTIFY_WEBHOOK }}
+          PACKAGE_VERSION: ${{ inputs.version }}
+        run: |
+          import json, os, urllib.request
+          url = os.environ.get("FEISHU_WEBHOOK_URL")
+          if url:
+              version = os.environ["PACKAGE_VERSION"]
+              text = f"Chat2DB Pro Windows x64 {version} 上传成功\nhttps://cdn.chat2db-ai.com/download/{version}/Chat2DB-Pro-{version}.exe"
+              request = urllib.request.Request(url, data=json.dumps({"msg_type": "text", "content": {"text": text}}).encode(), headers={"Content-Type": "application/json"})
+              try:
+                  urllib.request.urlopen(request, timeout=15).close()
+              except Exception as exc:
+                  print(f"::warning::Feishu package notification failed: {exc}")

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Product Id="*" Name="Chat2DB signing smoke test" Language="1033"
+           Version="0.0.0" Manufacturer="Chat2DB"
+           UpgradeCode="1AB39A9C-244B-4789-B748-173296BEDDB3">
+    <Package InstallerVersion="200" Compressed="yes" InstallScope="perUser" />
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="LocalAppDataFolder">
+        <Directory Id="INSTALLFOLDER" Name="Chat2DBSigningSmoke">
+          <Component Id="SmokeComponent" Guid="CE367BC8-49CC-4F35-9079-1842893867FC">
+            <RegistryValue Root="HKCU" Key="Software\Chat2DB\SigningSmoke"
+                           Name="Probe" Type="integer" Value="1" KeyPath="yes" />
+          </Component>
+        </Directory>
+      </Directory>
+    </Directory>
+    <Feature Id="Main" Level="1">
+      <ComponentRef Id="SmokeComponent" />
+    </Feature>
+  </Product>
+</Wix>
