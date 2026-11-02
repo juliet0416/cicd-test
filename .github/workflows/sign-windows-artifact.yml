@@ -1,0 +1,91 @@
+name: Sign Windows artifact on Mac Studio
+
+on:
+  workflow_call:
+    inputs:
+      artifact_name:
+        type: string
+        required: true
+      package_filename:
+        type: string
+        required: true
+    outputs:
+      artifact_id:
+        description: Signed artifact ID
+        value: ${{ jobs.sign.outputs.artifact_id }}
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  sign:
+    name: Sign on Mac Studio
+    if: >-
+      github.repository == 'juliet0416/cicd-test' &&
+      (github.event_name == 'workflow_dispatch' || github.event_name == 'push')
+    runs-on: [self-hosted, macOS, ARM64, macstudio-signing]
+    timeout-minutes: 30
+    outputs:
+      artifact_id: ${{ steps.upload.outputs.artifact-id }}
+    steps:
+      - name: Create isolated signing workspace
+        id: workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          work_dir=$(mktemp -d "${RUNNER_TEMP}/windows-sign.XXXXXX")
+          mkdir "${work_dir}/input" "${work_dir}/output"
+          echo "path=${work_dir}" >> "${GITHUB_OUTPUT}"
+
+      - name: Download unsigned package
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: ${{ inputs.artifact_name }}
+          path: ${{ steps.workspace.outputs.path }}/input
+
+      - name: Sign with the local hardware certificate
+        shell: bash
+        timeout-minutes: 10
+        env:
+          WORK_DIR: ${{ steps.workspace.outputs.path }}
+          PACKAGE_FILENAME: ${{ inputs.package_filename }}
+          WINDOWS_SIGN_SCRIPT: ${{ vars.WINDOWS_SIGN_SCRIPT }}
+        run: |
+          set -euo pipefail
+          if [[ ! "${PACKAGE_FILENAME}" =~ ^[A-Za-z0-9][A-Za-z0-9._\ -]*\.(msi|exe)$ ]]; then
+            echo "::error::Expected a plain MSI or EXE filename"
+            exit 1
+          fi
+          test -n "${WINDOWS_SIGN_SCRIPT}"
+          test -x "${WINDOWS_SIGN_SCRIPT}"
+          input="${WORK_DIR}/input/${PACKAGE_FILENAME}"
+          test -f "${input}" && test -s "${input}" && test ! -L "${input}"
+          test "$(find "${WORK_DIR}/input" -type f | wc -l | tr -d ' ')" = 1
+          output="${WORK_DIR}/output/${PACKAGE_FILENAME}"
+          cp "${input}" "${output}"
+          "${WINDOWS_SIGN_SCRIPT}" --alg SHA-1 "${output}"
+          "${WINDOWS_SIGN_SCRIPT}" --alg SHA-256 "${output}"
+          test -s "${output}"
+          shasum -a 256 "${output}"
+
+      - name: Upload signed package
+        id: upload
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: signed-${{ inputs.artifact_name }}
+          path: ${{ steps.workspace.outputs.path }}/output/${{ inputs.package_filename }}
+          if-no-files-found: error
+          compression-level: 0
+          overwrite: true
+          retention-days: 7
+
+      - name: Remove signing workspace
+        if: always()
+        shell: bash
+        env:
+          WORK_DIR: ${{ steps.workspace.outputs.path }}
+        run: |
+          if [ -n "${WORK_DIR}" ]; then
+            rm -rf "${WORK_DIR}"
+          fi

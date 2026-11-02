@@ -1,0 +1,74 @@
+name: Pro Windows signing trial
+
+on:
+  push:
+    branches: [trial/pro-macstudio-signing]
+    paths:
+      - .github/workflows/pro-signing-trial.yml
+      - .github/workflows/pro-windows-installer.yml
+      - .github/workflows/sign-windows-artifact.yml
+      - .github/workflows/pro.yml
+      - .github/fixtures/signing-smoke.wxs
+      - .github/scripts/tests/local-windows-signing-test.py
+      - .github/scripts/tests/remote-signing-workflow-test.py
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  validate:
+    name: Validate signing workflow contracts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          python3 .github/scripts/tests/remote-signing-workflow-test.py
+          python3 .github/scripts/tests/local-windows-signing-test.py
+
+  fixture:
+    name: Build unsigned test MSI
+    needs: validate
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install WiX
+        shell: pwsh
+        run: choco install wixtoolset --version=3.14.1 -y --no-progress
+
+      - name: Build unsigned MSI fixture
+        shell: pwsh
+        run: |
+          $wix = Join-Path ${env:ProgramFiles(x86)} 'WiX Toolset v3.14/bin'
+          $object = Join-Path $env:RUNNER_TEMP 'signing-smoke.wixobj'
+          $msi = Join-Path $env:RUNNER_TEMP 'Chat2DB-Pro-0.0.0.msi'
+          & "$wix/candle.exe" -nologo -out $object .github/fixtures/signing-smoke.wxs
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot compile MSI fixture' }
+          & "$wix/light.exe" -nologo -sval -out $msi $object
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot link MSI fixture' }
+          if ((Get-AuthenticodeSignature -LiteralPath $msi).Status -ne 'NotSigned') {
+            throw 'Smoke test input must be unsigned'
+          }
+
+      - name: Upload unsigned MSI
+        uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-pro-msi-${{ github.run_id }}
+          path: ${{ runner.temp }}/Chat2DB-Pro-0.0.0.msi
+          if-no-files-found: error
+          compression-level: 0
+          overwrite: true
+          retention-days: 7
+
+  signing:
+    name: Exercise the Pro signing pipeline
+    needs: fixture
+    uses: ./.github/workflows/pro-windows-installer.yml
+    with:
+      version: 0.0.0
+      source_sha: 645a8f693756c213457f74fe43a9306504a579df
+      unsigned_msi_artifact: unsigned-pro-msi-${{ github.run_id }}
+      publish_release: false
+    secrets: inherit
