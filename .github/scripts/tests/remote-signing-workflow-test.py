@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
+"""Guard the release/signing boundary shared by the Pro and Local workflows."""
 
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[3]
-WORKFLOWS = (
-    ROOT / ".github/workflows/local.yml",
-)
 
 
 def require(condition: bool, message: str) -> None:
@@ -14,40 +12,32 @@ def require(condition: bool, message: str) -> None:
         raise AssertionError(message)
 
 
-require(
-    not (ROOT / ".github/scripts/invoke-winscp-with-retry.ps1").exists(),
-    "remote signing must not use the retired whole-operation retry helper",
-)
-
-for workflow in WORKFLOWS:
+for product in ("pro", "local"):
+    workflow = ROOT / f".github/workflows/{product}.yml"
     source = workflow.read_text(encoding="utf-8")
-    require("SuccessProbe" not in source, f"{workflow.name} must not use an ambient exit-code probe")
-    require("invoke-winscp-with-retry" not in source, f"{workflow.name} must not retry the full signing flow")
-    require(source.count('"/log=winscp-msi.log"') == 1, f"{workflow.name} must invoke MSI signing once")
-    require(source.count('"/log=winscp-exe.log"') == 1, f"{workflow.name} must invoke EXE signing once")
-    require(source.count("Get-AuthenticodeSignature") == 2,
-            f"{workflow.name} must validate both signed MSI and EXE artifacts")
-    require(source.count("signedDownloadDirectory") == 4,
-            f"{workflow.name} must download the signed EXE away from the existing unsigned package path")
-    require(source.count("Copy-Item -LiteralPath $signedPackagePath -Destination $packagePath -Force") == 1,
-            f"{workflow.name} must replace the unsigned EXE only after signature validation")
-    require(source.count("${{ github.run_id }}-${{ github.run_attempt }}") >= 8,
-            f"{workflow.name} signing paths must be isolated by run and attempt")
-    require(source.count("will be validated independently") == 2,
-            f"{workflow.name} must defer WinSCP exit-code decisions to artifact validation")
+    require("WinSCP" not in source and "WIN_SERVER_IP" not in source,
+            f"{product} signing must not require an inbound SSH connection")
+    require("uses: ./.github/workflows/windows-installer.yml" in source,
+            f"{product} must use the shared Windows signing pipeline")
+    require("needs: [resolve_source, release]" in source,
+            f"{product} Windows finishing must wait for locked source and unsigned build")
+    require(f"unsigned-{product}-msi-${{{{ github.run_id }}}}" in source,
+            f"{product} must keep unsigned MSI artifacts separate")
+    promote = source.split("  promote:\n", 1)[1].split("  notify_summary:\n", 1)[0]
+    require("      - windows_release\n" in promote,
+            f"{product} promotion must wait for verified Windows signatures")
+    require("if: inputs.publish_release" in promote,
+            f"{product} build-only trials must not promote update pointers")
+    require("if: ${{ always() && inputs.publish_release }}" in source,
+            f"{product} build-only trials must not send release summaries")
 
-pro = (ROOT / ".github/workflows/pro.yml").read_text(encoding="utf-8")
-installer = (ROOT / ".github/workflows/pro-windows-installer.yml").read_text(encoding="utf-8")
+local = (ROOT / ".github/workflows/local.yml").read_text(encoding="utf-8")
+require("      edition: Local\n" in local,
+        "Local must select its own Windows product instead of the Pro default")
+installer = (ROOT / ".github/workflows/windows-installer.yml").read_text(encoding="utf-8")
 signer = (ROOT / ".github/workflows/sign-windows-artifact.yml").read_text(encoding="utf-8")
-require("WinSCP" not in pro and "WIN_SERVER_IP" not in pro,
-        "Pro signing must not require an inbound SSH connection")
-require("needs: [resolve_source, release]" in pro,
-        "Windows finishing must wait for the locked source and unsigned build")
-promote = pro.split("  promote:\n", 1)[1].split("  notify_summary:\n", 1)[0]
-require("      - windows_release\n" in promote,
-        "promotion must wait for verified Windows signatures")
-require("if: inputs.publish_release" in promote,
-        "build-only trials must not promote update pointers")
+require("        default: Pro\n" in installer,
+        "Existing Pro callers must retain their default product")
 require("    needs: sign_msi\n" in installer and "    needs: wrap_exe\n" in installer
         and "    needs: sign_exe\n" in installer,
         "MSI signing, wrapping, EXE signing, and final verification must run in order")

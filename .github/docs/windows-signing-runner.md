@@ -1,7 +1,7 @@
-# Pro Windows signing on Mac Studio
+# Pro and Local Windows signing on Mac Studio
 
-Pro builds an unsigned MSI on a GitHub-hosted Windows runner. The reusable
-`pro-windows-installer.yml` workflow then signs the MSI on the native macOS
+Pro and Local build unsigned MSI packages on GitHub-hosted Windows runners. The
+reusable `windows-installer.yml` workflow then signs the MSI on the native macOS
 runner, verifies it on Windows, wraps it with the locked product source's Inno
 Setup script, signs the EXE on macOS, and verifies the EXE on Windows.
 
@@ -39,14 +39,18 @@ Runner labels are routing labels, not an authorization boundary.
 
 ## Trial
 
-`pro-signing-trial.yml` runs on the trial branch. It creates an unsigned test MSI,
-executes the same MSI/sign/wrap/EXE/sign/verify chain as Pro, and retains the
-verified EXE as an artifact. It neither installs the MSI nor publishes packages,
-sends release notifications, or changes update pointers.
+`windows-signing-trial.yml` runs on the trial branch. Its Pro/Local matrix creates
+unsigned test MSI packages, executes the same MSI/sign/wrap/EXE/sign/verify chain
+as each product, and retains the verified EXEs as artifacts. It neither installs
+the MSI nor publishes packages, sends release notifications, or changes update
+pointers.
 
-For a complete Pro build without publication, set `publish_release=false` on
-`pro.yml`. This also suppresses native-package uploads and release notifications.
+For a complete build without publication, set `publish_release=false` on
+`pro.yml` or `local.yml`. This also suppresses native-package uploads and release
+notifications.
 Production dispatches retain `publish_release=true`. Promotion waits for both the
 platform build matrix and the verified Windows installer workflow.
 
-Local retains its existing signing flow until separately migrated.
+The shared installer workflow defaults to `edition: Pro` for existing callers.
+Local selects `edition: Local`, uses its own artifact names and packaging mode,
+and publishes verified EXEs under `offline/`; Pro retains `download/`.

@@ -1,8 +1,12 @@
-name: Finish Pro Windows installer
+name: Finish Windows installer
 
 on:
   workflow_call:
     inputs:
+      edition:
+        description: Windows product edition (Pro or Local)
+        type: string
+        default: Pro
       version:
         type: string
         required: true
@@ -30,12 +34,16 @@ jobs:
     uses: ./.github/workflows/sign-windows-artifact.yml
     with:
       artifact_name: ${{ inputs.unsigned_msi_artifact }}
-      package_filename: Chat2DB-Pro-${{ inputs.version }}.msi
+      package_filename: Chat2DB-${{ inputs.edition }}-${{ inputs.version }}.msi
 
   wrap_exe:
     name: Verify MSI and wrap EXE
     needs: sign_msi
     runs-on: windows-latest
+    env:
+      PACKAGE_EDITION: ${{ inputs.edition }}
+      PACKAGE_VERSION: ${{ inputs.version }}
+      PRODUCT_SLUG: ${{ inputs.edition == 'Local' && 'local' || 'pro' }}
     outputs:
       artifact_name: ${{ steps.artifact.outputs.name }}
     steps:
@@ -57,10 +65,11 @@ jobs:
 
       - name: Verify signed MSI
         shell: pwsh
-        env:
-          PACKAGE_VERSION: ${{ inputs.version }}
         run: |
-          $packagePath = Join-Path $env:GITHUB_WORKSPACE "source/jpackage/output/Chat2DB-Pro-$env:PACKAGE_VERSION.msi"
+          if ($env:PACKAGE_EDITION -notin @('Pro', 'Local')) {
+            throw "Unsupported Windows edition: $env:PACKAGE_EDITION"
+          }
+          $packagePath = Join-Path $env:GITHUB_WORKSPACE "source/jpackage/output/Chat2DB-$env:PACKAGE_EDITION-$env:PACKAGE_VERSION.msi"
           if (-not (Test-Path -LiteralPath $packagePath -PathType Leaf)) {
             throw "Signed MSI is missing: $packagePath"
           }
@@ -76,20 +85,18 @@ jobs:
 
       - name: Wrap signed MSI with Inno Setup
         shell: bash
-        env:
-          PACKAGE_VERSION: ${{ inputs.version }}
-        run: bash source/script/package/wrap_win_installer.sh "${PACKAGE_VERSION}" pro
+        run: bash source/script/package/wrap_win_installer.sh "${PACKAGE_VERSION}" "${PRODUCT_SLUG}"
 
       - name: Name unsigned EXE artifact
         id: artifact
         shell: bash
-        run: echo "name=unsigned-pro-exe-${GITHUB_RUN_ID}" >> "${GITHUB_OUTPUT}"
+        run: echo "name=unsigned-${PRODUCT_SLUG}-exe-${GITHUB_RUN_ID}" >> "${GITHUB_OUTPUT}"
 
       - name: Upload unsigned EXE
         uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.artifact.outputs.name }}
-          path: source/jpackage/output/Chat2DB-Pro-${{ inputs.version }}.exe
+          path: source/jpackage/output/Chat2DB-${{ inputs.edition }}-${{ inputs.version }}.exe
           if-no-files-found: error
           compression-level: 0
           overwrite: true
@@ -101,12 +108,17 @@ jobs:
     uses: ./.github/workflows/sign-windows-artifact.yml
     with:
       artifact_name: ${{ needs.wrap_exe.outputs.artifact_name }}
-      package_filename: Chat2DB-Pro-${{ inputs.version }}.exe
+      package_filename: Chat2DB-${{ inputs.edition }}-${{ inputs.version }}.exe
 
   finalize:
     name: Verify and deliver Windows installer
     needs: sign_exe
     runs-on: windows-latest
+    env:
+      PACKAGE_EDITION: ${{ inputs.edition }}
+      PACKAGE_VERSION: ${{ inputs.version }}
+      PRODUCT_SLUG: ${{ inputs.edition == 'Local' && 'local' || 'pro' }}
+      RELEASE_ROOT: ${{ inputs.edition == 'Local' && 'offline' || 'download' }}
     outputs:
       artifact_id: ${{ steps.upload.outputs.artifact-id }}
     steps:
@@ -114,15 +126,13 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           artifact-ids: ${{ needs.sign_exe.outputs.artifact_id }}
-          path: ${{ runner.temp }}/signed-pro-exe
+          path: ${{ runner.temp }}/signed-${{ env.PRODUCT_SLUG }}-exe
           merge-multiple: true
 
       - name: Verify signed EXE
         shell: pwsh
-        env:
-          PACKAGE_VERSION: ${{ inputs.version }}
         run: |
-          $packagePath = Join-Path $env:RUNNER_TEMP "signed-pro-exe/Chat2DB-Pro-$env:PACKAGE_VERSION.exe"
+          $packagePath = Join-Path $env:RUNNER_TEMP "signed-$env:PRODUCT_SLUG-exe/Chat2DB-$env:PACKAGE_EDITION-$env:PACKAGE_VERSION.exe"
           if (-not (Test-Path -LiteralPath $packagePath -PathType Leaf)) {
             throw "Signed EXE is missing: $packagePath"
           }
@@ -136,8 +146,8 @@ jobs:
         id: upload
         uses: actions/upload-artifact@v4
         with:
-          name: verified-pro-windows-${{ github.run_id }}
-          path: ${{ runner.temp }}/signed-pro-exe/Chat2DB-Pro-${{ inputs.version }}.exe
+          name: verified-${{ env.PRODUCT_SLUG }}-windows-${{ github.run_id }}
+          path: ${{ runner.temp }}/signed-${{ env.PRODUCT_SLUG }}-exe/Chat2DB-${{ inputs.edition }}-${{ inputs.version }}.exe
           if-no-files-found: error
           compression-level: 0
           overwrite: true
@@ -156,26 +166,26 @@ jobs:
         if: inputs.publish_release
         shell: bash
         env:
-          PACKAGE_VERSION: ${{ inputs.version }}
           BUCKET_NAME: ${{ secrets.BUCKET_NAME }}
         run: |
           set -euo pipefail
-          package="Chat2DB-Pro-${PACKAGE_VERSION}.exe"
-          ossutil cp -f "$(cygpath -u "${RUNNER_TEMP}")/signed-pro-exe/${package}" \
-            "oss://${BUCKET_NAME}/download/${PACKAGE_VERSION}/${package}"
+          package="Chat2DB-${PACKAGE_EDITION}-${PACKAGE_VERSION}.exe"
+          ossutil cp -f "$(cygpath -u "${RUNNER_TEMP}")/signed-${PRODUCT_SLUG}-exe/${package}" \
+            "oss://${BUCKET_NAME}/${RELEASE_ROOT}/${PACKAGE_VERSION}/${package}"
 
       - name: Notify Windows package publication
         if: inputs.publish_release
         shell: python
         env:
           FEISHU_WEBHOOK_URL: ${{ secrets.FEISHU_RELEASE_NOTIFY_WEBHOOK }}
-          PACKAGE_VERSION: ${{ inputs.version }}
         run: |
           import json, os, urllib.request
           url = os.environ.get("FEISHU_WEBHOOK_URL")
           if url:
               version = os.environ["PACKAGE_VERSION"]
-              text = f"Chat2DB Pro Windows x64 {version} 上传成功\nhttps://cdn.chat2db-ai.com/download/{version}/Chat2DB-Pro-{version}.exe"
+              edition = os.environ["PACKAGE_EDITION"]
+              root = os.environ["RELEASE_ROOT"]
+              text = f"Chat2DB {edition} Windows x64 {version} 上传成功\nhttps://cdn.chat2db-ai.com/{root}/{version}/Chat2DB-{edition}-{version}.exe"
               request = urllib.request.Request(url, data=json.dumps({"msg_type": "text", "content": {"text": text}}).encode(), headers={"Content-Type": "application/json"})
               try:
                   urllib.request.urlopen(request, timeout=15).close()
