@@ -1050,7 +1050,7 @@ jobs:
   windows_release:
     name: Finish Windows installer
     needs: [resolve_source, release]
-    uses: ./.github/workflows/pro-windows-installer.yml
+    uses: ./.github/workflows/windows-installer.yml
     with:
       version: ${{ inputs.version }}
       source_sha: ${{ needs.resolve_source.outputs.enterprise_sha }}

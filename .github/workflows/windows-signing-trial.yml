@@ -1,13 +1,14 @@
-name: Pro Windows signing trial
+name: Windows signing trial
 
 on:
   push:
-    branches: [trial/pro-macstudio-signing]
+    branches: [trial/local-macstudio-signing]
     paths:
-      - .github/workflows/pro-signing-trial.yml
-      - .github/workflows/pro-windows-installer.yml
+      - .github/workflows/windows-signing-trial.yml
+      - .github/workflows/windows-installer.yml
       - .github/workflows/sign-windows-artifact.yml
       - .github/workflows/pro.yml
+      - .github/workflows/local.yml
       - .github/fixtures/signing-smoke.wxs
       - .github/scripts/tests/local-windows-signing-test.py
       - .github/scripts/tests/remote-signing-workflow-test.py
@@ -28,9 +29,16 @@ jobs:
           python3 .github/scripts/tests/local-windows-signing-test.py
 
   fixture:
-    name: Build unsigned test MSI
+    name: Build unsigned ${{ matrix.edition }} test MSI
     needs: validate
     runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        edition: [Pro, Local]
+    env:
+      PACKAGE_EDITION: ${{ matrix.edition }}
+      PRODUCT_SLUG: ${{ matrix.edition == 'Local' && 'local' || 'pro' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -44,7 +52,7 @@ jobs:
             }
           }
           $object = Join-Path $env:RUNNER_TEMP 'signing-smoke.wixobj'
-          $msi = Join-Path $env:RUNNER_TEMP 'Chat2DB-Pro-0.0.0.msi'
+          $msi = Join-Path $env:RUNNER_TEMP "Chat2DB-$env:PACKAGE_EDITION-0.0.0.msi"
           & "$wix/candle.exe" -nologo -out $object .github/fixtures/signing-smoke.wxs
           if ($LASTEXITCODE -ne 0) { throw 'Cannot compile MSI fixture' }
           & "$wix/light.exe" -nologo -sval -out $msi $object
@@ -56,20 +64,25 @@ jobs:
       - name: Upload unsigned MSI
         uses: actions/upload-artifact@v4
         with:
-          name: unsigned-pro-msi-${{ github.run_id }}
-          path: ${{ runner.temp }}/Chat2DB-Pro-0.0.0.msi
+          name: unsigned-${{ env.PRODUCT_SLUG }}-msi-${{ github.run_id }}
+          path: ${{ runner.temp }}/Chat2DB-${{ matrix.edition }}-0.0.0.msi
           if-no-files-found: error
           compression-level: 0
           overwrite: true
           retention-days: 7
 
   signing:
-    name: Exercise the Pro signing pipeline
+    name: Exercise ${{ matrix.edition }} signing pipeline
     needs: fixture
-    uses: ./.github/workflows/pro-windows-installer.yml
+    strategy:
+      fail-fast: false
+      matrix:
+        edition: [Pro, Local]
+    uses: ./.github/workflows/windows-installer.yml
     with:
+      edition: ${{ matrix.edition }}
       version: 0.0.0
       source_sha: 645a8f693756c213457f74fe43a9306504a579df
-      unsigned_msi_artifact: unsigned-pro-msi-${{ github.run_id }}
+      unsigned_msi_artifact: unsigned-${{ matrix.edition == 'Local' && 'local' || 'pro' }}-msi-${{ github.run_id }}
       publish_release: false
     secrets: inherit
