@@ -14,8 +14,8 @@ replace its own stage output.
 ## Host setup
 
 - Register a native macOS ARM64 runner in this packaging repository, with the
-  custom label `macstudio-signing`. Keep one signing runner instance so its
-  hardware certificate jobs execute serially.
+  custom label `macstudio-signing`. Use a separate runner installation and work
+  directory for each repository sharing the host.
 - Run the runner service as the macOS account that already has access to the
   hardware token and working signing script.
 - Stage the signing script, JAR, PKCS11 configuration, and certificate chain in a
@@ -25,6 +25,14 @@ replace its own stage output.
 - Set the repository variable `WINDOWS_SIGN_SCRIPT` to the host-local script
   path. The script must accept `--alg SHA-1 <file>` and `--alg SHA-256 <file>` and
   return a nonzero exit code on failure. Certificate credentials stay on the host.
+- When repositories share one hardware token, rename the existing local signer
+  to `jsign-impl.sh` and install `.github/scripts/windows-signing-lock.sh` beside
+  it as `jsign.sh`. Both scripts must be executable. Keep `WINDOWS_SIGN_SCRIPT`
+  pointing to this shared `jsign.sh` entry point in every repository. It uses
+  macOS `lockf -k -t 600` to serialize individual signing calls, forwards all
+  arguments, and returns the signer's exit status. The persistent `token.lock`
+  file must not be deleted while runners are using it. Signing steps include
+  the possible lock wait in their timeout budget.
 - Configure the runner's outbound HTTPS proxy if direct GitHub access is not
   available. Verify access to GitHub APIs and workflow artifact storage, not just
   the GitHub website.
