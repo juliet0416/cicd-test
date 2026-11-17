@@ -25,7 +25,7 @@ jobs:
       github.repository == 'juliet0416/cicd-test' &&
       (github.event_name == 'workflow_dispatch' || github.event_name == 'push')
     runs-on: [self-hosted, macOS, ARM64, macstudio-signing]
-    timeout-minutes: 30
+    timeout-minutes: 40
     outputs:
       artifact_id: ${{ steps.upload.outputs.artifact-id }}
     steps:
@@ -46,7 +46,7 @@ jobs:
 
       - name: Sign with the local hardware certificate
         shell: bash
-        timeout-minutes: 10
+        timeout-minutes: 30
         env:
           WORK_DIR: ${{ steps.workspace.outputs.path }}
           PACKAGE_FILENAME: ${{ inputs.package_filename }}
